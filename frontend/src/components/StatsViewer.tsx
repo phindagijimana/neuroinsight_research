@@ -3,7 +3,7 @@
  * Display job statistics in CSV/table format
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import BarChart from './icons/BarChart';
 import Download from './icons/Download';
 import Activity from './icons/Activity';
@@ -166,8 +166,8 @@ export const StatsViewer: React.FC<StatsViewerProps> = ({ jobId, pipelineName })
                 {headers.map((header, colIdx) => (
                   <td key={colIdx} className="px-4 py-2 text-gray-900">
                     {typeof row[header] === 'number' && !header.includes('volume')
-                      ? parseFloat(row[header] as string).toFixed(3)
-                      : row[header].toLocaleString()}
+                      ? Number(row[header]).toFixed(3)
+                      : String(row[header]).toLocaleString()}
                   </td>
                 ))}
               </tr>

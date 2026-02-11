@@ -13,7 +13,7 @@ import { apiService } from '../services/api';
 import type { DirectoryInfo } from '../types';
 
 interface DirectorySelectorProps {
-  mode: 'local' | 'hpc';
+  mode: 'local' | 'remote' | 'hpc';
   onSubmit: (inputDir: string, outputDir: string, files: string[]) => void;
   onCancel?: () => void;
 }
@@ -74,7 +74,7 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-lg font-medium text-gray-900">
-              {mode === 'local' ? 'Local' : 'HPC'} Directory Selection
+              {mode === 'local' ? 'Local' : mode === 'remote' ? 'Remote Server' : 'HPC'} Directory Selection
             </h3>
             <p className="mt-1 text-sm text-gray-500">
               Select directories for batch processing. Data stays in place.

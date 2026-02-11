@@ -3,8 +3,8 @@
  * Full PACS-like NIfTI viewer with multi-plane views and segmentation overlays
  */
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Niivue, NVImage } from '@niivue/niivue';
+import { useEffect, useRef, useState } from 'react';
+import { Niivue } from '@niivue/niivue';
 
 interface NiivueViewerProps {
   imageUrl?: string;
@@ -39,7 +39,7 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
       colorbarHeight: 0.05,
       crosshairWidth: 1,
       isRadiologicalConvention: false,
-      logging: false,
+      logLevel: 'error' as never, // suppress verbose console output
       dragMode: 1, // 1 = pan, 2 = measure
       isColorbar: true,
       isOrientCube: true,
@@ -50,7 +50,7 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
       isAntiAlias: true,
       limitFrames4D: NaN,
       isHighResolutionCapable: true,
-    });
+    } as ConstructorParameters<typeof Niivue>[0]);
 
     nv.attachToCanvas(canvasRef.current);
     nv.setSliceType(sliceType);
@@ -70,14 +70,14 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
     const loadImages = async () => {
       setIsLoading(true);
       try {
-        const volumeList: NVImage[] = [];
-        
-        // Load main volume
-        volumeList.push({
-          url: imageUrl,
-          colormap: colormap,
-          opacity: 1.0,
-        });
+        // Build volume descriptors for Niivue.loadVolumes()
+        const volumeList: Array<{ url: string; colormap?: string; opacity?: number }> = [
+          {
+            url: imageUrl,
+            colormap: colormap,
+            opacity: 1.0,
+          },
+        ];
 
         // Load segmentation if provided
         if (segmentationUrl) {
@@ -88,7 +88,7 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
           });
         }
 
-        await nvRef.current!.loadVolumes(volumeList);
+        await (nvRef.current as Niivue).loadVolumes(volumeList as never);
         
         if (onLoad) onLoad();
       } catch (error) {

@@ -11,7 +11,7 @@ import { Cpu, HardDrive, Clock, Zap, Layers, Settings2, AlertTriangle, ChevronDo
 import type { SystemResources, ResourceProfile, ParallelizationInfo } from '../types';
 import { apiService } from '../services/api';
 
-/* ─── Types ──────────────────────────────────────────────────────────────── */
+/* --- Types ---------------------------------------------------------------- */
 
 export interface ResourceConfig {
   memory_gb: number;
@@ -39,24 +39,24 @@ interface PluginResources {
 
 interface ResourceSelectorProps {
   plugin: PluginResources | null;
-  backendType: 'local' | 'hpc';
+  backendType: 'local' | 'remote' | 'hpc';
   onResourcesChange: (resources: ResourceConfig) => void;
 }
 
-/* ─── Helpers ────────────────────────────────────────────────────────────── */
+/* --- Helpers -------------------------------------------------------------- */
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const profileLabel = (name: string) =>
   name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-/* ─── Component ──────────────────────────────────────────────────────────── */
+/* --- Component ------------------------------------------------------------ */
 
 export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
   plugin,
   backendType,
   onResourcesChange,
 }) => {
-  /* ── State ─────────────────────────────────────────────────────────────── */
+  /* -- State --------------------------------------------------------------- */
   const [systemRes, setSystemRes] = useState<SystemResources | null>(null);
   const [activeProfile, setActiveProfile] = useState<string>('default');
   const [useCustom, setUseCustom] = useState(false);
@@ -66,14 +66,14 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
     threads: 4, omp_nthreads: 4, parallel: true,
   });
 
-  /* ── Fetch system resources once ───────────────────────────────────────── */
+  /* -- Fetch system resources once ----------------------------------------- */
   useEffect(() => {
     apiService.getSystemResources()
       .then(setSystemRes)
       .catch(() => setSystemRes(null));
   }, []);
 
-  /* ── Derived limits ────────────────────────────────────────────────────── */
+  /* -- Derived limits ------------------------------------------------------ */
   const limits = useMemo(() => ({
     maxCpus:   systemRes?.limits.max_cpus      ?? 32,
     maxMemGb:  systemRes?.limits.max_memory_gb ?? 128,
@@ -81,12 +81,12 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
     gpuCount:  systemRes?.limits.gpu_count     ?? 0,
   }), [systemRes]);
 
-  /* ── Profiles ──────────────────────────────────────────────────────────── */
+  /* -- Profiles ------------------------------------------------------------ */
   const profiles = plugin?.resource_profiles ?? {};
   const profileNames = Object.keys(profiles);
   const para = plugin?.parallelization;
 
-  /* ── Build ResourceConfig from a profile ───────────────────────────────── */
+  /* -- Build ResourceConfig from a profile --------------------------------- */
   const configFromProfile = (prof: ResourceProfile): ResourceConfig => {
     const cpus = clamp(prof.cpus, 1, limits.maxCpus);
     return {
@@ -100,7 +100,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
     };
   };
 
-  /* ── Initialise from plugin defaults ───────────────────────────────────── */
+  /* -- Initialise from plugin defaults ------------------------------------- */
   useEffect(() => {
     if (!plugin) return;
     const prof = profiles[activeProfile] ?? profiles['default'];
@@ -126,7 +126,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
     }
   }, [plugin, activeProfile, limits.maxCpus, limits.maxMemGb, limits.gpuAvail]);
 
-  /* ── Updater ───────────────────────────────────────────────────────────── */
+  /* -- Updater ------------------------------------------------------------- */
   const update = (key: keyof ResourceConfig, value: any) => {
     setResources((prev) => {
       const next = { ...prev, [key]: value };
@@ -154,14 +154,14 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
 
   if (!plugin) return null;
 
-  /* ── Warning flags ─────────────────────────────────────────────────────── */
+  /* -- Warning flags ------------------------------------------------------- */
   const overCpu = resources.cpus > limits.maxCpus;
   const overMem = resources.memory_gb > limits.maxMemGb;
   const gpuNeededButMissing = resources.gpu && !limits.gpuAvail;
 
-  /* ─────────────────────────────────────────────────────────────────────── */
+  /* ----------------------------------------------------------------------- */
   /*  RENDER                                                                 */
-  /* ─────────────────────────────────────────────────────────────────────── */
+  /* ----------------------------------------------------------------------- */
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 h-full flex flex-col gap-4">
       {/* Header + customize toggle */}
@@ -199,7 +199,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
         </div>
       )}
 
-      {/* ── Profile selector (only if multiple profiles) ──────────────── */}
+      {/* -- Profile selector (only if multiple profiles) ---------------- */}
       {profileNames.length > 1 && (
         <div>
           <label className="text-[11px] font-medium text-gray-500 mb-1 block">
@@ -226,7 +226,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
         </div>
       )}
 
-      {/* ── Read-only mode ────────────────────────────────────────────── */}
+      {/* -- Read-only mode ---------------------------------------------- */}
       {!useCustom ? (
         <div className="space-y-2">
           <Row icon={<HardDrive />} label="Memory"    value={`${resources.memory_gb} GB`} />
@@ -241,7 +241,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
           </p>
         </div>
       ) : (
-        /* ── Editable mode ──────────────────────────────────────────── */
+        /* -- Editable mode -------------------------------------------- */
         <div className="space-y-3">
           {/* Memory */}
           <SliderField
@@ -306,7 +306,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
             </p>
           )}
 
-          {/* ── Advanced: Parallelization ───────────────────────────── */}
+          {/* -- Advanced: Parallelization ----------------------------- */}
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
             className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 pt-1"
@@ -416,9 +416,9 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
   );
 };
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ===========================================================================
    Sub-components
-   ═══════════════════════════════════════════════════════════════════════════ */
+   =========================================================================== */
 
 /** Read-only resource row */
 const Row: React.FC<{

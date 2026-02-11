@@ -3,7 +3,7 @@
  * PACS-like viewer for NIfTI brain imaging with colored segmentation
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
 import { getMockJobs } from '../data/mockJobs';
 import type { Job } from '../types';
@@ -36,7 +36,7 @@ const ViewerPage: React.FC<ViewerPageProps> = ({ selectedJobId, setSelectedJobId
   const [useMockData, setUseMockData] = useState(true);
   const [imageUrl, setImageUrl] = useState<string>(SAMPLE_DATA.mri);
   const [segmentationUrl, setSegmentationUrl] = useState<string>(SAMPLE_DATA.segmentation);
-  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  const [, setSelectedFilePath] = useState<string | null>(null);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
 
   useEffect(() => {

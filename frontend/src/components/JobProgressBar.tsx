@@ -26,7 +26,7 @@ const JobProgressBar: React.FC<JobProgressBarProps> = ({
   currentPhase,
   status,
 }) => {
-  // ── Colour scheme by status ───────────────────────────────────────────
+  // -- Colour scheme by status -------------------------------------------
   const getBarColor = () => {
     switch (status) {
       case 'completed':

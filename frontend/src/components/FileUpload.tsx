@@ -163,7 +163,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
             onClick={onBack}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
           >
-            <- Back
+            &larr; Back
           </button>
         )}
       </div>
@@ -182,7 +182,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
           {selectedPipeline && (
             <ResourceSelector
               plugin={selectedPipeline}
-              backendType={selectedBackend === 'local' ? 'local' : 'hpc'}
+              backendType={selectedBackend === 'local' ? 'local' : selectedBackend === 'remote_hpc' ? 'hpc' : 'remote'}
               onResourcesChange={setCustomResources}
             />
           )}
@@ -259,7 +259,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
                 <div className="flex-1">
                   {mode === 'directory' ? (
                     <DirectorySelector
-                      mode={selectedBackend === 'local' ? 'local' : 'hpc'}
+                      mode={selectedBackend === 'local' ? 'local' : selectedBackend === 'remote_hpc' ? 'hpc' : 'remote'}
                       onSubmit={handleBatchSubmit}
                     />
                   ) : (

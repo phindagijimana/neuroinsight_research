@@ -23,7 +23,7 @@ const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) =>
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">NeuroInsight Research</h1>
-              <p className="text-xs text-gray-500">HPC-Native Neuroimaging Platform</p>
+              <p className="text-xs text-gray-500">Neuroimaging Platform</p>
             </div>
           </div>
           <nav className="flex gap-6">

@@ -11,14 +11,14 @@
  * -------------------
  * 
  * App (Root)
- *  ├── Navigation (Header - Always Visible)
- *  │    └── Page Buttons: Home | Jobs | Dashboard | Viewer
- *  │
- *  └── Page Router (State-based, conditional rendering)
- *       ├── HomePage          - Landing, introduction
- *       ├── JobsPage          - Pipeline submission & quick monitoring
- *       ├── DashboardPage     - All jobs overview & results
- *       └── ViewerPage        - NIfTI visualization with segmentation
+ *  |-- Navigation (Header - Always Visible)
+ *  |    \-- Page Buttons: Home | Jobs | Dashboard | Viewer
+ *  |
+ *  \-- Page Router (State-based, conditional rendering)
+ *       |-- HomePage          - Landing, introduction
+ *       |-- JobsPage          - Pipeline submission & quick monitoring
+ *       |-- DashboardPage     - All jobs overview & results
+ *       \-- ViewerPage        - NIfTI visualization with segmentation
  * 
  * STATE MANAGEMENT
  * ----------------
@@ -84,23 +84,23 @@
  * -------------------
  * 
  * components/
- *  ├── Navigation.tsx              # Header navigation bar
- *  ├── PipelineSelector.tsx        # Pipeline dropdown with metadata display
- *  ├── ResourceSelector.tsx        # CPU/Memory/GPU configuration
- *  ├── FileUpload.tsx              # Main upload wrapper (Dir/Single modes)
- *  ├── DirectorySelector.tsx       # Batch processing - select input/output dirs
- *  ├── SingleFileUpload.tsx        # Individual file upload
- *  ├── NiivueViewer.tsx            # Medical imaging viewer (PACS-like)
- *  └── icons/                      # 19 custom SVG icon components
+ *  |-- Navigation.tsx              # Header navigation bar
+ *  |-- PipelineSelector.tsx        # Pipeline dropdown with metadata display
+ *  |-- ResourceSelector.tsx        # CPU/Memory/GPU configuration
+ *  |-- FileUpload.tsx              # Main upload wrapper (Dir/Single modes)
+ *  |-- DirectorySelector.tsx       # Batch processing - select input/output dirs
+ *  |-- SingleFileUpload.tsx        # Individual file upload
+ *  |-- NiivueViewer.tsx            # Medical imaging viewer (PACS-like)
+ *  \-- icons/                      # 19 custom SVG icon components
  * 
  * services/
- *  └── api.ts                      # Backend API client (fetch wrapper)
+ *  \-- api.ts                      # Backend API client (fetch wrapper)
  * 
  * types/
- *  └── index.ts                    # TypeScript interfaces (Job, Pipeline, etc.)
+ *  \-- index.ts                    # TypeScript interfaces (Job, Pipeline, etc.)
  * 
  * data/
- *  └── mockJobs.ts                 # Sample data for testing/demo
+ *  \-- mockJobs.ts                 # Sample data for testing/demo
  * 
  * STYLING APPROACH
  * ----------------
@@ -192,52 +192,63 @@
  * REACT: 18.2+ (concurrent features)
  */
 
-import React, { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import Navigation from './components/Navigation';
-import HomePage from './pages/HomePage';
-import JobsPage from './pages/JobsPage';
-import DashboardPage from './pages/DashboardPage';
-import ViewerPage from './pages/ViewerPage';
-import DocsPage from './pages/DocsPage';
 
-// Page type definition for type-safe navigation
-type Page = 'home' | 'jobs' | 'dashboard' | 'viewer' | 'docs';
+// Page type definition for type-safe navigation -- exported for child components
+export type Page = 'home' | 'jobs' | 'dashboard' | 'viewer' | 'docs';
+
+// Code-split pages with React.lazy for smaller initial bundle
+const HomePage = lazy(() => import('./pages/HomePage'));
+const JobsPage = lazy(() => import('./pages/JobsPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const ViewerPage = lazy(() => import('./pages/ViewerPage'));
+const DocsPage = lazy(() => import('./pages/DocsPage'));
 
 function App() {
   const [activePage, setActivePage] = useState<Page>('home');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
+  // Type-safe page setter that child components can use
+  const navigateTo = (page: string) => setActivePage(page as Page);
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation activePage={activePage} setActivePage={setActivePage} />
+      <Navigation activePage={activePage} setActivePage={navigateTo} />
 
-      {activePage === 'home' && <HomePage setActivePage={setActivePage} />}
-      
-      {activePage === 'jobs' && (
-        <JobsPage 
-          setActivePage={setActivePage} 
-          setSelectedJobId={setSelectedJobId}
-        />
-      )}
-      
-      {activePage === 'dashboard' && (
-        <DashboardPage 
-          selectedJobId={selectedJobId}
-          setSelectedJobId={setSelectedJobId}
-          setActivePage={setActivePage}
-        />
-      )}
+      <Suspense fallback={
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-gray-500 text-lg">Loading...</div>
+        </div>
+      }>
+        {activePage === 'home' && <HomePage setActivePage={navigateTo} />}
+        
+        {activePage === 'jobs' && (
+          <JobsPage 
+            setActivePage={navigateTo} 
+            setSelectedJobId={setSelectedJobId}
+          />
+        )}
+        
+        {activePage === 'dashboard' && (
+          <DashboardPage 
+            selectedJobId={selectedJobId}
+            setSelectedJobId={setSelectedJobId}
+            setActivePage={navigateTo}
+          />
+        )}
 
-      {activePage === 'viewer' && (
-        <ViewerPage 
-          selectedJobId={selectedJobId}
-          setSelectedJobId={setSelectedJobId}
-        />
-      )}
+        {activePage === 'viewer' && (
+          <ViewerPage 
+            selectedJobId={selectedJobId}
+            setSelectedJobId={setSelectedJobId}
+          />
+        )}
 
-      {activePage === 'docs' && (
-        <DocsPage setActivePage={setActivePage} />
-      )}
+        {activePage === 'docs' && (
+          <DocsPage setActivePage={navigateTo} />
+        )}
+      </Suspense>
 
       {/* Footer */}
       <footer className="bg-white border-t border-gray-200 mt-12">

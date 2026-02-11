@@ -20,5 +20,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split heavy neuroimaging libraries into their own chunk
+          // Only downloaded when user opens the Viewer page
+          'niivue-vendor': ['@niivue/niivue'],
+          // Split React + ReactDOM into a shared vendor chunk
+          'react-vendor': ['react', 'react-dom'],
+        },
+      },
+    },
   },
 });

@@ -88,6 +88,13 @@ api.interceptors.response.use(
  * All methods return Promises that resolve to typed data.
  */
 export const apiService = {
+  /**
+   * Get the base URL for direct fetch calls (used by HPC components).
+   */
+  getBaseUrl(): string {
+    return API_BASE_URL;
+  },
+
   // ================================================================================
   // HEALTH & STATUS
   // ================================================================================
@@ -453,7 +460,14 @@ export const apiService = {
    * // Browse HPC directory (Phase 2)
    * const hpcDir = await apiService.browseDirectory("/scratch/user/data", "hpc");
    */
-  async browseDirectory(path: string, backendType: 'local' | 'hpc' = 'local'): Promise<DirectoryInfo> {
+  async browseDirectory(path: string, backendType: 'local' | 'remote' | 'hpc' = 'local'): Promise<DirectoryInfo> {
+    if (backendType === 'hpc' || backendType === 'remote') {
+      // Route to HPC browse endpoint (remote filesystem via SSH/SFTP)
+      const response = await api.get('/api/hpc/browse', {
+        params: { path },
+      });
+      return response.data;
+    }
     const response = await api.get('/api/browse', {
       params: { path, backend_type: backendType },
     });
@@ -500,6 +514,83 @@ export const apiService = {
       },
     });
 
+    return response.data;
+  },
+
+  // ================================================================================
+  // HPC / REMOTE BACKEND
+  // ================================================================================
+
+  /**
+   * Test SSH connection to HPC cluster.
+   */
+  async hpcConnect(host: string, username: string, port: number = 22): Promise<{ connected: boolean; message: string }> {
+    const response = await api.post('/api/hpc/connect', { host, username, port });
+    return response.data;
+  },
+
+  /**
+   * Disconnect SSH connection.
+   */
+  async hpcDisconnect(): Promise<void> {
+    await api.post('/api/hpc/disconnect');
+  },
+
+  /**
+   * Get SSH connection status.
+   */
+  async hpcStatus(): Promise<{ connected: boolean; host: string | null; username: string | null }> {
+    const response = await api.get('/api/hpc/status');
+    return response.data;
+  },
+
+  /**
+   * Switch execution backend (local or slurm).
+   */
+  async switchBackend(config: {
+    backend_type: string;
+    ssh_host?: string;
+    ssh_user?: string;
+    ssh_port?: number;
+    work_dir?: string;
+    partition?: string;
+    account?: string;
+    qos?: string;
+    modules?: string;
+  }): Promise<{ backend_type: string; message: string; health: any }> {
+    const response = await api.post('/api/hpc/backend/switch', config);
+    return response.data;
+  },
+
+  /**
+   * Get current backend type and status.
+   */
+  async getCurrentBackend(): Promise<{ backend_type: string; healthy: boolean }> {
+    const response = await api.get('/api/hpc/backend/current');
+    return response.data;
+  },
+
+  /**
+   * List available SLURM partitions.
+   */
+  async hpcPartitions(): Promise<{ partitions: any[] }> {
+    const response = await api.get('/api/hpc/partitions');
+    return response.data;
+  },
+
+  /**
+   * Get SLURM queue information.
+   */
+  async hpcQueue(userOnly: boolean = true): Promise<{ queue: any[] }> {
+    const response = await api.get('/api/hpc/queue', { params: { user_only: userOnly } });
+    return response.data;
+  },
+
+  /**
+   * Browse remote HPC filesystem.
+   */
+  async browseRemote(path: string = '~'): Promise<DirectoryInfo> {
+    const response = await api.get('/api/hpc/browse', { params: { path } });
     return response.data;
   },
 

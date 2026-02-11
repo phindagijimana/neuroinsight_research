@@ -1,6 +1,6 @@
 # NeuroInsight Research
 
-HPC-native neuroimaging pipeline platform for processing, monitoring, and visualizing brain MRI data.
+Neuroimaging pipeline platform for processing, monitoring, and visualizing brain MRI data.
 
 ## Features
 
@@ -8,7 +8,7 @@ HPC-native neuroimaging pipeline platform for processing, monitoring, and visual
 - Real-time job monitoring with progress tracking
 - Built-in NIfTI viewer with segmentation overlays (Niivue)
 - Plugin architecture with YAML-based pipeline definitions
-- Local Docker or HPC SLURM execution backends
+- Three execution backends: Local Docker, Remote Server (EC2/cloud VMs via SSH), or HPC SLURM
 
 ## Tech Stack
 

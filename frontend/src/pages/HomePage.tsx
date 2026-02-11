@@ -3,7 +3,6 @@
  * Adapted from NeuroInsight for NeuroInsight Research
  */
 
-import React from 'react';
 import Zap from '../components/icons/Zap';
 import Activity from '../components/icons/Activity';
 import CheckCircle from '../components/icons/CheckCircle';
@@ -27,8 +26,8 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage }) => {
             </h2>
 
             <p className="text-lg text-gray-600 leading-relaxed">
-              Process neuroimaging data with production-ready pipelines. Works locally during development 
-              or on HPC for production. Data stays in place—no upload needed.
+              Process neuroimaging data with production-ready pipelines. Works both locally 
+              or on a remote computer. Data stays in place—no upload needed.
             </p>
 
             <div className="grid grid-cols-1 gap-3 pt-4">

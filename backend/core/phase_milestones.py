@@ -1,169 +1,169 @@
 """
-PhaseMilestones—Fixedprogresspercentagesperpipelinephase.
+Phase Milestones -- Fixed progress percentages per pipeline phase.
 
-Eachplugindefinesalistof(log_marker,percentage,label)tuples.
-WhentheCeleryworkerseesalog_markerinthecontainer'sstdout,
-itjumpsthejob'sprogresstothatfixedpercentage.
+Each plugin defines a list of (log_marker, percentage, label) tuples.
+When the Celery worker sees a log_marker in the container's stdout,
+it jumps the job's progress to that fixed percentage.
 
-Thepercentagesareweightedestimatesbasedontypicalwall-clocktime
-foreachphase.TheyareNOTcomputeddynamically—theyare
-hand-tunedconstantsthatrepresent"howfarthroughthepipeline
-arewe"whenagivenphaseisreached.
+The percentages are weighted estimates based on typical wall-clock time
+for each phase.  They are NOT computed dynamically -- they are
+hand-tuned constants that represent "how far through the pipeline
+are we" when a given phase is reached.
 
-PhasesarematchedinORDER.Theworkercheckseachmarkeragainst
-thelatestlogoutput.Onceamarkerismatched,progressjumpsto
-thatpercentage(nevergoesbackwards).
+Phases are matched in ORDER.  The worker checks each marker against
+the latest log output.  Once a marker is matched, progress jumps to
+that percentage (never goes backwards).
 """
 
-fromtypingimportDict,List,Tuple
+from typing import Dict, List, Tuple
 
 #
-#Type:Listof(log_marker_regex_or_substring,pct,label)
+# Type: List of (log_marker_regex_or_substring, pct, label)
 #
-PhaseMilestone=Tuple[str,int,str]
+PhaseMilestone = Tuple[str, int, str]
 
 #
-#FreeSurferrecon-all(~6-8hours)
+# FreeSurfer recon-all (~6-8 hours)
 #
-#Phasesandtheirtypicalwall-clockweight:
-#autorecon1(motioncorrect,talairach,skullstrip)~15min->3%
-#autorecon2(intensitynorm,whitematterseg,tessellate,
-#smooth,inflate,register,parcellate)~4-5h->70%
-#autorecon3(sphere,corticalthickness,stats)~1-2h->20%
-#Post-processing(stats,bundleextraction)~10min->5%
+# Phases and their typical wall-clock weight:
+#   autorecon1 (motion correct, talairach, skull strip)   ~15 min -> 3%
+#   autorecon2 (intensity norm, white matter seg, tessellate,
+#               smooth, inflate, register, parcellate)    ~4-5 h  -> 70%
+#   autorecon3 (sphere, cortical thickness, stats)        ~1-2 h  -> 20%
+#   Post-processing (stats, bundle extraction)            ~10 min -> 5%
 #
-FREESURFER_RECON:List[PhaseMilestone]=[
-#Setup&inputvalidation
-("recon-all",2,"Initializingrecon-all"),
-("SUBJECTS_DIR",3,"Settingupsubjectdirectory"),
+FREESURFER_RECON: List[PhaseMilestone] = [
+    # Setup & input validation
+    ("recon-all", 2, "Initializing recon-all"),
+    ("SUBJECTS_DIR", 3, "Setting up subject directory"),
 
-#autorecon1
-("MotionCorrect",5,"Motioncorrection"),
-("mri_convert",6,"Convertinginputformat"),
-("Talairach",8,"Talairachregistration"),
-("NUIntensityCorrection",10,"Intensitycorrection(N3)"),
-("SkullStripping",14,"Skullstripping"),
+    # autorecon1
+    ("MotionCorrect", 5, "Motion correction"),
+    ("mri_convert", 6, "Converting input format"),
+    ("Talairach", 8, "Talairach registration"),
+    ("NUIntensityCorrection", 10, "Intensity correction (N3)"),
+    ("SkullStripping", 14, "Skull stripping"),
 
-#autorecon2
-("EMRegister",18,"EMregistration"),
-("CANormalize",20,"CAnormalize"),
-("CARegister",25,"CAregister(atlas)"),
-("SubCortSeg",30,"Subcorticalsegmentation"),
-("IntensityNormalization2",33,"Intensitynormalization2"),
-("WhiteMatterSegmentation",36,"Whitemattersegmentation"),
-("Fill",38,"Fillingventricles"),
-("Tessellate",42,"Tessellatinghemispheres"),
-("Smooth1",45,"Smoothingsurface1"),
-("Inflation1",48,"Inflatingsurface1"),
-("QSphere",52,"Quasi-spheremapping"),
-("FixTopology",56,"Fixingtopology"),
-("MakeWhiteSurface",60,"Generatingwhitesurface"),
-("Smooth2",63,"Smoothingsurface2"),
-("Inflation2",65,"Inflatingsurface2"),
-("SphericalMapping",68,"Sphericalmapping"),
-("IpsilateralSurfaceReg",72,"Surfaceregistration"),
-("CorticalParcellation",75,"Corticalparcellation(Desikan)"),
-("PialSurface",78,"Generatingpialsurface"),
+    # autorecon2
+    ("EMRegister", 18, "EM registration"),
+    ("CANormalize", 20, "CA normalize"),
+    ("CARegister", 25, "CA register (atlas)"),
+    ("SubCortSeg", 30, "Subcortical segmentation"),
+    ("IntensityNormalization2", 33, "Intensity normalization 2"),
+    ("WhiteMatterSegmentation", 36, "White matter segmentation"),
+    ("Fill", 38, "Filling ventricles"),
+    ("Tessellate", 42, "Tessellating hemispheres"),
+    ("Smooth1", 45, "Smoothing surface 1"),
+    ("Inflation1", 48, "Inflating surface 1"),
+    ("QSphere", 52, "Quasi-sphere mapping"),
+    ("FixTopology", 56, "Fixing topology"),
+    ("MakeWhiteSurface", 60, "Generating white surface"),
+    ("Smooth2", 63, "Smoothing surface 2"),
+    ("Inflation2", 65, "Inflating surface 2"),
+    ("SphericalMapping", 68, "Spherical mapping"),
+    ("IpsilateralSurfaceReg", 72, "Surface registration"),
+    ("CorticalParcellation", 75, "Cortical parcellation (Desikan)"),
+    ("PialSurface", 78, "Generating pial surface"),
 
-#autorecon3
-("CorticalParcellation2",82,"Corticalparcellation(DKT)"),
-("CorticalRibbon",85,"Corticalribbonmask"),
-("CorticalThickness",88,"Computingcorticalthickness"),
-("ParcellationStats",91,"Parcellationstatistics"),
-("CorticalParcellation3",93,"Corticalparcellation(BA)"),
-("WM/GMContrast",95,"WM/GMcontrast"),
+    # autorecon3
+    ("CorticalParcellation2", 82, "Cortical parcellation (DKT)"),
+    ("CorticalRibbon", 85, "Cortical ribbon mask"),
+    ("CorticalThickness", 88, "Computing cortical thickness"),
+    ("ParcellationStats", 91, "Parcellation statistics"),
+    ("CorticalParcellation3", 93, "Cortical parcellation (BA)"),
+    ("WM/GMContrast", 95, "WM/GM contrast"),
 
-#Completion
-("recon-all.*finished",97,"recon-allfinished"),
-("FreeSurferrecon-allcompleted",100,"Completed"),
+    # Completion
+    ("recon-all.*finished", 97, "recon-all finished"),
+    ("FreeSurfer recon-all completed", 100, "Completed"),
 ]
 
 #
-#FastSurfer(~10-60mindependingonGPU/CPU)
+# FastSurfer (~10-60 min depending on GPU/CPU)
 #
-#Phases:
-#SegmentationCNN~1-5min->35%
-#Surfacereconstruction~5-45min->50%
-#Stats~2min->10%
+# Phases:
+#   Segmentation CNN       ~1-5 min  -> 35%
+#   Surface reconstruction ~5-45 min -> 50%
+#   Stats                  ~2 min    -> 10%
 #
-FASTSURFER:List[PhaseMilestone]=[
-#Setup
-("run_fastsurfer",2,"StartingFastSurfer"),
-("SUBJECTS_DIR",3,"Settingupdirectories"),
+FASTSURFER: List[PhaseMilestone] = [
+    # Setup
+    ("run_fastsurfer", 2, "Starting FastSurfer"),
+    ("SUBJECTS_DIR", 3, "Setting up directories"),
 
-#Segmentation(CNN)
-("RunningFastSurferCNN",5,"Loadingsegmentationmodel"),
-("Loadingcheckpoint",8,"Loadingmodelcheckpoint"),
-("Evaluating",12,"RunningCNNsegmentation"),
-("sagittal",18,"Segmentingsagittalplane"),
-("coronal",24,"Segmentingcoronalplane"),
-("axial",30,"Segmentingaxialplane"),
-("ViewAggregation",35,"Aggregatingviews"),
+    # Segmentation (CNN)
+    ("Running FastSurferCNN", 5, "Loading segmentation model"),
+    ("Loading checkpoint", 8, "Loading model checkpoint"),
+    ("Evaluating", 12, "Running CNN segmentation"),
+    ("sagittal", 18, "Segmenting sagittal plane"),
+    ("coronal", 24, "Segmenting coronal plane"),
+    ("axial", 30, "Segmenting axial plane"),
+    ("ViewAggregation", 35, "Aggregating views"),
 
-#Surfacereconstruction
-("recon-surf",38,"Startingsurfacerecon"),
-("mri_convert",40,"Convertingvolumes"),
-("mris_inflate",50,"Inflatingsurfaces"),
-("mris_sphere",58,"Sphericalmapping"),
-("mris_register",65,"Surfaceregistration"),
-("mris_ca_label",72,"Corticalparcellation"),
-("mris_anatomical_stats",80,"Anatomicalstatistics"),
-("mri_aparc2aseg",85,"aparc+asegcreation"),
+    # Surface reconstruction
+    ("recon-surf", 38, "Starting surface recon"),
+    ("mri_convert", 40, "Converting volumes"),
+    ("mris_inflate", 50, "Inflating surfaces"),
+    ("mris_sphere", 58, "Spherical mapping"),
+    ("mris_register", 65, "Surface registration"),
+    ("mris_ca_label", 72, "Cortical parcellation"),
+    ("mris_anatomical_stats", 80, "Anatomical statistics"),
+    ("mri_aparc2aseg", 85, "aparc+aseg creation"),
 
-#Stats&metrics
-("aseg.stats",90,"Writingstatistics"),
-("Metricsextracted",95,"Extractingmetrics"),
+    # Stats & metrics
+    ("aseg.stats", 90, "Writing statistics"),
+    ("Metrics extracted", 95, "Extracting metrics"),
 
-#Completion
-("FastSurfercompleted",100,"Completed"),
+    # Completion
+    ("FastSurfer completed", 100, "Completed"),
 ]
 
 #
-#fMRIPrep(~2-6hours)
+# fMRIPrep (~2-6 hours)
 #
-FMRIPREP:List[PhaseMilestone]=[
-("fMRIPrep",2,"InitializingfMRIPrep"),
-("Anatomicalprocessing",8,"Anatomicalpreprocessing"),
-("Brainextraction",15,"Brainextraction"),
-("Tissuesegmentation",22,"Tissuesegmentation"),
-("Surfacereconstruction",35,"Surfacereconstruction"),
-("BOLDprocessing",50,"BOLDpreprocessing"),
-("Slice-timingcorrection",55,"Slice-timingcorrection"),
-("Head-motionestimation",60,"Head-motionestimation"),
-("Susceptibilitydistortion",65,"Susceptibilitydistortioncorrection"),
-("Registration",72,"Registrationtostandard"),
-("Confoundestimation",82,"Confoundestimation"),
-("BOLDresampling",90,"BOLDresampling"),
-("Generatingreport",95,"Generatingreport"),
-("fMRIPrepfinished",100,"Completed"),
+FMRIPREP: List[PhaseMilestone] = [
+    ("fMRIPrep", 2, "Initializing fMRIPrep"),
+    ("Anatomical processing", 8, "Anatomical preprocessing"),
+    ("Brain extraction", 15, "Brain extraction"),
+    ("Tissue segmentation", 22, "Tissue segmentation"),
+    ("Surface reconstruction", 35, "Surface reconstruction"),
+    ("BOLD processing", 50, "BOLD preprocessing"),
+    ("Slice-timing correction", 55, "Slice-timing correction"),
+    ("Head-motion estimation", 60, "Head-motion estimation"),
+    ("Susceptibility distortion", 65, "Susceptibility distortion correction"),
+    ("Registration", 72, "Registration to standard"),
+    ("Confound estimation", 82, "Confound estimation"),
+    ("BOLD resampling", 90, "BOLD resampling"),
+    ("Generating report", 95, "Generating report"),
+    ("fMRIPrep finished", 100, "Completed"),
 ]
 
 #
-#Genericfallback(anyunknownplugin)
-#Usessimpleelapsed-timefractionsofthemaxtime
+# Generic fallback (any unknown plugin)
+# Uses simple elapsed-time fractions of the max time
 #
-GENERIC:List[PhaseMilestone]=[
-("Starting",5,"Initializing"),
-("Processing",25,"Processing"),
-("Running",50,"Running"),
-("Writing",75,"Writingoutputs"),
-("completed",100,"Completed"),
+GENERIC: List[PhaseMilestone] = [
+    ("Starting", 5, "Initializing"),
+    ("Processing", 25, "Processing"),
+    ("Running", 50, "Running"),
+    ("Writing", 75, "Writing outputs"),
+    ("completed", 100, "Completed"),
 ]
 
 #
-#Registry:plugin_id->milestonelist
+# Registry: plugin_id -> milestone list
 #
-MILESTONES:Dict[str,List[PhaseMilestone]]={
-"freesurfer_recon":FREESURFER_RECON,
-"freesurfer_recon_long":FREESURFER_RECON,#samepipeline
-"fastsurfer":FASTSURFER,
-"fastsurfer_seg":FASTSURFER,
-"fmriprep":FMRIPREP,
+MILESTONES: Dict[str, List[PhaseMilestone]] = {
+    "freesurfer_recon": FREESURFER_RECON,
+    "freesurfer_recon_long": FREESURFER_RECON,  # same pipeline
+    "fastsurfer": FASTSURFER,
+    "fastsurfer_seg": FASTSURFER,
+    "fmriprep": FMRIPREP,
 }
 
-#Sharedsystemphases(prependedtoallplugins)
-SYSTEM_PHASES:List[PhaseMilestone]=[
-#ThesearesetbytheCelerytaskdirectly,notfromlogmarkers
+# Shared system phases (prepended to all plugins)
+SYSTEM_PHASES: List[PhaseMilestone] = [
+    # These are set by the Celery task directly, not from log markers
 ]
 
 

@@ -16,8 +16,8 @@ import Clock from '../components/icons/Clock';
 import Activity from '../components/icons/Activity';
 import Trash2 from '../components/icons/Trash2';
 import Eye from '../components/icons/Eye';
-import Download from '../components/icons/Download';
 import JobProgressBar from '../components/JobProgressBar';
+import SlurmQueueMonitor from '../components/SlurmQueueMonitor';
 
 interface JobsPageProps {
   setActivePage: (page: string) => void;
@@ -72,7 +72,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
     setStats(counts);
   }, [jobs]);
 
-  // ── Progress polling for active jobs (lightweight, 2.5s interval) ──────
+  // -- Progress polling for active jobs (lightweight, 2.5s interval) ------
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fullRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -255,6 +255,11 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
             </div>
           </div>
         )}
+
+        {/* SLURM Queue Monitor (auto-detects if HPC backend is active) */}
+        <div className="mb-6">
+          <SlurmQueueMonitor visible={true} />
+        </div>
 
         {/* Jobs List */}
         <div className="bg-white rounded-xl shadow-lg border border-navy-100">

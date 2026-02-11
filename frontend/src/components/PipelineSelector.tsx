@@ -5,11 +5,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, Info, Cpu, Clock, Database, Zap, GitBranch, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, Info, Zap, GitBranch, CheckCircle, AlertTriangle } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { Pipeline } from '../types';
-import Brain from './icons/Brain';
-import ChevronRight from './icons/ChevronRight';
 
 interface PipelineSelectorProps {
   onPipelineSelect: (pipeline: Pipeline | null) => void;
@@ -232,17 +230,6 @@ const MOCK_WORKFLOWS: Workflow[] = [
   },
 ];
 
-const getCategoryColor = (category: string) => {
-  switch (category) {
-    case 'structural': return 'bg-navy-50 text-[#003d7a] border-navy-200';
-    case 'functional': return 'bg-navy-50 text-[#003d7a] border-navy-200';
-    case 'diffusion': return 'bg-navy-50 text-[#003d7a] border-navy-200';
-    case 'conversion': return 'bg-gray-50 text-gray-700 border-gray-200';
-    case 'epilepsy': return 'bg-navy-50 text-[#003d7a] border-navy-200';
-    default: return 'bg-gray-50 text-gray-700 border-gray-200';
-  }
-};
-
 const getCategoryLabel = (category: string) => {
   switch (category) {
     case 'structural': return 'Structural';
@@ -325,8 +312,10 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
           setUsingLiveData(true);
           console.log(`Loaded ${apiPlugins.length} plugins and ${apiWorkflows.length} workflows from API`);
         }
-      } catch (err: any) {
-        console.warn('API unavailable, using mock data:', err.message);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        console.warn('API unavailable, using mock data:', msg);
+        setError(`Live data unavailable (${msg}). Using sample data.`);
         setUsingLiveData(false);
       } finally {
         setLoading(false);

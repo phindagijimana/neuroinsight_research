@@ -37,7 +37,7 @@ interface FileBrowserProps {
 }
 
 // Check if file is a viewable medical image
-const isViewableImage = (filename: string): boolean => {
+export const isViewableImage = (filename: string): boolean => {
   const imageExtensions = [
     '.nii.gz', '.nii',           // NIfTI
     '.mgz', '.mgh',              // FreeSurfer MGH/MGZ
