@@ -38,6 +38,17 @@ inputs:
       type: bool
       default: true
 
+input_format:
+  format_name: "FreeSurfer Longitudinal SUBJECTS_DIR"
+  description: "A FreeSurfer SUBJECTS_DIR containing longitudinal processing output."
+  example_structure: |
+    subjects_dir/
+      sub-01_ses-01/              (cross-sectional)
+      sub-01_ses-02/              (cross-sectional)
+      sub-01_base/                (unbiased template)
+      sub-01_ses-01.long.sub-01_base/   (longitudinal)
+      sub-01_ses-02.long.sub-01_base/   (longitudinal)
+
 validation:
   preflight_checks:
     - "path_exists(subjects_dir)"

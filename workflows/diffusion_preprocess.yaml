@@ -27,6 +27,20 @@ inputs:
       type: float
       default: 1.5
 
+input_format:
+  format_name: "BIDS (with DWI)"
+  description: "BIDS dataset with diffusion-weighted imaging data."
+  example_structure: |
+    bids_dir/
+      dataset_description.json
+      sub-01/
+        dwi/
+          sub-01_dwi.nii.gz
+          sub-01_dwi.bval
+          sub-01_dwi.bvec
+        anat/
+          sub-01_T1w.nii.gz
+
 validation:
   preflight_checks:
     - "directory_exists(bids_dir)"

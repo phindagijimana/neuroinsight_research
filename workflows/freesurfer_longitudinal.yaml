@@ -39,6 +39,15 @@ inputs:
         max_parallel_cross: { type: int, default: 2 }
         max_parallel_long: { type: int, default: 2 }
 
+input_format:
+  format_name: "Multiple Timepoint NIfTIs"
+  description: "Two or more T1-weighted scans from different timepoints for the same subject."
+  example_structure: |
+    timepoint files:
+      sub-01_ses-baseline_T1w.nii.gz
+      sub-01_ses-followup_T1w.nii.gz
+      sub-01_ses-year2_T1w.nii.gz    (optional additional timepoints)
+
 validation:
   preflight_checks:
     - "timepoints_count(timepoints) >= 2"

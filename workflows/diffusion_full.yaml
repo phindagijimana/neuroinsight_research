@@ -31,6 +31,20 @@ inputs:
       type: choice
       default: "mrtrix_multishell_msmt"
 
+input_format:
+  format_name: "BIDS (with DWI)"
+  description: "BIDS dataset with diffusion-weighted imaging data."
+  example_structure: |
+    bids_dir/
+      dataset_description.json
+      sub-01/
+        anat/
+          sub-01_T1w.nii.gz
+        dwi/
+          sub-01_dwi.nii.gz
+          sub-01_dwi.bval
+          sub-01_dwi.bvec
+
 validation:
   preflight_checks:
     - "directory_exists(bids_dir)"

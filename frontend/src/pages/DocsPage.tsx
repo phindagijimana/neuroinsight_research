@@ -19,7 +19,16 @@ import {
   Shield,
   AlertTriangle,
   ChevronRight,
+  FolderTree,
 } from 'lucide-react';
+
+interface InputFormat {
+  format_name?: string;
+  description?: string;
+  notes?: string[];
+  example_structure?: string;
+  file_types?: string[];
+}
 
 interface PluginDoc {
   id: string;
@@ -32,6 +41,7 @@ interface PluginDoc {
   user_selectable: boolean;
   ui_category: string;
   inputs: { required: any[]; optional: any[] };
+  input_format?: InputFormat;
   parameters: any[];
   resources: Record<string, any>;
   resource_profiles: Record<string, any>;
@@ -52,6 +62,7 @@ interface WorkflowDoc {
   steps: any[];
   plugin_ids: string[];
   inputs: { required: any[]; optional: any[] };
+  input_format?: InputFormat;
   validation: Record<string, any>;
   outputs: Record<string, any>;
   yaml: string;
@@ -82,6 +93,67 @@ const domainColor = (domain: string) => {
 interface DocsPageProps {
   setActivePage?: (page: string) => void;
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Input Format Section (shared by Plugin & Workflow detail)                  */
+/* -------------------------------------------------------------------------- */
+
+const InputFormatSection: React.FC<{ inputFormat?: InputFormat }> = ({ inputFormat }) => {
+  if (!inputFormat || (!inputFormat.format_name && !inputFormat.example_structure)) return null;
+
+  return (
+    <div>
+      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+        <FolderTree className="w-4 h-4" />
+        Input Data Format
+      </h3>
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+        {/* Format name & description */}
+        {inputFormat.format_name && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-[#003d7a]">{inputFormat.format_name}</span>
+          </div>
+        )}
+        {inputFormat.description && (
+          <p className="text-sm text-gray-600">{inputFormat.description}</p>
+        )}
+
+        {/* Notes */}
+        {inputFormat.notes && inputFormat.notes.length > 0 && (
+          <ul className="text-xs text-gray-500 space-y-1 pl-1">
+            {inputFormat.notes.map((note: string, i: number) => (
+              <li key={i} className="flex items-start gap-1.5">
+                <span className="w-1 h-1 bg-gray-400 rounded-full mt-1.5 flex-shrink-0"></span>
+                {note}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Folder structure example */}
+        {inputFormat.example_structure && (
+          <div>
+            <span className="text-xs font-medium text-gray-500 block mb-1.5">Expected folder structure:</span>
+            <pre className="bg-gray-900 text-green-300 rounded-md px-3 py-2.5 text-xs font-mono leading-relaxed overflow-x-auto whitespace-pre">
+              {inputFormat.example_structure.trim()}
+            </pre>
+          </div>
+        )}
+
+        {/* Accepted file types */}
+        {inputFormat.file_types && inputFormat.file_types.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {inputFormat.file_types.map((ft: string, i: number) => (
+              <span key={i} className="text-xs bg-navy-50 text-navy-700 px-2 py-0.5 rounded font-mono">
+                {ft}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 /* -------------------------------------------------------------------------- */
 /*  Plugin Detail                                                             */
@@ -145,6 +217,9 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
           </div>
         </div>
       </div>
+
+      {/* Input Data Format */}
+      <InputFormatSection inputFormat={plugin.input_format} />
 
       {/* Inputs */}
       {plugin.inputs && (plugin.inputs.required?.length > 0 || plugin.inputs.optional?.length > 0) && (
@@ -299,6 +374,9 @@ const WorkflowDetail: React.FC<{ workflow: WorkflowDoc }> = ({ workflow }) => {
           </div>
         </div>
       )}
+
+      {/* Input Data Format */}
+      <InputFormatSection inputFormat={workflow.input_format} />
 
       {/* Inputs */}
       {workflow.inputs && (workflow.inputs.required?.length > 0 || workflow.inputs.optional?.length > 0) && (

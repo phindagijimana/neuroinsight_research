@@ -24,7 +24,7 @@ references:
 container:
   runtime: docker
   image: "pennbbl/qsiprep:0.20.0"
-  digest: null
+  digest: "sha256:3736fdd73342671de8e7a8f4b20fc50cd998fdbf40e46124bde2e28daa14d5c9"
 
 inputs:
   required:
@@ -38,6 +38,30 @@ inputs:
     - key: fs_license
       type: path
       description: "FreeSurfer license file path"
+
+input_format:
+  format_name: "BIDS (with DWI)"
+  description: "Brain Imaging Data Structure with diffusion-weighted imaging data."
+  notes:
+    - "Must include DWI data (dwi/ directory) for the subject"
+    - "Requires .bval and .bvec files alongside the DWI NIfTI"
+    - "An anatomical T1w scan is recommended but not required"
+  example_structure: |
+    bids_dir/
+      dataset_description.json
+      sub-01/
+        anat/
+          sub-01_T1w.nii.gz
+        dwi/
+          sub-01_dwi.nii.gz
+          sub-01_dwi.bval
+          sub-01_dwi.bvec
+          sub-01_dwi.json
+  file_types:
+    - ".nii.gz (NIfTI images)"
+    - ".bval (b-value table)"
+    - ".bvec (gradient directions)"
+    - ".json (BIDS sidecar metadata)"
 
 parameters:
   - name: output_resolution

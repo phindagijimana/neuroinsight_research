@@ -24,7 +24,7 @@ references:
 container:
   runtime: docker
   image: "pennlinc/xcp_d:0.6.1"
-  digest: null
+  digest: "sha256:169a3c3da31b9b78c74b00ce639659eccd458e73cd6048ce3567430bfb9abab4"
 
 inputs:
   required:
@@ -38,6 +38,28 @@ inputs:
     - key: fs_license
       type: path
       description: "FreeSurfer license file path"
+
+input_format:
+  format_name: "fMRIPrep Derivatives"
+  description: "Output directory from a completed fMRIPrep run."
+  notes:
+    - "Must be a valid fMRIPrep derivatives directory"
+    - "Contains preprocessed BOLD, confounds, and anatomical outputs"
+    - "Run fMRIPrep first, then point XCP-D to its output"
+  example_structure: |
+    fmriprep_derivatives/
+      dataset_description.json
+      sub-01/
+        anat/
+          sub-01_desc-preproc_T1w.nii.gz
+          sub-01_desc-brain_mask.nii.gz
+        func/
+          sub-01_task-rest_desc-preproc_bold.nii.gz
+          sub-01_task-rest_desc-confounds_timeseries.tsv
+  file_types:
+    - ".nii.gz (preprocessed NIfTI images)"
+    - ".tsv (confound regressors)"
+    - ".json (sidecar metadata)"
 
 parameters:
   - name: smoothing

@@ -25,6 +25,9 @@ interface Plugin {
   description: string;
   category: 'structural' | 'functional' | 'diffusion' | 'conversion' | 'epilepsy';
   user_selectable?: boolean; // If false, plugin is hidden from UI (utility plugins)
+  input_format_name?: string;
+  input_format_description?: string;
+  input_format_example?: string;
 }
 
 interface Workflow {
@@ -34,6 +37,9 @@ interface Workflow {
   description: string;
   plugins: string[]; // Plugin IDs in order
   category: 'structural' | 'functional' | 'diffusion' | 'conversion' | 'epilepsy';
+  input_format_name?: string;
+  input_format_description?: string;
+  input_format_example?: string;
 }
 
 // Mock plugins data
@@ -42,9 +48,12 @@ const MOCK_PLUGINS: Plugin[] = [
     id: 'dcm2niix',
     name: 'DICOM to NIfTI Converter',
     version: '1.0.0',
-    container: 'nipy/heudiconv:latest',
+    container: 'nipy/heudiconv:1.3.4',
     description: 'Convert DICOM images to NIfTI format with JSON sidecars',
-    category: 'conversion'
+    category: 'conversion',
+    input_format_name: 'DICOM Directory',
+    input_format_description: 'A folder containing DICOM files from the scanner.',
+    input_format_example: 'dicom_dir/\n  series001/\n    IM-0001-0001.dcm\n    IM-0001-0002.dcm'
   },
   {
     id: 'freesurfer_recon',
@@ -52,15 +61,21 @@ const MOCK_PLUGINS: Plugin[] = [
     version: '7.4.1',
     container: 'freesurfer/freesurfer:7.4.1',
     description: 'Full cortical reconstruction and subcortical segmentation',
-    category: 'structural'
+    category: 'structural',
+    input_format_name: 'Single NIfTI',
+    input_format_description: 'A single T1-weighted MRI scan in NIfTI format.',
+    input_format_example: 'any_folder/\n  sub-01_T1w.nii.gz'
   },
   {
     id: 'fastsurfer',
     name: 'FastSurfer',
     version: '2.0.0',
-    container: 'deepmi/fastsurfer:latest',
+    container: 'deepmi/fastsurfer:v2.4.2',
     description: 'Fast deep learning-based cortical parcellation (FreeSurfer-compatible)',
-    category: 'structural'
+    category: 'structural',
+    input_format_name: 'Single NIfTI',
+    input_format_description: 'A single T1-weighted MRI scan in NIfTI format.',
+    input_format_example: 'any_folder/\n  sub-01_T1w.nii.gz'
   },
   {
     id: 'segmentha_t1',
@@ -68,7 +83,9 @@ const MOCK_PLUGINS: Plugin[] = [
     version: '7.4.1',
     container: 'freesurfer/freesurfer:7.4.1',
     description: 'Segment hippocampal subfields and amygdala nuclei from T1',
-    category: 'structural'
+    category: 'structural',
+    input_format_name: 'FreeSurfer SUBJECTS_DIR',
+    input_format_description: 'Requires completed FreeSurfer recon-all outputs.'
   },
   {
     id: 'segmentha_t2',
@@ -76,7 +93,9 @@ const MOCK_PLUGINS: Plugin[] = [
     version: '7.4.1',
     container: 'freesurfer/freesurfer:7.4.1',
     description: 'Enhanced hippocampal subfields using high-res T2',
-    category: 'structural'
+    category: 'structural',
+    input_format_name: 'FreeSurfer SUBJECTS_DIR + T2w NIfTI',
+    input_format_description: 'Requires recon-all outputs plus a T2-weighted scan.'
   },
   {
     id: 'fmriprep',
@@ -84,7 +103,10 @@ const MOCK_PLUGINS: Plugin[] = [
     version: '23.2.1',
     container: 'nipreps/fmriprep:23.2.1',
     description: 'Preprocessing of fMRI data (motion correction, distortion correction, coregistration)',
-    category: 'functional'
+    category: 'functional',
+    input_format_name: 'BIDS',
+    input_format_description: 'A BIDS dataset with T1w and BOLD sequences.',
+    input_format_example: 'bids_dataset/\n  dataset_description.json\n  sub-01/\n    anat/\n      sub-01_T1w.nii.gz\n    func/\n      sub-01_task-rest_bold.nii.gz'
   },
   {
     id: 'xcpd',
@@ -92,7 +114,9 @@ const MOCK_PLUGINS: Plugin[] = [
     version: '0.6.1',
     container: 'pennlinc/xcp_d:0.6.1',
     description: 'Postprocessing of fMRI: denoising, parcellation, connectivity matrices',
-    category: 'functional'
+    category: 'functional',
+    input_format_name: 'fMRIPrep Derivatives',
+    input_format_description: 'Output directory from a completed fMRIPrep run.'
   },
   {
     id: 'qsiprep',
@@ -100,32 +124,42 @@ const MOCK_PLUGINS: Plugin[] = [
     version: '0.20.0',
     container: 'pennbbl/qsiprep:0.20.0',
     description: 'Preprocessing of diffusion MRI (distortion, motion, coregistration)',
-    category: 'diffusion'
+    category: 'diffusion',
+    input_format_name: 'BIDS (with DWI)',
+    input_format_description: 'A BIDS dataset with DWI, bvals/bvecs, and T1w.',
+    input_format_example: 'bids_dataset/\n  sub-01/\n    anat/sub-01_T1w.nii.gz\n    dwi/\n      sub-01_dwi.nii.gz\n      sub-01_dwi.bval\n      sub-01_dwi.bvec'
   },
   {
     id: 'qsirecon',
     name: 'QSIRecon',
     version: '0.20.0',
-    container: 'pennbbl/qsirecon:0.20.0',
+    container: 'pennlinc/qsirecon:1.1.1',
     description: 'Diffusion reconstruction, tractography, and connectomes',
-    category: 'diffusion'
+    category: 'diffusion',
+    input_format_name: 'QSIPrep Derivatives',
+    input_format_description: 'Output directory from a completed QSIPrep run.'
   },
   {
     id: 'meld_graph',
     name: 'MELD Graph',
     version: '1.0.0',
-    container: 'meldproject/meld_graph:latest',
+    container: 'meldproject/meld_graph:v2.2.4',
     description: 'Cortical dysplasia detection for epilepsy research',
-    category: 'epilepsy'
+    category: 'epilepsy',
+    input_format_name: 'FreeSurfer SUBJECTS_DIR',
+    input_format_description: 'Requires completed FreeSurfer recon-all outputs.'
   },
   {
     id: 'freesurfer_longitudinal',
     name: 'FreeSurfer Longitudinal',
     version: '1.0.0',
     container: 'freesurfer/freesurfer:7.4.1',
-    description: 'Full FreeSurfer longitudinal stream (CROSS -> BASE -> LONG) for ≥2 timepoints',
+    description: 'Full FreeSurfer longitudinal stream (CROSS -> BASE -> LONG) for >=2 timepoints',
     category: 'structural',
-    user_selectable: true
+    user_selectable: true,
+    input_format_name: 'Multiple Timepoint NIfTIs',
+    input_format_description: '>=2 T1w NIfTI scans from different timepoints for the same subject.',
+    input_format_example: 'subject_data/\n  ses-01/sub-01_ses-01_T1w.nii.gz\n  ses-02/sub-01_ses-02_T1w.nii.gz'
   },
   {
     id: 'freesurfer_longitudinal_stats',
@@ -290,6 +324,9 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
                        p.domain === 'diffusion_mri' ? 'diffusion' :
                        p.domain === 'epilepsy' ? 'epilepsy' :
                        p.domain === 'conversion' ? 'conversion' : 'structural') as Plugin['category'],
+            input_format_name: p.input_format?.format_name,
+            input_format_description: p.input_format?.description,
+            input_format_example: p.input_format?.example_structure,
             user_selectable: p.user_selectable,
           }));
 
@@ -300,6 +337,9 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
             version: w.version,
             description: w.description,
             plugins: w.plugin_ids || [],
+            input_format_name: w.input_format?.format_name,
+            input_format_description: w.input_format?.description,
+            input_format_example: w.input_format?.example_structure,
             category: (w.domain === 'structural_mri' ? 'structural' :
                        w.domain === 'functional_mri' ? 'functional' :
                        w.domain === 'diffusion_mri' ? 'diffusion' :
@@ -536,7 +576,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
 
       {/* Selected Plugin Details */}
       {selectedPlugin && mode === 'plugins' && (
-        <div className="mt-6">
+        <div className="mt-6 space-y-3">
           {/* Description */}
           <div className="p-4 bg-gray-50 rounded-md">
             <div className="flex items-start">
@@ -547,12 +587,20 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Input format hint -- brief label only, full details in Docs page */}
+          {selectedPlugin.input_format_name && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-navy-50 rounded-md">
+              <span className="text-xs text-gray-500">Input:</span>
+              <span className="text-xs font-medium text-[#003d7a]">{selectedPlugin.input_format_name}</span>
+            </div>
+          )}
         </div>
       )}
 
       {/* Selected Workflow Details */}
       {selectedWorkflow && mode === 'workflows' && (
-        <div className="mt-6">
+        <div className="mt-6 space-y-3">
           {/* Pipeline Steps */}
           <div className="p-4 bg-navy-50 border border-navy-200 rounded-md">
             <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">

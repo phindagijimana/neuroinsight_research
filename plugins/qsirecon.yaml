@@ -1,7 +1,7 @@
 # Plugin 9: QSIRecon
 id: qsirecon
 name: "QSIRecon"
-version: "0.20.0"
+version: "1.1.1"
 type: plugin
 domain: diffusion_mri
 
@@ -24,8 +24,8 @@ references:
 
 container:
   runtime: docker
-  image: "pennbbl/qsirecon:0.20.0"
-  digest: null
+  image: "pennlinc/qsirecon:1.1.1"
+  digest: "sha256:f3eaa8f8f8b2e84f2fb4d5f83b069bec59a7ba657efb7fe1e782b5ca7aeb2657"
 
 inputs:
   required:
@@ -39,6 +39,27 @@ inputs:
     - key: fs_license
       type: path
       description: "FreeSurfer license file path"
+
+input_format:
+  format_name: "QSIPrep Derivatives"
+  description: "Output directory from a completed QSIPrep run."
+  notes:
+    - "Must be a valid QSIPrep derivatives directory"
+    - "Contains preprocessed DWI, b-tables, and QC outputs"
+    - "Run QSIPrep first, then point QSIRecon to its output"
+  example_structure: |
+    qsiprep_derivatives/
+      dataset_description.json
+      sub-01/
+        dwi/
+          sub-01_space-T1w_desc-preproc_dwi.nii.gz
+          sub-01_space-T1w_desc-preproc_dwi.bval
+          sub-01_space-T1w_desc-preproc_dwi.bvec
+        anat/
+          sub-01_desc-preproc_T1w.nii.gz
+  file_types:
+    - ".nii.gz (preprocessed DWI and anatomical)"
+    - ".bval / .bvec (diffusion gradient tables)"
 
 parameters:
   - name: recon_spec

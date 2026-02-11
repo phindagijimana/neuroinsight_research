@@ -166,13 +166,19 @@ class LocalDockerBackend(ExecutionBackend):
         except Exception as e:
             logger.error(f"Failed to create DB record for job {job_id[:8]}: {e}")
 
-        # Dispatch to Celery
+        # Dispatch to Celery -- pick the right task for single-plugin vs workflow
         try:
-            from backend.execution.celery_tasks import run_docker_job
-            result = run_docker_job.delay(job_id, spec_dict)
+            is_workflow = spec_dict.get("execution_mode") == "workflow"
+            if is_workflow:
+                from backend.execution.celery_tasks import run_workflow_job
+                result = run_workflow_job.delay(job_id, spec_dict)
+            else:
+                from backend.execution.celery_tasks import run_docker_job
+                result = run_docker_job.delay(job_id, spec_dict)
             with self._lock:
                 self._jobs[job_id]["celery_task_id"] = result.id
-            logger.info(f"Dispatched job {job_id[:8]} to Celery (task_id={result.id})")
+            task_name = "run_workflow_job" if is_workflow else "run_docker_job"
+            logger.info(f"Dispatched job {job_id[:8]} to Celery ({task_name}, task_id={result.id})")
         except Exception as e:
             logger.warning(f"Celery dispatch failed for job {job_id[:8]}: {e}. Running in-thread.")
             self._run_in_thread(job_id, spec_dict)

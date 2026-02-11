@@ -214,12 +214,25 @@ cmd_install() {
         success "Frontend built -> frontend/dist/"
     fi
 
-    # -- .env file -------------------------------------------------------------
+    # -- .env file with generated secrets --------------------------------------
     step "Environment configuration"
     if [ ! -f ".env" ]; then
         if [ -f ".env.example" ]; then
             cp .env.example .env
-            success "Created .env from .env.example (edit as needed)"
+            # Generate random passwords for local services
+            _rand() { python3 -c "import secrets; print(secrets.token_urlsafe(24))"; }
+            local pg_pass; pg_pass=$(_rand)
+            local redis_pass; redis_pass=$(_rand)
+            local minio_pass; minio_pass=$(_rand)
+            local secret_key; secret_key=$(_rand)
+            # Replace defaults in .env
+            sed -i "s|neuroinsight_secure_password|${pg_pass}|g" .env
+            sed -i "s|redis_secure_password|${redis_pass}|g" .env
+            sed -i "s|minioadmin_secure|${minio_pass}|g" .env
+            sed -i "s|dev-secret-key-change-in-production-minimum-32-characters|${secret_key}|g" .env
+            # docker-compose.infra.yml now reads passwords from .env via
+            # ${VARIABLE:-default} syntax, so no sed replacement needed.
+            success "Created .env with generated random passwords"
         else
             warn "No .env or .env.example found"
         fi
@@ -242,27 +255,56 @@ cmd_install() {
 
     # -- Database schema -------------------------------------------------------
     step "Database schema"
-    if python3 -c "from backend.core.database import init_db; init_db()" 2>/dev/null; then
+    local _db_err
+    _db_err=$(python3 -c "from backend.core.database import init_db; init_db(); print('OK')" 2>&1)
+    if echo "$_db_err" | grep -q "OK"; then
         success "Database tables verified/created"
     else
         warn "Could not initialise database (is PostgreSQL reachable?)"
+        info "  Error: $(echo "$_db_err" | tail -1)"
+        info "  Check: docker ps | grep neuroinsight-db"
     fi
 
     # -- MinIO buckets ---------------------------------------------------------
     step "MinIO storage buckets"
-    if python3 -c "
+    local _minio_err
+    _minio_err=$(python3 -c "
 from backend.core.storage import storage
 storage.client
-print('ok')
-" 2>/dev/null | grep -q ok; then
+print('OK')
+" 2>&1)
+    if echo "$_minio_err" | grep -q "OK"; then
         success "MinIO buckets ready"
     else
         warn "Could not verify MinIO buckets (is MinIO reachable?)"
+        info "  Error: $(echo "$_minio_err" | tail -1)"
+        info "  Check: docker ps | grep neuroinsight-minio"
+    fi
+
+    # -- FreeSurfer license ----------------------------------------------------
+    step "FreeSurfer license"
+    local _fs_license_found=false
+    for _lpath in \
+        "./license.txt" \
+        "$HOME/.freesurfer/license.txt" \
+        "$HOME/freesurfer/license.txt" \
+        "/usr/local/freesurfer/license.txt" \
+        "${FS_LICENSE:-__none__}"; do
+        if [ -f "$_lpath" ] && [ -s "$_lpath" ]; then
+            _fs_license_found=true
+            success "FreeSurfer license found at $_lpath"
+            break
+        fi
+    done
+    if [ "$_fs_license_found" = false ]; then
+        warn "FreeSurfer license.txt not found (needed for FreeSurfer/FastSurfer plugins)"
+        info "Place your license.txt in the app directory or ~/.freesurfer/license.txt"
+        info "Get a free license at: https://surfer.nmr.mgh.harvard.edu/registration.html"
     fi
 
     # -- Pipeline Docker images ------------------------------------------------
     step "Pipeline Docker images"
-    local images=("freesurfer/freesurfer:7.4.1" "deepmi/fastsurfer:latest")
+    local images=("freesurfer/freesurfer:7.4.1" "deepmi/fastsurfer:v2.4.2")
     for img in "${images[@]}"; do
         if docker image inspect "$img" &>/dev/null; then
             success "$img  (present)"
@@ -650,9 +692,23 @@ preflight_checks() {
     if ! command -v python3 &>/dev/null; then
         error "python3 not found"; exit 1
     fi
+
     if ! command -v npm &>/dev/null && [ -d "frontend" ]; then
         error "npm not found (needed for frontend)"; exit 1
     fi
+
+    # Check Node.js version (>=18 required for Vite)
+    if command -v node &>/dev/null; then
+        local node_major
+        node_major=$(node --version | sed 's/v//' | cut -d'.' -f1)
+        if [ "$node_major" -lt 18 ] 2>/dev/null; then
+            warn "Node.js v${node_major} detected. Version 18+ recommended (Vite requires it)."
+            info "Install Node 18+: https://nodejs.org/ or use nvm"
+        else
+            success "Node.js $(node --version)"
+        fi
+    fi
+
     if ! command -v docker &>/dev/null; then
         error "docker not found -- required for infrastructure and job execution"; exit 1
     fi

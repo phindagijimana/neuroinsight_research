@@ -25,7 +25,7 @@ references:
 container:
   runtime: docker
   image: "nipreps/fmriprep:23.2.1"
-  digest: null
+  digest: "sha256:9189837e68b0a0c912fad8f0948d74e6280a2d0617b234c8dee738127a035233"
 
 inputs:
   required:
@@ -43,6 +43,32 @@ inputs:
       type: string
       default: "MNI152NLin2009cAsym"
       description: "Output space(s) for preprocessing"
+
+input_format:
+  format_name: "BIDS"
+  description: "Brain Imaging Data Structure. A standardized folder layout for neuroimaging datasets."
+  notes:
+    - "The dataset must pass BIDS validation (bids-validator)"
+    - "At minimum, an anatomical T1w and functional BOLD are required"
+    - "Fieldmaps are optional but recommended for distortion correction"
+  example_structure: |
+    bids_dir/
+      dataset_description.json
+      participants.tsv
+      sub-01/
+        anat/
+          sub-01_T1w.nii.gz
+          sub-01_T1w.json
+        func/
+          sub-01_task-rest_bold.nii.gz
+          sub-01_task-rest_bold.json
+        fmap/                          (optional)
+          sub-01_phasediff.nii.gz
+          sub-01_magnitude1.nii.gz
+  file_types:
+    - ".nii.gz (NIfTI images)"
+    - ".json (BIDS sidecar metadata)"
+    - ".tsv (participant/event tables)"
 
 parameters:
   - name: task

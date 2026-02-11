@@ -79,13 +79,13 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage }) => {
           {[
             {
               icon: Brain,
-              title: 'Pipeline Plugins',
-              description: 'YAML-based pipeline definitions. Add FreeSurfer, FastSurfer, ANTs, FSL, or custom pipelines easily.'
+              title: 'Pipeline Plugins and Workflows',
+              description: 'YAML-based pipeline definitions. Contains pipelines like FreeSurfer, FastSurfer, QSIprep, fMRIprep, ... and common workflows.'
             },
             {
               icon: Zap,
               title: 'Works Anywhere',
-              description: 'Develop locally with Docker. Deploy to HPC with SLURM. Same codebase, zero changes.'
+              description: 'Runs locally with Docker, HPC with SLURM and Remote servers on AWS, Google Cloud, Azure.'
             },
             {
               icon: Shield,

@@ -28,6 +28,14 @@ inputs:
     - key: fs_license
       type: path
 
+input_format:
+  format_name: "T1w + T2w NIfTI"
+  description: "T1-weighted and T2-weighted MRI scans in NIfTI format."
+  example_structure: |
+    any_folder/
+      sub-01_T1w.nii.gz
+      sub-01_T2w.nii.gz
+
 validation:
   preflight_checks:
     - "file_exists(T1w)"

@@ -610,13 +610,55 @@ export const apiService = {
    * apiService.downloadFile('job_12345', '/bundle/volumes/aseg.nii.gz');
    */
   async downloadFile(jobId: string, filePath: string): Promise<void> {
-    // Create download URL with query parameters
     const url = `${API_BASE_URL}/api/results/${jobId}/download?file_path=${encodeURIComponent(filePath)}`;
-    
-    // Trigger download by opening URL in new window
-    // Browser will handle the file download based on FileResponse headers
     window.open(url, '_blank');
   },
+
+  // ================================================================================
+  // JOB RESULTS (real data from backend)
+  // ================================================================================
+
+  /** List all output files for a completed job. */
+  async getJobFiles(jobId: string): Promise<{ job_id: string; files: any[]; total: number }> {
+    const resp = await api.get(`/api/results/${jobId}/files`);
+    return resp.data;
+  },
+
+  /** Get quantitative metrics for a completed job. */
+  async getJobMetrics(jobId: string): Promise<{ job_id: string; metrics: Record<string, any>; csv_files: string[]; sources: string[] }> {
+    const resp = await api.get(`/api/results/${jobId}/metrics`);
+    return resp.data;
+  },
+
+  /** Get label definitions for segmentation. */
+  async getJobLabels(jobId: string): Promise<{ job_id: string; labels: Record<string, any> }> {
+    const resp = await api.get(`/api/results/${jobId}/labels`);
+    return resp.data;
+  },
+
+  /** Find anatomical volume files. */
+  async getJobVolumes(jobId: string): Promise<{ job_id: string; volumes: any[] }> {
+    const resp = await api.get(`/api/results/${jobId}/volume`);
+    return resp.data;
+  },
+
+  /** Find segmentation files. */
+  async getJobSegmentations(jobId: string): Promise<{ job_id: string; segmentations: any[] }> {
+    const resp = await api.get(`/api/results/${jobId}/segmentation`);
+    return resp.data;
+  },
+
+  /** Get provenance/reproducibility info. */
+  async getJobProvenance(jobId: string): Promise<any> {
+    const resp = await api.get(`/api/results/${jobId}/provenance`);
+    return resp.data;
+  },
+
+  /** Export results as tar.gz -- returns download URL. */
+  exportJobResultsUrl(jobId: string): string {
+    return `${API_BASE_URL}/api/results/${jobId}/export`;
+  },
+
 };
 
 export default apiService;

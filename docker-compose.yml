@@ -1,0 +1,156 @@
+# ==============================================================================
+#  NeuroInsight Research -- Full Production Stack
+#
+#  Bundles the app (backend + frontend) with infrastructure services.
+#
+#  Usage:
+#    docker compose up -d          # Start everything
+#    docker compose logs -f app    # Watch app logs
+#    docker compose down           # Stop everything
+#    docker compose down -v        # Stop and delete data
+# ==============================================================================
+
+name: neuroinsight
+
+services:
+  # ---- Application (Backend + Frontend) ------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: neuroinsight-app
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${APP_PORT:-3001}:8000"
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql://neuroinsight:${POSTGRES_PASSWORD:-neuroinsight_secure_password}@db:5432/neuroinsight
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secure_password}
+      MINIO_HOST: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin_secure}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-use-random-32chars}
+      WORKERS: ${WORKERS:-2}
+    volumes:
+      - app-data:/home/neuroinsight/app/data
+      - app-logs:/home/neuroinsight/app/logs
+      # Mount Docker socket for local job execution
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ---- Celery Worker -------------------------------------------------------
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: neuroinsight-worker
+    restart: unless-stopped
+    command: >
+      celery -A backend.core.celery_app:celery_app worker
+      --loglevel=info --concurrency=2 -Q default
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql://neuroinsight:${POSTGRES_PASSWORD:-neuroinsight_secure_password}@db:5432/neuroinsight
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secure_password}
+    volumes:
+      - app-data:/home/neuroinsight/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ---- PostgreSQL ----------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: neuroinsight-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: neuroinsight
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neuroinsight_secure_password}
+      POSTGRES_DB: neuroinsight
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neuroinsight"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- Redis ---------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: neuroinsight-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-redis_secure_password}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secure_password}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- MinIO ---------------------------------------------------------------
+  minio:
+    image: minio/minio:RELEASE.2024-01-18T22-51-28Z
+    container_name: neuroinsight-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin_secure}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- nginx (frontend + reverse proxy) ------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: neuroinsight-nginx
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+  app-data:
+  app-logs:

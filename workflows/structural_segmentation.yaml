@@ -25,6 +25,13 @@ inputs:
     - key: fs_license
       type: path
 
+input_format:
+  format_name: "Single NIfTI"
+  description: "A single T1-weighted MRI scan in NIfTI format."
+  example_structure: |
+    any_folder/
+      sub-01_T1w.nii.gz
+
 validation:
   preflight_checks:
     - "file_exists(T1w)"

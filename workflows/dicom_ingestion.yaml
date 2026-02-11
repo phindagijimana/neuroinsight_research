@@ -23,6 +23,17 @@ inputs:
       default: "sub-01"
       description: "Subject identifier for BIDS naming"
 
+input_format:
+  format_name: "DICOM Directory"
+  description: "A folder containing DICOM files from the scanner."
+  example_structure: |
+    dicom_dir/
+      series001/
+        IM-0001-0001.dcm
+        IM-0001-0002.dcm
+      series002/
+        IM-0002-0001.dcm
+
 validation:
   preflight_checks:
     - "directory_exists(dicom_dir)"

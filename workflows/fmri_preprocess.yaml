@@ -27,6 +27,19 @@ inputs:
       type: string
       default: "MNI152NLin2009cAsym"
 
+input_format:
+  format_name: "BIDS"
+  description: "BIDS dataset with functional BOLD and anatomical T1w scans."
+  example_structure: |
+    bids_dir/
+      dataset_description.json
+      sub-01/
+        anat/
+          sub-01_T1w.nii.gz
+        func/
+          sub-01_task-rest_bold.nii.gz
+          sub-01_task-rest_bold.json
+
 validation:
   preflight_checks:
     - "directory_exists(bids_dir)"

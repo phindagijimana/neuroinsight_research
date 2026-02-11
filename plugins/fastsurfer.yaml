@@ -24,8 +24,8 @@ references:
 
 container:
   runtime: docker
-  image: "deepmi/fastsurfer:latest"
-  digest: null
+  image: "deepmi/fastsurfer:v2.4.2"
+  digest: "sha256:d4f87043faa13ae481d49d4417bf28ac8c9957b17949921189bd1b51ff0fd743"
 
 inputs:
   required:
@@ -40,6 +40,19 @@ inputs:
     - key: fs_license
       type: path
       description: "FreeSurfer license file path"
+
+input_format:
+  format_name: "Single NIfTI"
+  description: "A single T1-weighted MRI scan in NIfTI format."
+  notes:
+    - "1mm isotropic resolution is recommended"
+    - "The file should be skull-on (not skull-stripped)"
+    - "Both .nii and .nii.gz are accepted"
+  example_structure: |
+    any_folder/
+      sub-01_T1w.nii.gz
+  file_types:
+    - ".nii.gz or .nii (T1-weighted NIfTI image)"
 
 parameters:
   - name: seg_only

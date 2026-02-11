@@ -722,10 +722,13 @@ class SLURMBackend(ExecutionBackend):
             # Write command template as script inside container
             # Substitute parameters into template
             cmd_script = command_template
+            # Sanitize parameters to prevent shell injection
+            dangerous_chars = set(";|&`$(){}!><\n\r")
             for key, value in spec.parameters.items():
                 if not str(key).startswith("_"):
-                    cmd_script = cmd_script.replace(f"{{{key}}}", str(value))
-                    cmd_script = cmd_script.replace(f"${{{key}}}", str(value))
+                    safe_val = "".join(c for c in str(value) if c not in dangerous_chars)
+                    cmd_script = cmd_script.replace(f"{{{key}}}", safe_val)
+                    cmd_script = cmd_script.replace(f"${{{key}}}", safe_val)
 
             lines.append("# Write pipeline command script")
             lines.append(f"cat > {job_dir}/scripts/pipeline_cmd.sh << 'NEUROINSIGHT_CMD_EOF'")

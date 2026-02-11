@@ -24,7 +24,7 @@ references:
 container:
   runtime: docker
   image: "freesurfer/freesurfer:7.4.1"
-  digest: null
+  digest: "sha256:10b6468cbd9fcd2db3708f4651d59ad75d4da849a2c5d8bb6dba217f08b8c46b"
 
 inputs:
   required:
@@ -38,6 +38,32 @@ inputs:
     - key: fs_license
       type: path
       description: "FreeSurfer license file path"
+
+input_format:
+  format_name: "FreeSurfer SUBJECTS_DIR"
+  description: "A FreeSurfer SUBJECTS_DIR containing completed recon-all output."
+  notes:
+    - "The subject must have completed recon-all (or FastSurfer)"
+    - "The surf/, mri/, and label/ subdirectories must exist"
+  example_structure: |
+    subjects_dir/
+      sub-01/
+        mri/
+          orig.mgz
+          aseg.mgz
+          brain.mgz
+        surf/
+          lh.white
+          rh.white
+          lh.pial
+          rh.pial
+        label/
+          lh.aparc.annot
+          rh.aparc.annot
+  file_types:
+    - ".mgz (FreeSurfer volume format)"
+    - "lh.* / rh.* (surface files)"
+    - ".annot (atlas annotations)"
 
 parameters:
   - name: threads

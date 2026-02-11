@@ -24,8 +24,8 @@ references:
 
 container:
   runtime: docker
-  image: "meldproject/meld_graph:latest"
-  digest: null
+  image: "meldproject/meld_graph:v2.2.4"
+  digest: "sha256:64917b746047a5395ecc5a298cfc097fc0194ee4c483e0730e49f97fe3590ff7"
 
 inputs:
   required:
@@ -36,6 +36,31 @@ inputs:
       type: string
       description: "Subject identifier within SUBJECTS_DIR"
   optional: []
+
+input_format:
+  format_name: "FreeSurfer SUBJECTS_DIR"
+  description: "A FreeSurfer SUBJECTS_DIR with completed recon-all for the subject."
+  notes:
+    - "Full recon-all must be completed (not just segmentation)"
+    - "Surface files (lh.white, rh.white, lh.pial, rh.pial) are required"
+    - "FLAIR images improve lesion detection if available"
+  example_structure: |
+    freesurfer_subjects_dir/
+      sub-01/
+        mri/
+          orig.mgz
+          brain.mgz
+          aseg.mgz
+        surf/
+          lh.white
+          rh.white
+          lh.pial
+          rh.pial
+          lh.thickness
+          rh.thickness
+  file_types:
+    - ".mgz (FreeSurfer volume format)"
+    - "lh.* / rh.* (surface files)"
 
 parameters:
   - name: threshold

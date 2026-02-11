@@ -24,8 +24,8 @@ references:
 
 container:
   runtime: docker
-  image: "nipy/heudiconv:latest"
-  digest: null
+  image: "nipy/heudiconv:1.3.4"
+  digest: "sha256:6ecbf13e3f77a0b10dd7876da7ae5f73fc3e5e6789649f65bbcfb477aabb16e8"
 
 inputs:
   required:
@@ -40,6 +40,26 @@ inputs:
       type: string
       default: "sub-01"
       description: "Subject identifier for BIDS naming"
+
+input_format:
+  format_name: "DICOM Directory"
+  description: "A folder containing DICOM files from the scanner."
+  notes:
+    - "DICOM files can be nested in subdirectories (the tool searches recursively)"
+    - "Common extensions: .dcm, .ima, or no extension"
+    - "Multiple series can be in the same directory"
+  example_structure: |
+    dicom_dir/
+      series001/
+        IM-0001-0001.dcm
+        IM-0001-0002.dcm
+        ...
+      series002/
+        IM-0002-0001.dcm
+        ...
+  file_types:
+    - ".dcm or .ima (DICOM images)"
+    - "DICOMDIR (optional index file)"
 
 parameters:
   - name: compress

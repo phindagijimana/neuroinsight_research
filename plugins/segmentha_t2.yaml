@@ -25,7 +25,7 @@ references:
 container:
   runtime: docker
   image: "freesurfer/freesurfer:7.4.1"
-  digest: null
+  digest: "sha256:10b6468cbd9fcd2db3708f4651d59ad75d4da849a2c5d8bb6dba217f08b8c46b"
 
 inputs:
   required:
@@ -42,6 +42,29 @@ inputs:
     - key: fs_license
       type: path
       description: "FreeSurfer license file path"
+
+input_format:
+  format_name: "FreeSurfer SUBJECTS_DIR + T2w NIfTI"
+  description: "A FreeSurfer SUBJECTS_DIR plus a high-resolution T2-weighted scan."
+  notes:
+    - "The subject must have completed recon-all (or FastSurfer)"
+    - "A separate T2-weighted NIfTI file is required for hippocampal subfield segmentation"
+    - "T2w should be high-resolution (0.4-0.7mm recommended)"
+  example_structure: |
+    subjects_dir/
+      sub-01/
+        mri/
+          orig.mgz
+          aseg.mgz
+        surf/
+          lh.white
+          rh.white
+
+    T2w file (separate):
+      sub-01_T2w.nii.gz
+  file_types:
+    - ".mgz (FreeSurfer volume format)"
+    - ".nii.gz (T2-weighted NIfTI image)"
 
 parameters:
   - name: threads

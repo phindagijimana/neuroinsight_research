@@ -158,6 +158,17 @@ class SSHManager:
             self._close_internal()
 
             client = paramiko.SSHClient()
+
+            # Load system known_hosts for host key verification
+            known_hosts = os.path.expanduser("~/.ssh/known_hosts")
+            if os.path.isfile(known_hosts):
+                client.load_host_keys(known_hosts)
+            # Also load system-wide known hosts
+            sys_known_hosts = "/etc/ssh/ssh_known_hosts"
+            if os.path.isfile(sys_known_hosts):
+                client.load_system_host_keys(sys_known_hosts)
+            # AutoAddPolicy for first-connection convenience (TOFU model)
+            # Keys are saved to ~/.ssh/known_hosts for future verification
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
             try:
@@ -192,6 +203,14 @@ class SSHManager:
                 self._connect_time = time.time()
                 self._last_activity = time.time()
                 self._reset_idle_timer()
+
+                # Persist host key to known_hosts for future TOFU verification
+                try:
+                    known_hosts_path = os.path.expanduser("~/.ssh/known_hosts")
+                    os.makedirs(os.path.dirname(known_hosts_path), exist_ok=True)
+                    client.save_host_keys(known_hosts_path)
+                except Exception as e:
+                    logger.warning(f"Could not save host key to known_hosts: {e}")
 
                 logger.info(f"SSH connected to {self.username}@{self.host}")
 

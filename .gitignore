@@ -40,6 +40,16 @@ outputs/
 # Environment
 .env
 
+# FreeSurfer license (contains personal info)
+license.txt
+
+# Local-only documents
+improve.md
+
+# Sample data (large binaries)
+sample_data/
+frontend/public/sample_data/
+
 # OS
 .DS_Store
 Thumbs.db

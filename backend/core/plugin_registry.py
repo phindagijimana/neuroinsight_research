@@ -33,6 +33,7 @@ class PluginDefinition:
     ui_category: str = "primary"
     ui_label: str = ""
     container_image: str = ""
+    container_digest: str = ""
     container_runtime: str = "docker"
     inputs_required: List[Dict[str, Any]] = field(default_factory=list)
     inputs_optional: List[Dict[str, Any]] = field(default_factory=list)
@@ -41,6 +42,7 @@ class PluginDefinition:
     resource_profiles: Dict[str, Any] = field(default_factory=dict)
     parallelization: Dict[str, Any] = field(default_factory=dict)
     outputs: List[Dict[str, Any]] = field(default_factory=list)
+    input_format: Dict[str, Any] = field(default_factory=dict)
     command: str = ""
     command_template: str = ""
     execution_stages: List[Dict[str, Any]] = field(default_factory=list)
@@ -61,12 +63,14 @@ class PluginDefinition:
             "ui_category": self.ui_category,
             "ui_label": self.ui_label,
             "container_image": self.container_image,
+            "container_digest": self.container_digest,
             "inputs": {"required": self.inputs_required, "optional": self.inputs_optional},
             "parameters": self.parameters,
             "resources": self.resources,
             "resource_profiles": self.resource_profiles,
             "parallelization": self.parallelization,
             "outputs": self.outputs,
+            "input_format": self.input_format,
             "authors": self.authors,
             "references": self.references,
         }
@@ -94,6 +98,7 @@ class WorkflowDefinition:
     description: str = ""
     inputs_required: List[Dict[str, Any]] = field(default_factory=list)
     inputs_optional: List[Dict[str, Any]] = field(default_factory=list)
+    input_format: Dict[str, Any] = field(default_factory=dict)
     steps: List[WorkflowStep] = field(default_factory=list)
     outputs: List[Dict[str, Any]] = field(default_factory=list)
     authors: List[str] = field(default_factory=list)
@@ -118,6 +123,9 @@ class WorkflowDefinition:
                 step_dict["plugin_description"] = plugin.description
             steps_list.append(step_dict)
 
+        # Extract flat list of plugin IDs referenced by steps
+        plugin_ids = [step.uses for step in self.steps if step.uses]
+
         return {
             "id": self.id,
             "name": self.name,
@@ -126,7 +134,9 @@ class WorkflowDefinition:
             "domain": self.domain,
             "description": self.description,
             "inputs": {"required": self.inputs_required, "optional": self.inputs_optional},
+            "input_format": self.input_format,
             "steps": steps_list,
+            "plugin_ids": plugin_ids,
             "outputs": self.outputs,
             "authors": self.authors,
             "references": self.references,
@@ -170,12 +180,17 @@ class PluginWorkflowRegistry:
                 container = data.get("container", {})
                 resources = data.get("resources", {})
 
-                # Extract command_template from execution.stages[0].command_template
+                # Extract command_template from multiple locations (in priority order):
+                #   1. execution.stages[0].command_template  (stage-based plugins)
+                #   2. execution.command_template             (single-stage plugins)
+                #   3. top-level "command"                    (legacy fallback)
                 execution_block = data.get("execution", {})
                 execution_stages = execution_block.get("stages", [])
                 command_template = ""
                 if execution_stages and isinstance(execution_stages[0], dict):
                     command_template = execution_stages[0].get("command_template", "")
+                if not command_template:
+                    command_template = execution_block.get("command_template", "")
 
                 # Fall back to top-level command if no stage template
                 top_level_command = data.get("command", "")
@@ -192,6 +207,7 @@ class PluginWorkflowRegistry:
                     ui_category=visibility.get("ui_category", "primary"),
                     ui_label=visibility.get("ui_label", ""),
                     container_image=container.get("image", ""),
+                    container_digest=container.get("digest", "") or "",
                     container_runtime=container.get("runtime", "docker"),
                     inputs_required=data.get("inputs", {}).get("required", []),
                     inputs_optional=data.get("inputs", {}).get("optional", []),
@@ -200,6 +216,7 @@ class PluginWorkflowRegistry:
                     resource_profiles=resources.get("profiles", {}),
                     parallelization=resources.get("parallelization", {}),
                     outputs=data.get("outputs", []),
+                    input_format=data.get("input_format", {}),
                     command=effective_command,
                     command_template=command_template,
                     execution_stages=[s for s in execution_stages if isinstance(s, dict)],
@@ -251,6 +268,7 @@ class PluginWorkflowRegistry:
                     description=data.get("description", ""),
                     inputs_required=data.get("inputs", {}).get("required", []),
                     inputs_optional=data.get("inputs", {}).get("optional", []),
+                    input_format=data.get("input_format", {}),
                     steps=steps,
                     outputs=data.get("outputs", []),
                     authors=data.get("authors", []),
