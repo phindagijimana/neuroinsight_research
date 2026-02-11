@@ -1,0 +1,113 @@
+# Plugin 1: DICOM to NIfTI Conversion
+id: dcm2niix
+name: "DICOM to NIfTI Converter"
+version: "1.0.0"
+type: plugin
+domain: conversion
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "DICOM to NIfTI Converter"
+
+description: >
+  Convert DICOM images to NIfTI format with JSON sidecars using dcm2niix
+  (via HeuDiConv). Supports all standard DICOM formats and produces
+  BIDS-compatible output.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on dcm2niix (Li et al., 2016)"
+
+references:
+  - "Li, X., et al. (2016). The first step for neuroimaging data analysis: DICOM to NIfTI conversion. Journal of Neuroscience Methods, 264, 47-56."
+
+container:
+  runtime: docker
+  image: "nipy/heudiconv:latest"
+  digest: null
+
+inputs:
+  required:
+    - key: dicom_dir
+      type: directory
+      description: "Directory containing DICOM files"
+  optional:
+    - key: heuristic
+      type: string
+      description: "HeuDiConv heuristic file for BIDS conversion"
+    - key: subject_id
+      type: string
+      default: "sub-01"
+      description: "Subject identifier for BIDS naming"
+
+parameters:
+  - name: compress
+    type: bool
+    default: true
+    description: "Compress output NIfTI files (.nii.gz)"
+  - name: merge_2d
+    type: bool
+    default: false
+    description: "Merge 2D slices into 3D volumes"
+  - name: anonymize
+    type: bool
+    default: false
+    description: "Remove identifying information from DICOM headers"
+
+resources:
+  profiles:
+    default:
+      cpus: 2
+      mem_gb: 8
+      time_hours: 1
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/dcm2niix"
+    logs_dir: "{run_root}/logs/dcm2niix"
+
+  stages:
+    - id: convert
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+
+        mkdir -p /data/outputs/native/dcm2niix
+        mkdir -p /data/outputs/logs/dcm2niix
+
+        # Run dcm2niix
+        dcm2niix \
+          -z y \
+          -f "%p_%s" \
+          -o /data/outputs/native/dcm2niix \
+          /data/inputs/dicom_dir
+
+        echo "DICOM to NIfTI conversion completed"
+
+native_outputs:
+  preserved: true
+  layout: "native/dcm2niix/*.nii.gz + *.json"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  extraction:
+    volumes:
+      - from: "{native_root}/*.nii.gz"
+        to: "{bundle.root}/volumes/"
+        method: copy
+    metadata:
+      - from: "{native_root}/*.json"
+        to: "{bundle.root}/metadata/"
+        method: copy
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true
+  record_inputs_hashes: true

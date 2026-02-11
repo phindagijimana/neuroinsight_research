@@ -1,0 +1,141 @@
+# Plugin 2: FreeSurfer recon-all
+id: freesurfer_recon
+name: "FreeSurfer recon-all"
+version: "7.4.1"
+type: plugin
+domain: structural_mri
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "FreeSurfer recon-all"
+
+description: >
+  Full cortical reconstruction and subcortical segmentation using FreeSurfer
+  recon-all. Produces cortical thickness maps, subcortical volumes, surface
+  meshes, and atlas-based parcellations.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on FreeSurfer (Fischl, 2012)"
+
+references:
+  - "Fischl, B. (2012). FreeSurfer. Neuroimage, 62(2), 774-781."
+
+container:
+  runtime: docker
+  image: "freesurfer/freesurfer:7.4.1"
+  digest: null
+
+inputs:
+  required:
+    - key: T1w
+      type: nifti
+      description: "T1-weighted MRI scan (.nii or .nii.gz)"
+  optional:
+    - key: subject_id
+      type: string
+      default: "subject"
+      description: "Subject identifier for SUBJECTS_DIR"
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license file path"
+
+parameters:
+  - name: threads
+    type: int
+    default: 8
+    min_value: 1
+    max_value: 32
+    description: "Number of CPU threads for parallel processing"
+  - name: hippocampal_subfields
+    type: bool
+    default: false
+    description: "Run hippocampal subfields segmentation (adds ~2h)"
+  - name: brainstem
+    type: bool
+    default: false
+    description: "Run brainstem substructures segmentation"
+
+resources:
+  profiles:
+    default:
+      cpus: 8
+      mem_gb: 32
+      time_hours: 8
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/freesurfer"
+    subjects_dir: "{run_root}/native/freesurfer/SUBJECTS_DIR"
+    logs_dir: "{run_root}/logs/freesurfer"
+  environment:
+    SUBJECTS_DIR: "{execution.workdirs.subjects_dir}"
+    FS_LICENSE: "{inputs.fs_license}"
+
+  stages:
+    - id: recon_all
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+
+        export SUBJECTS_DIR=/data/outputs/native/freesurfer/SUBJECTS_DIR
+        mkdir -p $SUBJECTS_DIR
+        mkdir -p /data/outputs/logs/freesurfer
+
+        # Run recon-all
+        recon-all \
+          -i /data/inputs/T1w.nii.gz \
+          -subject {subject_id} \
+          -all \
+          -parallel \
+          -openmp {threads}
+
+        echo "FreeSurfer recon-all completed"
+
+native_outputs:
+  preserved: true
+  layout: "SUBJECTS_DIR/{subject_id}/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  policy:
+    prefer_symlinks: true
+    convert_for_viewing: true
+  extraction:
+    conversions:
+      - from: "{subjects_dir}/{subject_id}/mri/norm.mgz"
+        to: "{bundle.root}/volumes/norm.nii.gz"
+        method: "mri_convert"
+      - from: "{subjects_dir}/{subject_id}/mri/aseg.mgz"
+        to: "{bundle.root}/volumes/aseg.nii.gz"
+        method: "mri_convert"
+      - from: "{subjects_dir}/{subject_id}/mri/aparc+aseg.mgz"
+        to: "{bundle.root}/volumes/aparc+aseg.nii.gz"
+        method: "mri_convert"
+    metrics:
+      - from: "{subjects_dir}/{subject_id}/stats/aseg.stats"
+        to: "{bundle.root}/metrics/aseg_stats.json"
+        method: "parse_aseg_stats"
+      - from: "{subjects_dir}/{subject_id}/stats"
+        glob: "*aparc*.stats"
+        to: "{bundle.root}/metrics/aparc_stats.json"
+        method: "parse_aparc_stats"
+    qc:
+      - method: "make_slice_overlays"
+        inputs:
+          anatomy: "{bundle.root}/volumes/norm.nii.gz"
+          labels: "{bundle.root}/volumes/aseg.nii.gz"
+        outputs:
+          out_dir: "{bundle.root}/qc"
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true
+  record_inputs_hashes: true

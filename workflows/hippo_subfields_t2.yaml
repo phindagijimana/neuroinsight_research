@@ -1,0 +1,63 @@
+# Workflow 4: Hippocampal Subfields Segmentation T1 + T2
+id: hippo_subfields_t2
+name: "Hippocampal Subfields Segmentation T1 + T2"
+version: "1.0.0"
+type: workflow
+domain: structural_mri
+
+description: >
+  Three-input workflow: FreeSurfer recon-all followed by enhanced
+  hippocampal subfield segmentation using both T1 and high-resolution
+  T2 MRI. Produces improved subfield delineation.
+
+developer_contract: >
+  Workflows only orchestrate plugins. No direct execution steps allowed.
+
+inputs:
+  required:
+    - key: T1w
+      type: nifti
+      description: "T1-weighted MRI scan"
+    - key: T2w
+      type: nifti
+      description: "High-resolution T2-weighted MRI scan"
+  optional:
+    - key: subject_id
+      type: string
+      default: "subject"
+    - key: fs_license
+      type: path
+
+validation:
+  preflight_checks:
+    - "file_exists(T1w)"
+    - "file_exists(T2w)"
+    - "is_nifti(T1w)"
+    - "is_nifti(T2w)"
+
+steps:
+  - id: recon_all
+    uses: freesurfer_recon
+    with:
+      T1w: "{inputs.T1w}"
+      subject_id: "{inputs.subject_id}"
+      fs_license: "{inputs.fs_license}"
+
+  - id: segment_ha
+    uses: segmentha_t2
+    with:
+      subjects_dir: "{step.recon_all.outputs.subjects_dir}"
+      subject_id: "{inputs.subject_id}"
+      T2w: "{inputs.T2w}"
+      fs_license: "{inputs.fs_license}"
+
+outputs:
+  native:
+    - "{run_root}/native/freesurfer"
+  bundle:
+    - "{run_root}/bundle"
+
+reproducibility:
+  pin_containers: true
+  write_run_manifest: true
+  store_exact_commands: true

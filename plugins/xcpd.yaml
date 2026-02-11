@@ -1,0 +1,133 @@
+# Plugin 7: XCP-D
+id: xcpd
+name: "XCP-D"
+version: "0.6.1"
+type: plugin
+domain: functional_mri
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "XCP-D"
+
+description: >
+  Postprocessing of fMRI data: denoising, parcellation, and functional
+  connectivity matrix generation. Operates on fMRIPrep derivatives.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on XCP-D (Ciric et al., 2022)"
+
+references:
+  - "Ciric, R., et al. (2022). XCP-D: A robust pipeline for the post-processing of fMRI data."
+
+container:
+  runtime: docker
+  image: "pennlinc/xcp_d:0.6.1"
+  digest: null
+
+inputs:
+  required:
+    - key: fmriprep_derivatives
+      type: path
+      description: "fMRIPrep derivatives directory"
+    - key: subject_id
+      type: string
+      description: "Subject identifier (without 'sub-' prefix)"
+  optional:
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license file path"
+
+parameters:
+  - name: smoothing
+    type: float
+    default: 6.0
+    min_value: 0.0
+    max_value: 12.0
+    description: "Smoothing kernel FWHM in mm"
+  - name: fd_threshold
+    type: float
+    default: 0.3
+    min_value: 0.1
+    max_value: 1.0
+    description: "Framewise displacement threshold for censoring"
+  - name: low_pass
+    type: float
+    default: 0.08
+    min_value: 0.01
+    max_value: 0.2
+    description: "Low-pass filter frequency (Hz)"
+  - name: atlases
+    type: string
+    default: "Schaefer2018"
+    description: "Atlas(es) for parcellation"
+
+resources:
+  profiles:
+    default:
+      cpus: 4
+      mem_gb: 16
+      time_hours: 2
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/xcpd"
+    logs_dir: "{run_root}/logs/xcpd"
+
+  stages:
+    - id: xcpd_run
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+
+        mkdir -p /data/outputs/native/xcpd
+        mkdir -p /data/outputs/logs/xcpd
+
+        xcp_d \
+          /data/inputs/fmriprep_derivatives \
+          /data/outputs/native/xcpd \
+          participant \
+          --participant-label {subject_id} \
+          --smoothing {smoothing} \
+          --fd-threshold {fd_threshold} \
+          --low-pass {low_pass} \
+          -p {atlases} \
+          --nthreads {threads} \
+          --omp-nthreads {omp_nthreads}
+
+        echo "XCP-D completed successfully"
+
+native_outputs:
+  preserved: true
+  layout: "native/xcpd/sub-{subject_id}/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  extraction:
+    volumes:
+      - from: "{native_root}/sub-{subject_id}/func/*denoised_bold.nii.gz"
+        to: "{bundle.root}/volumes/"
+        method: copy
+    metrics:
+      - from: "{native_root}/sub-{subject_id}/func/*connectivity*.tsv"
+        to: "{bundle.root}/metrics/"
+        method: copy
+      - from: "{native_root}/sub-{subject_id}/func/*timeseries*.tsv"
+        to: "{bundle.root}/metrics/"
+        method: copy
+    qc:
+      - from: "{native_root}/sub-{subject_id}/figures/*.svg"
+        to: "{bundle.root}/qc/"
+        method: copy
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true
+  record_inputs_hashes: true

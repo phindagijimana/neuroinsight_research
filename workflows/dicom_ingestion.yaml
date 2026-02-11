@@ -1,0 +1,47 @@
+# Workflow 1: DICOM Ingestion
+id: dicom_ingestion
+name: "DICOM to NIfTI Ingestion"
+version: "1.0.0"
+type: workflow
+domain: conversion
+
+description: >
+  Convert DICOM images to NIfTI format with JSON sidecars.
+  Entry point for all imaging data into the platform.
+
+developer_contract: >
+  Workflows only orchestrate plugins. No direct execution steps allowed.
+
+inputs:
+  required:
+    - key: dicom_dir
+      type: directory
+      description: "Directory containing DICOM files"
+  optional:
+    - key: subject_id
+      type: string
+      default: "sub-01"
+      description: "Subject identifier for BIDS naming"
+
+validation:
+  preflight_checks:
+    - "directory_exists(dicom_dir)"
+    - "directory_has_dicoms(dicom_dir)"
+
+steps:
+  - id: convert
+    uses: dcm2niix
+    with:
+      dicom_dir: "{inputs.dicom_dir}"
+      subject_id: "{inputs.subject_id}"
+
+outputs:
+  native:
+    - "{run_root}/native/dcm2niix"
+  bundle:
+    - "{run_root}/bundle"
+
+reproducibility:
+  pin_containers: true
+  write_run_manifest: true
+  store_exact_commands: true

@@ -1,0 +1,109 @@
+# Plugin 12: FreeSurfer Longitudinal Stats (Hidden Utility)
+id: freesurfer_longitudinal_stats
+name: "FreeSurfer Longitudinal Stats Utility"
+version: "1.0.0"
+type: plugin
+domain: structural_mri
+
+visibility:
+  user_selectable: false
+  ui_category: internal_utility
+  ui_label: "Longitudinal Stats Utility"
+
+description: >
+  Utility plugin for post-processing existing FreeSurfer longitudinal
+  outputs. Hidden from UI plugin list. Invoked by workflows only.
+  Generates QDEC-style tables and optional slopes summaries.
+
+authors:
+  - "NeuroInsight Research Team"
+
+references:
+  - "https://surfer.nmr.mgh.harvard.edu/fswiki/FsTutorial/LongitudinalTutorial"
+
+container:
+  runtime: docker
+  image: "freesurfer/freesurfer:7.4.1"
+  digest: null
+
+inputs:
+  required:
+    - key: subjects_dir
+      type: path
+      description: "SUBJECTS_DIR containing LONG dirs"
+    - key: base_id
+      type: string
+      description: "Base template identifier"
+    - key: timepoints
+      type: list
+      min_items: 2
+      item_schema:
+        - key: tp_id
+          type: string
+  optional:
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license file path"
+    - key: time_variable_table
+      type: path
+      description: "Optional TSV/CSV with time variables"
+    - key: run_slopes
+      type: bool
+      default: true
+
+parameters: []
+
+resources:
+  profiles:
+    default:
+      cpus: 4
+      mem_gb: 16
+      time_hours: 2
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    logs_dir: "{run_root}/logs/freesurfer_longitudinal_stats"
+  environment:
+    FS_LICENSE: "{inputs.fs_license}"
+    SUBJECTS_DIR: "{inputs.subjects_dir}"
+
+  stages:
+    - id: stats
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+
+        mkdir -p /data/outputs/bundle/metrics
+        mkdir -p /data/outputs/logs/freesurfer_longitudinal_stats
+
+        python3 -m neuroinsight_fs_long_stats \
+          --subjects-dir "{SUBJECTS_DIR}" \
+          --base-id "{inputs.base_id}" \
+          --timepoints "{render_tp_list(inputs.timepoints)}" \
+          --out "/data/outputs/bundle/metrics"
+
+        echo "Longitudinal stats extraction completed"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  extraction:
+    metrics:
+      - from: "{bundle.root}/metrics/qdec_table_template.tsv"
+        to: "{bundle.root}/metrics/qdec_table_template.tsv"
+        method: identity
+      - from: "{bundle.root}/metrics/longitudinal_slopes.json"
+        to: "{bundle.root}/metrics/longitudinal_slopes.json"
+        method: identity
+      - from: "{bundle.root}/metrics/longitudinal_postprocess_summary.json"
+        to: "{bundle.root}/metrics/longitudinal_postprocess_summary.json"
+        method: identity
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true

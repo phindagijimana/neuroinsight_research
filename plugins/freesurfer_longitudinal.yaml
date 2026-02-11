@@ -1,0 +1,160 @@
+# Plugin 11: FreeSurfer Longitudinal
+id: freesurfer_longitudinal
+name: "FreeSurfer Longitudinal (CROSS->BASE->LONG)"
+version: "1.0.0"
+type: plugin
+domain: structural_mri
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "FreeSurfer Longitudinal"
+
+description: >
+  Runs the full FreeSurfer longitudinal stream for a subject with >=2
+  timepoints: (1) CROSS recon-all per timepoint, (2) BASE within-subject
+  template, (3) LONG recon-all per timepoint against BASE.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on FreeSurfer (Reuter et al., 2012)"
+
+references:
+  - "Reuter, M., et al. (2012). Within-subject template estimation for unbiased longitudinal image analysis. NeuroImage, 61(4), 1402-1418."
+
+container:
+  runtime: docker
+  image: "freesurfer/freesurfer:7.4.1"
+  digest: null
+
+inputs:
+  required:
+    - key: timepoints
+      type: list
+      min_items: 2
+      item_schema:
+        - key: tp_id
+          type: string
+          description: "Timepoint id (e.g., sub-001_ses-01)"
+        - key: T1w
+          type: nifti
+          description: "T1 NIfTI file for this timepoint"
+  optional:
+    - key: base_id
+      type: string
+      description: "Base template id (default derived)"
+    - key: subjects_dir
+      type: path
+      description: "SUBJECTS_DIR path"
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license file path"
+    - key: parallelism
+      type: object
+      properties:
+        max_parallel_cross: { type: int, default: 2, min: 1 }
+        max_parallel_long: { type: int, default: 2, min: 1 }
+    - key: resume
+      type: bool
+      default: true
+      description: "Skip completed stages using recon-all.done markers"
+
+parameters:
+  - name: threads
+    type: int
+    default: 8
+    min_value: 1
+    max_value: 32
+    description: "Number of CPU threads per stage"
+
+resources:
+  profiles:
+    cross:
+      cpus: 8
+      mem_gb: 32
+      time_hours: 8
+      gpus: 0
+    base:
+      cpus: 8
+      mem_gb: 48
+      time_hours: 10
+      gpus: 0
+    long:
+      cpus: 8
+      mem_gb: 32
+      time_hours: 10
+      gpus: 0
+
+execution:
+  style: multi_stage
+  workdirs:
+    native_root: "{run_root}/native/freesurfer"
+    subjects_dir: "{inputs.subjects_dir || run_root + '/native/freesurfer/SUBJECTS_DIR'}"
+    logs_dir: "{run_root}/logs/freesurfer_longitudinal"
+  environment:
+    FS_LICENSE: "{inputs.fs_license}"
+    SUBJECTS_DIR: "{execution.workdirs.subjects_dir}"
+
+  stages:
+    - id: cross
+      kind: per_timepoint
+      profile: cross
+      concurrency: "{inputs.parallelism.max_parallel_cross || 2}"
+      resume_done_file: "{SUBJECTS_DIR}/{tp.tp_id}/scripts/recon-all.done"
+      command_template: |
+        #!/bin/bash
+        set -e
+        recon-all -subjid "{tp.tp_id}" -i "{tp.T1w}" -all -openmp {threads}
+
+    - id: base
+      kind: single
+      profile: base
+      resume_done_file: "{SUBJECTS_DIR}/{base_id}/scripts/recon-all.done"
+      command_template: |
+        #!/bin/bash
+        set -e
+        recon-all -base "{base_id}" {tp_args} -all -openmp {threads}
+
+    - id: long
+      kind: per_timepoint
+      profile: long
+      concurrency: "{inputs.parallelism.max_parallel_long || 2}"
+      resume_done_file: "{SUBJECTS_DIR}/{tp.tp_id}.long.{base_id}/scripts/recon-all.done"
+      command_template: |
+        #!/bin/bash
+        set -e
+        recon-all -long "{tp.tp_id}" "{base_id}" -all -openmp {threads}
+
+native_outputs:
+  preserved: true
+  layout: "SUBJECTS_DIR/<tp>/, SUBJECTS_DIR/<base_id>/, SUBJECTS_DIR/<tp>.long.<base_id>/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  policy:
+    prefer_symlinks: true
+    convert_for_viewing: true
+  extraction:
+    from_long_dirs: true
+    timepoint_dir_pattern: "{tp.tp_id}.long.{base_id}"
+    conversions:
+      - from: "{SUBJECTS_DIR}/{tpdir}/mri/norm.mgz"
+        to: "{bundle.root}/volumes/{tp.tp_id}/norm.nii.gz"
+        method: "mri_convert"
+      - from: "{SUBJECTS_DIR}/{tpdir}/mri/aseg.mgz"
+        to: "{bundle.root}/volumes/{tp.tp_id}/aseg.nii.gz"
+        method: "mri_convert"
+    metrics:
+      - from: "{SUBJECTS_DIR}/{tpdir}/stats/aseg.stats"
+        to: "{bundle.root}/metrics/{tp.tp_id}/aseg_stats.json"
+        method: "parse_aseg_stats"
+    summary:
+      - to: "{bundle.root}/metrics/longitudinal_summary.json"
+        method: "summarize_longitudinal"
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true
+  record_inputs_hashes: true

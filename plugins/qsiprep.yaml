@@ -1,0 +1,141 @@
+# Plugin 8: QSIPrep
+id: qsiprep
+name: "QSIPrep"
+version: "0.20.0"
+type: plugin
+domain: diffusion_mri
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "QSIPrep"
+
+description: >
+  Preprocessing of diffusion MRI data including distortion correction,
+  motion correction, coregistration, and quality control reporting.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on QSIPrep (Cieslak et al., 2021)"
+
+references:
+  - "Cieslak, M., et al. (2021). QSIPrep: an integrative platform for preprocessing and reconstructing diffusion MRI data. Nature Methods, 18(7), 775-778."
+
+container:
+  runtime: docker
+  image: "pennbbl/qsiprep:0.20.0"
+  digest: null
+
+inputs:
+  required:
+    - key: bids_dir
+      type: directory
+      description: "BIDS-formatted dataset directory with DWI data"
+    - key: subject_id
+      type: string
+      description: "Subject identifier (without 'sub-' prefix)"
+  optional:
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license file path"
+
+parameters:
+  - name: output_resolution
+    type: float
+    default: 1.5
+    min_value: 0.5
+    max_value: 5.0
+    description: "Isotropic voxel size (mm) for outputs"
+  - name: denoise
+    type: bool
+    default: true
+    description: "Apply denoising (Veraart et al., 2016)"
+  - name: unringing
+    type: bool
+    default: true
+    description: "Apply Gibbs unringing (Kellner et al., 2016)"
+  - name: hmc_model
+    type: choice
+    default: eddy
+    choices: ["eddy", "3dSHORE", "none"]
+    description: "Head motion correction model"
+  - name: combine_all_dwis
+    type: bool
+    default: true
+    description: "Combine all DWI series into a single output"
+
+resources:
+  profiles:
+    default:
+      cpus: 8
+      mem_gb: 32
+      time_hours: 4
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/qsiprep"
+    logs_dir: "{run_root}/logs/qsiprep"
+
+  stages:
+    - id: qsiprep_run
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+
+        mkdir -p /data/outputs/native/qsiprep
+        mkdir -p /data/outputs/logs/qsiprep
+
+        QSIPREP_CMD="qsiprep /data/inputs/bids_dir /data/outputs/native/qsiprep participant"
+        QSIPREP_CMD="$QSIPREP_CMD --participant-label {subject_id}"
+        QSIPREP_CMD="$QSIPREP_CMD --output-resolution {output_resolution}"
+        QSIPREP_CMD="$QSIPREP_CMD --nthreads {threads}"
+        QSIPREP_CMD="$QSIPREP_CMD --omp-nthreads {omp_nthreads}"
+        QSIPREP_CMD="$QSIPREP_CMD --mem_mb $((1000 * {mem_gb}))"
+        QSIPREP_CMD="$QSIPREP_CMD --hmc-model {hmc_model}"
+
+        if [ "{denoise}" = "true" ]; then
+          QSIPREP_CMD="$QSIPREP_CMD --denoise-method dwidenoise"
+        fi
+
+        if [ "{unringing}" = "true" ]; then
+          QSIPREP_CMD="$QSIPREP_CMD --unringing-method mrdegibbs"
+        fi
+
+        if [ "{combine_all_dwis}" = "true" ]; then
+          QSIPREP_CMD="$QSIPREP_CMD --combine-all-dwis"
+        fi
+
+        $QSIPREP_CMD
+
+        echo "QSIPrep completed successfully"
+
+native_outputs:
+  preserved: true
+  layout: "native/qsiprep/sub-{subject_id}/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  extraction:
+    volumes:
+      - from: "{native_root}/sub-{subject_id}/dwi/*desc-preproc_dwi.nii.gz"
+        to: "{bundle.root}/volumes/"
+        method: copy
+    metrics:
+      - from: "{native_root}/sub-{subject_id}/dwi/*confounds*.tsv"
+        to: "{bundle.root}/metrics/"
+        method: copy
+    qc:
+      - from: "{native_root}/sub-{subject_id}.html"
+        to: "{bundle.root}/qc/report.html"
+        method: copy
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true
+  record_inputs_hashes: true

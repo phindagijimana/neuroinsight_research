@@ -1,0 +1,114 @@
+# Plugin 5: FreeSurfer SegmentHA_T2
+id: segmentha_t2
+name: "FreeSurfer SegmentHA_T2"
+version: "7.4.1"
+type: plugin
+domain: structural_mri
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "FreeSurfer SegmentHA_T2"
+
+description: >
+  Enhanced hippocampal subfield segmentation using high-resolution T2 MRI
+  in addition to T1. Produces improved subfield delineation, especially
+  for CA subfields.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on FreeSurfer (Iglesias et al., 2015)"
+
+references:
+  - "Iglesias, J.E. et al. (2015). A computational atlas of the hippocampal formation using ex vivo, ultra-high resolution MRI. Neuroimage, 115, 117-137."
+
+container:
+  runtime: docker
+  image: "freesurfer/freesurfer:7.4.1"
+  digest: null
+
+inputs:
+  required:
+    - key: subjects_dir
+      type: path
+      description: "FreeSurfer SUBJECTS_DIR (recon-all completed)"
+    - key: subject_id
+      type: string
+      description: "Subject identifier within SUBJECTS_DIR"
+    - key: T2w
+      type: nifti
+      description: "High-resolution T2-weighted MRI (.nii or .nii.gz)"
+  optional:
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license file path"
+
+parameters:
+  - name: threads
+    type: int
+    default: 4
+    min_value: 1
+    max_value: 16
+    description: "Number of CPU threads"
+
+resources:
+  profiles:
+    default:
+      cpus: 4
+      mem_gb: 16
+      time_hours: 2
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{inputs.subjects_dir}"
+    logs_dir: "{run_root}/logs/segmentha_t2"
+  environment:
+    SUBJECTS_DIR: "{inputs.subjects_dir}"
+    FS_LICENSE: "{inputs.fs_license}"
+
+  stages:
+    - id: segment_ha_t2
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+
+        export SUBJECTS_DIR=/data/inputs/subjects_dir
+        mkdir -p /data/outputs/logs/segmentha_t2
+
+        # Run hippocampal subfield segmentation with T2
+        segmentHA_T2.sh {subject_id} /data/inputs/T2w.nii.gz T2 1
+
+        echo "SegmentHA_T2 completed successfully"
+
+native_outputs:
+  preserved: true
+  layout: "SUBJECTS_DIR/{subject_id}/mri/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  extraction:
+    conversions:
+      - from: "{native_root}/{subject_id}/mri/lh.hippoAmygLabels-T1T2.v22.mgz"
+        to: "{bundle.root}/volumes/lh_hippo_subfields_T2.nii.gz"
+        method: "mri_convert"
+      - from: "{native_root}/{subject_id}/mri/rh.hippoAmygLabels-T1T2.v22.mgz"
+        to: "{bundle.root}/volumes/rh_hippo_subfields_T2.nii.gz"
+        method: "mri_convert"
+    metrics:
+      - from: "{native_root}/{subject_id}/mri/lh.hippoSfVolumes-T1T2.v22.txt"
+        to: "{bundle.root}/metrics/lh_hippo_volumes_T2.json"
+        method: "parse_hippo_stats"
+      - from: "{native_root}/{subject_id}/mri/rh.hippoSfVolumes-T1T2.v22.txt"
+        to: "{bundle.root}/metrics/rh_hippo_volumes_T2.json"
+        method: "parse_hippo_stats"
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true
+  record_inputs_hashes: true

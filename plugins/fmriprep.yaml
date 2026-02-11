@@ -1,0 +1,147 @@
+# Plugin 6: fMRIPrep
+id: fmriprep
+name: "fMRIPrep"
+version: "23.2.1"
+type: plugin
+domain: functional_mri
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "fMRIPrep"
+
+description: >
+  Preprocessing of functional MRI data including motion correction,
+  distortion correction, coregistration to anatomical, and confound
+  estimation. Produces BIDS-derivatives outputs.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on fMRIPrep (Esteban et al., 2019)"
+
+references:
+  - "Esteban, O., et al. (2019). fMRIPrep: a robust preprocessing pipeline for functional MRI. Nature Methods, 16(1), 111-116."
+
+container:
+  runtime: docker
+  image: "nipreps/fmriprep:23.2.1"
+  digest: null
+
+inputs:
+  required:
+    - key: bids_dir
+      type: directory
+      description: "BIDS-formatted dataset directory"
+    - key: subject_id
+      type: string
+      description: "Subject identifier (without 'sub-' prefix)"
+  optional:
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license file path"
+    - key: output_spaces
+      type: string
+      default: "MNI152NLin2009cAsym"
+      description: "Output space(s) for preprocessing"
+
+parameters:
+  - name: task
+    type: string
+    default: ""
+    description: "Task to preprocess (empty = all tasks)"
+  - name: dummy_scans
+    type: int
+    default: 0
+    min_value: 0
+    max_value: 20
+    description: "Number of non-steady-state volumes to discard"
+  - name: use_aroma
+    type: bool
+    default: false
+    description: "Enable ICA-AROMA denoising"
+  - name: ignore_fieldmaps
+    type: bool
+    default: false
+    description: "Skip distortion correction even if fieldmaps present"
+
+resources:
+  profiles:
+    default:
+      cpus: 8
+      mem_gb: 32
+      time_hours: 6
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/fmriprep"
+    logs_dir: "{run_root}/logs/fmriprep"
+  environment:
+    FS_LICENSE: "{inputs.fs_license}"
+
+  stages:
+    - id: fmriprep_run
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+
+        mkdir -p /data/outputs/native/fmriprep
+        mkdir -p /data/outputs/logs/fmriprep
+
+        FMRIPREP_CMD="fmriprep /data/inputs/bids_dir /data/outputs/native/fmriprep participant"
+        FMRIPREP_CMD="$FMRIPREP_CMD --participant-label {subject_id}"
+        FMRIPREP_CMD="$FMRIPREP_CMD --output-spaces {output_spaces}"
+        FMRIPREP_CMD="$FMRIPREP_CMD --nthreads {threads}"
+        FMRIPREP_CMD="$FMRIPREP_CMD --omp-nthreads {omp_nthreads}"
+        FMRIPREP_CMD="$FMRIPREP_CMD --mem_mb $((1000 * {mem_gb}))"
+        FMRIPREP_CMD="$FMRIPREP_CMD --fs-license-file /opt/freesurfer/license.txt"
+
+        if [ -n "{task}" ]; then
+          FMRIPREP_CMD="$FMRIPREP_CMD --task-id {task}"
+        fi
+
+        if [ "{dummy_scans}" -gt 0 ]; then
+          FMRIPREP_CMD="$FMRIPREP_CMD --dummy-scans {dummy_scans}"
+        fi
+
+        if [ "{use_aroma}" = "true" ]; then
+          FMRIPREP_CMD="$FMRIPREP_CMD --use-aroma"
+        fi
+
+        if [ "{ignore_fieldmaps}" = "true" ]; then
+          FMRIPREP_CMD="$FMRIPREP_CMD --ignore fieldmaps"
+        fi
+
+        $FMRIPREP_CMD
+
+        echo "fMRIPrep completed successfully"
+
+native_outputs:
+  preserved: true
+  layout: "native/fmriprep/sub-{subject_id}/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  extraction:
+    volumes:
+      - from: "{native_root}/sub-{subject_id}/func/*desc-preproc_bold.nii.gz"
+        to: "{bundle.root}/volumes/"
+        method: copy
+    metrics:
+      - from: "{native_root}/sub-{subject_id}/func/*confounds_timeseries.tsv"
+        to: "{bundle.root}/metrics/"
+        method: copy
+    qc:
+      - from: "{native_root}/sub-{subject_id}.html"
+        to: "{bundle.root}/qc/report.html"
+        method: copy
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true
+  record_inputs_hashes: true

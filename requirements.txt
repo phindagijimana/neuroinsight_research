@@ -1,0 +1,32 @@
+# NeuroInsight Research - Python Dependencies
+
+# Web Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Database
+sqlalchemy==2.0.25
+alembic==1.13.1
+psycopg2-binary==2.9.9
+
+# Task Queue (Celery + Redis)
+celery[redis]==5.3.6
+redis==5.0.1
+
+# Object Storage (MinIO)
+minio==7.2.3
+
+# Docker (Local Backend)
+docker==7.0.0
+
+# SSH/HPC (Phase 2)
+paramiko==3.4.0
+
+# Data Processing
+pyyaml==6.0.1
+python-multipart==0.0.6
+
+# Utilities
+python-dotenv==1.0.0

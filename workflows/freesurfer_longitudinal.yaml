@@ -1,0 +1,68 @@
+# Workflow 10: FreeSurfer Longitudinal Processing
+id: wf_freesurfer_longitudinal
+name: "FreeSurfer Longitudinal Processing"
+version: "1.0.0"
+type: workflow
+domain: structural_mri
+
+description: >
+  User-facing workflow that runs FreeSurfer longitudinal processing
+  (CROSS -> BASE -> LONG) for >=2 timepoints via the
+  freesurfer_longitudinal plugin.
+
+developer_contract: >
+  Workflows only orchestrate plugins. No direct execution steps allowed.
+
+inputs:
+  required:
+    - key: timepoints
+      type: list
+      min_items: 2
+      item_schema:
+        - key: tp_id
+          type: string
+        - key: T1w
+          type: nifti
+  optional:
+    - key: base_id
+      type: string
+    - key: subjects_dir
+      type: path
+    - key: fs_license
+      type: path
+    - key: resume
+      type: bool
+      default: true
+    - key: parallelism
+      type: object
+      properties:
+        max_parallel_cross: { type: int, default: 2 }
+        max_parallel_long: { type: int, default: 2 }
+
+validation:
+  preflight_checks:
+    - "timepoints_count(timepoints) >= 2"
+    - "all_tp_id_unique(timepoints[].tp_id)"
+    - "all_nifti_readable(timepoints[].T1w)"
+
+steps:
+  - id: longitudinal
+    uses: freesurfer_longitudinal
+    with:
+      timepoints: "{inputs.timepoints}"
+      base_id: "{inputs.base_id}"
+      subjects_dir: "{inputs.subjects_dir}"
+      fs_license: "{inputs.fs_license}"
+      resume: "{inputs.resume}"
+      parallelism: "{inputs.parallelism}"
+
+outputs:
+  native:
+    - "{run_root}/native/freesurfer/SUBJECTS_DIR"
+  bundle:
+    - "{run_root}/bundle"
+
+reproducibility:
+  pin_containers: true
+  write_run_manifest: true
+  store_exact_commands: true

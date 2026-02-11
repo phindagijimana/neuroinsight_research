@@ -1,0 +1,180 @@
+# Plugin 3: FastSurfer
+id: fastsurfer
+name: "FastSurfer"
+version: "2.0.0"
+type: plugin
+domain: structural_mri
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "FastSurfer"
+
+description: >
+  Fast deep learning-based cortical parcellation and segmentation,
+  FreeSurfer-compatible. Whole-brain segmentation in under 1 minute on GPU
+  vs 6-8 hours for FreeSurfer.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on FastSurfer (Henschel et al., 2020)"
+
+references:
+  - "Henschel, L., et al. (2020). FastSurfer - A fast and accurate deep learning based neuroimaging pipeline. NeuroImage, 219, 117012."
+
+container:
+  runtime: docker
+  image: "deepmi/fastsurfer:latest"
+  digest: null
+
+inputs:
+  required:
+    - key: T1w
+      type: nifti
+      description: "T1-weighted MRI scan (1mm isotropic recommended)"
+  optional:
+    - key: subject_id
+      type: string
+      default: "subject"
+      description: "Subject identifier"
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license file path"
+
+parameters:
+  - name: seg_only
+    type: bool
+    default: false
+    description: "Run segmentation only (skip surface reconstruction)"
+  - name: use_cpu
+    type: bool
+    default: false
+    description: "Force CPU processing (slower, use if GPU unavailable)"
+  - name: batch_size
+    type: int
+    default: 1
+    min_value: 1
+    max_value: 8
+    description: "Batch size for network inference"
+  - name: compute_volumes
+    type: bool
+    default: true
+    description: "Compute regional volumes from segmentation"
+
+resources:
+  profiles:
+    default:
+      cpus: 4
+      mem_gb: 16
+      time_hours: 1
+      gpus: 1
+    cpu_only:
+      cpus: 8
+      mem_gb: 16
+      time_hours: 3
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/fastsurfer"
+    logs_dir: "{run_root}/logs/fastsurfer"
+
+  stages:
+    - id: fastsurfer_run
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+
+        export SUBJECTS_DIR=/data/outputs/native/fastsurfer
+        mkdir -p $SUBJECTS_DIR
+        mkdir -p /data/outputs/logs/fastsurfer
+
+        # Set GPU/CPU flag
+        if [ "{use_cpu}" = "true" ]; then
+          DEVICE="cpu"
+        else
+          DEVICE="auto"
+        fi
+
+        # Set segmentation mode
+        if [ "{seg_only}" = "true" ]; then
+          RUN_MODE="--seg_only"
+        else
+          RUN_MODE=""
+        fi
+
+        # Run FastSurfer
+        /fastsurfer/run_fastsurfer.sh \
+          --t1 /data/inputs/T1w.nii.gz \
+          --sid {subject_id} \
+          --sd $SUBJECTS_DIR \
+          --device $DEVICE \
+          --batch_size {batch_size} \
+          $RUN_MODE
+
+        # Extract metrics if volume computation enabled
+        if [ "{compute_volumes}" = "true" ]; then
+          python3 << 'PYEOF'
+        import json
+        from pathlib import Path
+
+        stats_file = Path("/data/outputs/native/fastsurfer/{subject_id}/stats/aseg.stats")
+        if stats_file.exists():
+            metrics = {}
+            with open(stats_file) as f:
+                for line in f:
+                    if "Left-Hippocampus" in line:
+                        metrics["left_hippocampus_volume_mm3"] = float(line.split()[3])
+                    if "Right-Hippocampus" in line:
+                        metrics["right_hippocampus_volume_mm3"] = float(line.split()[3])
+                    if "BrainSegVol," in line:
+                        metrics["total_brain_volume_mm3"] = float(line.split()[3])
+            with open("/data/outputs/bundle/metrics/aseg_stats.json", "w") as f:
+                json.dump(metrics, f, indent=2)
+            print("Metrics extracted successfully")
+        PYEOF
+        fi
+
+        echo "FastSurfer completed successfully"
+
+native_outputs:
+  preserved: true
+  layout: "native/fastsurfer/{subject_id}/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  policy:
+    prefer_symlinks: true
+    convert_for_viewing: true
+  extraction:
+    conversions:
+      - from: "{native_root}/{subject_id}/mri/orig.mgz"
+        to: "{bundle.root}/volumes/orig.nii.gz"
+        method: "mri_convert"
+      - from: "{native_root}/{subject_id}/mri/aseg.mgz"
+        to: "{bundle.root}/volumes/aseg.nii.gz"
+        method: "mri_convert"
+      - from: "{native_root}/{subject_id}/mri/aparc.DKTatlas+aseg.deep.mgz"
+        to: "{bundle.root}/volumes/aparc+aseg.nii.gz"
+        method: "mri_convert"
+    metrics:
+      - from: "{native_root}/{subject_id}/stats/aseg.stats"
+        to: "{bundle.root}/metrics/aseg_stats.json"
+        method: "parse_aseg_stats"
+    qc:
+      - method: "make_slice_overlays"
+        inputs:
+          anatomy: "{bundle.root}/volumes/orig.nii.gz"
+          labels: "{bundle.root}/volumes/aseg.nii.gz"
+        outputs:
+          out_dir: "{bundle.root}/qc"
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true
+  record_inputs_hashes: true

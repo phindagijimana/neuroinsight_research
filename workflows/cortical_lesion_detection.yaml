@@ -1,0 +1,61 @@
+# Workflow 9: Cortical Lesion Detection (Epilepsy Research)
+id: cortical_lesion_detection
+name: "Cortical Lesion Detection"
+version: "1.0.0"
+type: workflow
+domain: epilepsy
+
+description: >
+  Epilepsy research workflow: FreeSurfer recon-all followed by MELD Graph
+  cortical dysplasia detection. Produces lesion probability maps and
+  detection metrics.
+
+developer_contract: >
+  Workflows only orchestrate plugins. No direct execution steps allowed.
+
+inputs:
+  required:
+    - key: T1w
+      type: nifti
+      description: "T1-weighted MRI scan"
+  optional:
+    - key: subject_id
+      type: string
+      default: "subject"
+    - key: fs_license
+      type: path
+    - key: threshold
+      type: float
+      default: 0.5
+
+validation:
+  preflight_checks:
+    - "file_exists(T1w)"
+    - "is_nifti(T1w)"
+
+steps:
+  - id: recon_all
+    uses: freesurfer_recon
+    with:
+      T1w: "{inputs.T1w}"
+      subject_id: "{inputs.subject_id}"
+      fs_license: "{inputs.fs_license}"
+
+  - id: meld
+    uses: meld_graph
+    with:
+      freesurfer_subjects_dir: "{step.recon_all.outputs.subjects_dir}"
+      subject_id: "{inputs.subject_id}"
+      threshold: "{inputs.threshold}"
+
+outputs:
+  native:
+    - "{run_root}/native/freesurfer"
+    - "{run_root}/native/meld"
+  bundle:
+    - "{run_root}/bundle"
+
+reproducibility:
+  pin_containers: true
+  write_run_manifest: true
+  store_exact_commands: true

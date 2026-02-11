@@ -1,0 +1,114 @@
+# Plugin 9: QSIRecon
+id: qsirecon
+name: "QSIRecon"
+version: "0.20.0"
+type: plugin
+domain: diffusion_mri
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "QSIRecon"
+
+description: >
+  Diffusion reconstruction, tractography, and connectome generation.
+  Operates on QSIPrep derivatives. Supports multiple reconstruction
+  methods (CSD, DTI, NODDI, MAPMRI).
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on QSIRecon (Cieslak et al., 2021)"
+
+references:
+  - "Cieslak, M., et al. (2021). QSIPrep: an integrative platform for preprocessing and reconstructing diffusion MRI data. Nature Methods, 18(7), 775-778."
+
+container:
+  runtime: docker
+  image: "pennbbl/qsirecon:0.20.0"
+  digest: null
+
+inputs:
+  required:
+    - key: qsiprep_derivatives
+      type: path
+      description: "QSIPrep derivatives directory"
+    - key: subject_id
+      type: string
+      description: "Subject identifier (without 'sub-' prefix)"
+  optional:
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license file path"
+
+parameters:
+  - name: recon_spec
+    type: choice
+    default: mrtrix_multishell_msmt
+    choices: ["mrtrix_multishell_msmt", "mrtrix_singleshell_ss3t", "dipy_dki", "dipy_mapmri", "csd"]
+    description: "Reconstruction pipeline specification"
+
+resources:
+  profiles:
+    default:
+      cpus: 8
+      mem_gb: 32
+      time_hours: 4
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/qsirecon"
+    logs_dir: "{run_root}/logs/qsirecon"
+
+  stages:
+    - id: qsirecon_run
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+
+        mkdir -p /data/outputs/native/qsirecon
+        mkdir -p /data/outputs/logs/qsirecon
+
+        qsirecon \
+          /data/inputs/qsiprep_derivatives \
+          /data/outputs/native/qsirecon \
+          participant \
+          --participant-label {subject_id} \
+          --recon-spec {recon_spec} \
+          --nthreads {threads} \
+          --omp-nthreads {omp_nthreads}
+
+        echo "QSIRecon completed successfully"
+
+native_outputs:
+  preserved: true
+  layout: "native/qsirecon/sub-{subject_id}/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  extraction:
+    volumes:
+      - from: "{native_root}/sub-{subject_id}/dwi/*FA*.nii.gz"
+        to: "{bundle.root}/volumes/"
+        method: copy
+      - from: "{native_root}/sub-{subject_id}/dwi/*MD*.nii.gz"
+        to: "{bundle.root}/volumes/"
+        method: copy
+    metrics:
+      - from: "{native_root}/sub-{subject_id}/dwi/*connectome*.csv"
+        to: "{bundle.root}/metrics/"
+        method: copy
+    qc:
+      - from: "{native_root}/sub-{subject_id}/figures/*.svg"
+        to: "{bundle.root}/qc/"
+        method: copy
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true
+  record_inputs_hashes: true

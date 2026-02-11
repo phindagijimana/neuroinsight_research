@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# ──────────────────────────────────────────────────────────────────────────────
+#  NeuroInsight Research — PRODUCTION CLI
+#
+#  Usage:  ./research <command> [options]
+#
+#  Production mode:
+#    - Backend:  uvicorn (no reload, optimised)
+#    - Frontend: pre-built static bundle via vite preview
+#    - Celery:   info-level logging
+#
+#  For development mode, use ./research-dev instead.
+# ──────────────────────────────────────────────────────────────────────────────
+set -euo pipefail
+
+MODE="production"
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SELF_DIR/.research-common.sh"
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  START — Production
+# ══════════════════════════════════════════════════════════════════════════════
+cmd_start() {
+    header
+    ensure_dirs
+
+    preflight_checks
+    cmd_stop --quiet 2>/dev/null || true
+    resolve_ports
+
+    # ── Backend (Uvicorn — no reload) ────────────────────────────────────
+    step "Backend  [PROD]  (port $BACKEND_PORT)"
+
+    nohup python3 -m uvicorn backend.main:app \
+        --host 0.0.0.0 \
+        --port "$BACKEND_PORT" \
+        --workers 2 \
+        > "$LOG_DIR/backend.log" 2>&1 &
+    write_pid backend $!
+    info "PID $! — waiting for health check ..."
+
+    if wait_for_url "http://localhost:$BACKEND_PORT/health" 25 "backend"; then
+        success "Backend ready  ->  http://localhost:$BACKEND_PORT"
+    else
+        error "Backend failed to start. See: $LOG_DIR/backend.log"
+        exit 1
+    fi
+
+    # ── Celery worker (info level) ───────────────────────────────────────
+    step "Celery worker  [PROD]  (concurrency=$CELERY_CONCURRENCY)"
+
+    nohup python3 -m celery \
+        -A backend.core.celery_app worker \
+        --loglevel=info \
+        --concurrency="$CELERY_CONCURRENCY" \
+        -Q docker_jobs,celery \
+        --hostname="neuroinsight-worker@%h" \
+        > "$LOG_DIR/celery.log" 2>&1 &
+    write_pid celery $!
+    info "PID $!"
+
+    sleep 3
+    if is_pid_alive "$(read_pid celery)"; then
+        success "Celery worker running"
+    else
+        warn "Celery worker may have failed — check: $LOG_DIR/celery.log"
+    fi
+
+    # ── Frontend (built bundle via vite preview) ─────────────────────────
+    step "Frontend  [PROD]  (port $FRONTEND_PORT)"
+
+    if [ -d "frontend" ]; then
+        # Build if dist/ doesn't exist or is older than src/
+        if [ ! -d "frontend/dist" ] || [ "$(find frontend/src -newer frontend/dist -print -quit 2>/dev/null)" ]; then
+            info "Building frontend ..."
+            (cd frontend && npm run build 2>&1 | tail -3)
+            success "Build complete"
+        else
+            info "Using existing frontend/dist/ build"
+        fi
+
+        # Patch preview proxy if needed
+        local VITE_CFG="frontend/vite.config.ts"
+        if [ -f "$VITE_CFG" ]; then
+            sed -i "s|target: 'http://localhost:[0-9]*'|target: 'http://localhost:$BACKEND_PORT'|g" "$VITE_CFG"
+        fi
+
+        (cd frontend && nohup npx vite preview \
+            --port "$FRONTEND_PORT" \
+            --host 0.0.0.0 \
+            > "../$LOG_DIR/frontend.log" 2>&1 &
+        write_pid frontend $!)
+
+        if wait_for_url "http://localhost:$FRONTEND_PORT" 10 "frontend"; then
+            success "Frontend ready  ->  http://localhost:$FRONTEND_PORT"
+        else
+            warn "Frontend may still be starting — check: $LOG_DIR/frontend.log"
+        fi
+    else
+        warn "frontend/ not found — skipping"
+    fi
+
+    print_start_summary "PRODUCTION"
+}
+
+dispatch "$@"

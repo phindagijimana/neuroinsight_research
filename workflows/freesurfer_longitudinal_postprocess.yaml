@@ -1,0 +1,66 @@
+# Workflow 11: FreeSurfer Longitudinal Post-processing
+id: wf_freesurfer_longitudinal_postprocess
+name: "FreeSurfer Longitudinal Post-processing (Tables / Slopes)"
+version: "1.0.0"
+type: workflow
+domain: structural_mri
+
+description: >
+  User-facing workflow that generates QDEC-style tables and optional
+  slopes summaries from existing FreeSurfer LONG outputs by calling
+  a hidden utility plugin.
+
+developer_contract: >
+  This workflow calls a utility plugin (freesurfer_longitudinal_stats)
+  that MUST remain hidden from the UI plugin list
+  (visibility.user_selectable=false). Users interact with this workflow,
+  not the utility plugin directly.
+
+inputs:
+  required:
+    - key: subjects_dir
+      type: path
+      description: "SUBJECTS_DIR containing <tp>.long.<base_id> outputs"
+    - key: base_id
+      type: string
+    - key: timepoints
+      type: list
+      min_items: 2
+      item_schema:
+        - key: tp_id
+          type: string
+  optional:
+    - key: fs_license
+      type: path
+    - key: time_variable_table
+      type: path
+    - key: run_slopes
+      type: bool
+      default: true
+
+validation:
+  preflight_checks:
+    - "path_exists(subjects_dir)"
+    - "all_tp_long_dirs_exist(subjects_dir, timepoints[].tp_id, base_id)"
+
+steps:
+  - id: longitudinal_stats
+    uses: freesurfer_longitudinal_stats
+    with:
+      subjects_dir: "{inputs.subjects_dir}"
+      base_id: "{inputs.base_id}"
+      timepoints: "{inputs.timepoints}"
+      fs_license: "{inputs.fs_license}"
+      time_variable_table: "{inputs.time_variable_table}"
+      run_slopes: "{inputs.run_slopes}"
+
+outputs:
+  bundle:
+    - "{run_root}/bundle/metrics/qdec_table_template.tsv"
+    - "{run_root}/bundle/metrics/longitudinal_slopes.json"
+    - "{run_root}/bundle/metrics/longitudinal_postprocess_summary.json"
+
+reproducibility:
+  pin_containers: true
+  write_run_manifest: true
+  store_exact_commands: true

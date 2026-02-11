@@ -1,0 +1,66 @@
+# Workflow 8: Diffusion Full Pipeline (Preprocess + Reconstruction)
+id: diffusion_full
+name: "Diffusion Full Pipeline"
+version: "1.0.0"
+type: workflow
+domain: diffusion_mri
+
+description: >
+  Complete diffusion analysis: QSIPrep preprocessing followed by
+  QSIRecon reconstruction. Produces corrected DWI, FA/MD maps,
+  tractography, and connectomes.
+
+developer_contract: >
+  Workflows only orchestrate plugins. No direct execution steps allowed.
+
+inputs:
+  required:
+    - key: bids_dir
+      type: directory
+      description: "BIDS-formatted dataset directory with DWI data"
+    - key: subject_id
+      type: string
+      description: "Subject identifier (without 'sub-' prefix)"
+  optional:
+    - key: fs_license
+      type: path
+    - key: output_resolution
+      type: float
+      default: 1.5
+    - key: recon_spec
+      type: choice
+      default: "mrtrix_multishell_msmt"
+
+validation:
+  preflight_checks:
+    - "directory_exists(bids_dir)"
+    - "bids_has_dwi(bids_dir, subject_id)"
+
+steps:
+  - id: qsiprep
+    uses: qsiprep
+    with:
+      bids_dir: "{inputs.bids_dir}"
+      subject_id: "{inputs.subject_id}"
+      fs_license: "{inputs.fs_license}"
+      output_resolution: "{inputs.output_resolution}"
+
+  - id: qsirecon
+    uses: qsirecon
+    with:
+      qsiprep_derivatives: "{step.qsiprep.outputs.native_root}"
+      subject_id: "{inputs.subject_id}"
+      fs_license: "{inputs.fs_license}"
+      recon_spec: "{inputs.recon_spec}"
+
+outputs:
+  native:
+    - "{run_root}/native/qsiprep"
+    - "{run_root}/native/qsirecon"
+  bundle:
+    - "{run_root}/bundle"
+
+reproducibility:
+  pin_containers: true
+  write_run_manifest: true
+  store_exact_commands: true

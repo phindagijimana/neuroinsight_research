@@ -1,0 +1,76 @@
+# ------------------------------------------------------------------------------
+#  NeuroInsight Research -- Infrastructure Services
+#
+#  Provides PostgreSQL, Redis, and MinIO for local development.
+#  Start:  docker compose -f docker-compose.infra.yml up -d
+#  Stop:   docker compose -f docker-compose.infra.yml down
+#  Reset:  docker compose -f docker-compose.infra.yml down -v   (deletes data!)
+#
+#  Or use the CLI:
+#    ./research infra up
+#    ./research infra down
+#    ./research infra status
+# ------------------------------------------------------------------------------
+
+name: neuroinsight
+
+services:
+  # -- PostgreSQL --
+  db:
+    image: postgres:16-alpine
+    container_name: neuroinsight-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: neuroinsight
+      POSTGRES_PASSWORD: neuroinsight_secure_password
+      POSTGRES_DB: neuroinsight
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neuroinsight"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # -- Redis --
+  redis:
+    image: redis:7-alpine
+    container_name: neuroinsight-redis
+    restart: unless-stopped
+    command: redis-server --requirepass redis_secure_password --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_secure_password", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # -- MinIO (S3-compatible object storage) --
+  minio:
+    image: minio/minio:latest
+    container_name: neuroinsight-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin_secure
+    ports:
+      - "9000:9000"    # S3 API
+      - "9001:9001"    # Web console
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:

@@ -1,0 +1,107 @@
+# Plugin 10: MELD Graph
+id: meld_graph
+name: "MELD Graph"
+version: "1.0.0"
+type: plugin
+domain: epilepsy
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "MELD Graph"
+
+description: >
+  Cortical dysplasia detection for epilepsy research using graph neural
+  networks. Operates on FreeSurfer outputs to produce lesion probability
+  maps and detection metrics.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on MELD Graph (Wagstyl et al., 2022)"
+
+references:
+  - "Wagstyl, K., et al. (2022). Atlas of lesion locations and postsurgical seizure freedom in focal cortical dysplasia. Brain Communications, 4(4)."
+
+container:
+  runtime: docker
+  image: "meldproject/meld_graph:latest"
+  digest: null
+
+inputs:
+  required:
+    - key: freesurfer_subjects_dir
+      type: path
+      description: "FreeSurfer SUBJECTS_DIR with completed recon-all"
+    - key: subject_id
+      type: string
+      description: "Subject identifier within SUBJECTS_DIR"
+  optional: []
+
+parameters:
+  - name: threshold
+    type: float
+    default: 0.5
+    min_value: 0.1
+    max_value: 0.9
+    description: "Detection threshold for lesion probability"
+
+resources:
+  profiles:
+    default:
+      cpus: 4
+      mem_gb: 16
+      time_hours: 1
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/meld"
+    logs_dir: "{run_root}/logs/meld"
+
+  stages:
+    - id: meld_run
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+
+        mkdir -p /data/outputs/native/meld
+        mkdir -p /data/outputs/logs/meld
+
+        # Run MELD Graph prediction
+        python -m meld_graph.predict \
+          --subjects-dir /data/inputs/freesurfer_subjects_dir \
+          --subject-id {subject_id} \
+          --output-dir /data/outputs/native/meld \
+          --threshold {threshold}
+
+        echo "MELD Graph completed successfully"
+
+native_outputs:
+  preserved: true
+  layout: "native/meld/{subject_id}/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  extraction:
+    volumes:
+      - from: "{native_root}/{subject_id}/*lesion_probability*.nii.gz"
+        to: "{bundle.root}/volumes/"
+        method: copy
+    metrics:
+      - from: "{native_root}/{subject_id}/*detection_metrics*.json"
+        to: "{bundle.root}/metrics/"
+        method: copy
+    qc:
+      - from: "{native_root}/{subject_id}/figures/*.png"
+        to: "{bundle.root}/qc/"
+        method: copy
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true
+  record_inputs_hashes: true
