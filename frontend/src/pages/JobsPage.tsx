@@ -135,8 +135,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
     };
   }, [jobs, pollProgress]);
 
-  const handleJobsSubmitted = (jobIds: string[]) => {
-    console.log(`Submitted ${jobIds.length} jobs`);
+  const handleJobsSubmitted = (_jobIds: string[]) => {
     fetchJobs();
   };
 

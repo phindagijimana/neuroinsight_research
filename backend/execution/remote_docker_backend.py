@@ -178,12 +178,14 @@ class RemoteDockerBackend(ExecutionBackend):
                 pass
 
         if command_template:
-            # Substitute parameters into template
+            # Substitute parameters into template with sanitization
             cmd = command_template
+            dangerous = set(";|&`$(){}!><\n\r")
             for key, value in spec.parameters.items():
                 if not key.startswith("_"):
-                    cmd = cmd.replace(f"{{{key}}}", str(value))
-                    cmd = cmd.replace(f"${{{key}}}", str(value))
+                    safe_val = "".join(c for c in str(value) if c not in dangerous)
+                    cmd = cmd.replace(f"{{{key}}}", safe_val)
+                    cmd = cmd.replace(f"${{{key}}}", safe_val)
             docker_args.append(image)
             docker_args.append(f'bash -c "{cmd}"')
         else:
@@ -209,13 +211,15 @@ class RemoteDockerBackend(ExecutionBackend):
         logger.info(f"Remote container started: {container_name} ({container_id})")
 
         # Track the job
+        now = datetime.utcnow()
         self._jobs[job_id] = {
             "container_name": container_name,
             "container_id": container_id,
             "job_dir": job_dir,
-            "spec": spec,
-            "submitted_at": datetime.utcnow(),
+            "pipeline_name": spec.pipeline_name,
             "image": image,
+            "plugin_id": spec.plugin_id,
+            "submitted_at": now,
         }
 
         # Save job metadata on remote for persistence
@@ -224,12 +228,26 @@ class RemoteDockerBackend(ExecutionBackend):
             "container_name": container_name,
             "pipeline_name": spec.pipeline_name,
             "image": image,
-            "submitted_at": datetime.utcnow().isoformat(),
+            "submitted_at": now.isoformat(),
         }
         ssh.write_file(
             f"{job_dir}/job_meta.json",
             json.dumps(meta, indent=2),
         )
+
+        # Create DB record for persistence across restarts
+        try:
+            from backend.core.database import get_db_context
+            from backend.models.job import Job
+
+            job_model = Job.from_spec(job_id, "remote_docker", spec)
+            job_model.backend_job_id = container_name
+            job_model.output_dir = f"{job_dir}/outputs"
+            with get_db_context() as db:
+                db.add(job_model)
+                db.commit()
+        except Exception as e:
+            logger.error(f"Failed to create DB record for job {job_id[:8]}: {e}")
 
         return job_id
 
@@ -280,9 +298,7 @@ class RemoteDockerBackend(ExecutionBackend):
         info = JobInfo(
             job_id=job_id,
             status=status,
-            pipeline_name=job_meta.get("spec", JobSpec(
-                pipeline_name="Unknown", container_image="", input_files=[], output_dir="", parameters={}
-            )).pipeline_name if "spec" in job_meta else "Unknown",
+            pipeline_name=job_meta.get("pipeline_name", "Unknown"),
             container_image=job_meta.get("image", ""),
             backend_job_id=container_name,
             submitted_at=job_meta.get("submitted_at"),
@@ -376,8 +392,7 @@ class RemoteDockerBackend(ExecutionBackend):
                 jobs.append(JobInfo(
                     job_id=job_id,
                     status=status,
-                    pipeline_name=self._jobs.get(job_id, {}).get("spec", None) and
-                                  self._jobs[job_id]["spec"].pipeline_name or "Unknown",
+                    pipeline_name=self._jobs.get(job_id, {}).get("pipeline_name", "Unknown"),
                     backend_job_id=container_name,
                 ))
 

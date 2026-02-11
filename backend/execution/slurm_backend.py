@@ -193,7 +193,7 @@ class SLURMBackend(ExecutionBackend):
         except Exception as e:
             raise ExecutionError(f"sbatch submission failed: {e}")
 
-        # Track locally
+        # Track locally (include spec metadata for get_job_info/progress lookup)
         now = datetime.utcnow()
         self._jobs[job_id] = {
             "job_id": job_id,
@@ -208,6 +208,11 @@ class SLURMBackend(ExecutionBackend):
             "error_message": None,
             "progress": 0,
             "current_phase": "Queued in SLURM",
+            "spec": {
+                "pipeline_name": spec.pipeline_name,
+                "container_image": spec.container_image,
+                "plugin_id": spec.plugin_id,
+            },
         }
 
         # Create DB record

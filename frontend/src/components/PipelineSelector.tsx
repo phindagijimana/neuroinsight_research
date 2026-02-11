@@ -350,11 +350,9 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
           setLivePlugins(apiPlugins);
           setLiveWorkflows(apiWorkflows);
           setUsingLiveData(true);
-          console.log(`Loaded ${apiPlugins.length} plugins and ${apiWorkflows.length} workflows from API`);
         }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
-        console.warn('API unavailable, using mock data:', msg);
         setError(`Live data unavailable (${msg}). Using sample data.`);
         setUsingLiveData(false);
       } finally {

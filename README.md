@@ -21,15 +21,34 @@ Neuroimaging pipeline platform for processing, monitoring, and visualizing brain
 Prerequisites: Python 3.9+, Node.js 18+, Docker with Compose v2
 
 ```bash
-./research-dev install    # Install deps, start infra, init DB
-./research-dev start      # Start backend + celery + frontend
+./research install    # Install deps, start infra, init DB
+./research start      # Start backend + celery + frontend
 # Frontend: http://localhost:3000
 # API docs: http://localhost:3001/docs
 ```
 
-## CLI
+## Docker Compose Deployment
 
-Both `./research` (production) and `./research-dev` (development):
+For a fully containerized production deployment:
+
+```bash
+# Copy and edit environment variables
+cp .env.example .env
+# Edit .env to set secure passwords and SECRET_KEY
+
+# Start the full stack (app, worker, PostgreSQL, Redis, MinIO, nginx)
+docker compose up -d
+
+# View logs
+docker compose logs -f app
+
+# Stop everything
+docker compose down
+```
+
+Frontend: `http://localhost:3000`, API: `http://localhost:3001`
+
+## CLI
 
 ```
 install          Install dependencies, start infra, init DB

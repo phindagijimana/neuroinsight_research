@@ -38,11 +38,12 @@ COPY backend/ ./backend/
 COPY plugins/ ./plugins/
 COPY workflows/ ./workflows/
 
+# Copy Alembic migration files
+COPY alembic.ini ./alembic.ini
+COPY alembic/ ./alembic/
+
 # Copy built frontend from stage 1
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
-
-# Copy nginx config for serving frontend
-COPY deploy/nginx.conf /etc/nginx/nginx.conf
 
 # Create data directories
 RUN mkdir -p data/outputs data/uploads logs && \

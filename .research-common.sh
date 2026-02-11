@@ -894,7 +894,7 @@ cmd_infra() {
                 warn  "PostgreSQL   starting ..."
             fi
 
-            if docker exec neuroinsight-redis redis-cli -a "redis_secure_password" ping 2>/dev/null | grep -q PONG; then
+            if docker exec neuroinsight-redis redis-cli -a "${REDIS_PASSWORD:-redis_secure_password}" ping 2>/dev/null | grep -q PONG; then
                 success "Redis        ready  (localhost:6379)"
             else
                 warn  "Redis        starting ..."

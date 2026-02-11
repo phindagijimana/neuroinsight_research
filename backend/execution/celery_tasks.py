@@ -884,9 +884,10 @@ def run_workflow_job(self, job_id: str, spec_dict: dict) -> dict:
 
     # Extract bundle (mgz -> nii.gz)
     try:
-        # Use last step's image for conversion
+        import docker as _docker
+        docker_client = _docker.from_env()
         last_plugin = registry.get_plugin(workflow_steps[-1])
-        _extract_bundle(job_id, {"container_image": last_plugin.container_image}, output_dir)
+        _extract_bundle(job_id, {"container_image": last_plugin.container_image}, output_dir, docker_client)
     except Exception as e:
         logger.warning(f"Bundle extraction failed for workflow {job_id[:8]}: {e}")
 

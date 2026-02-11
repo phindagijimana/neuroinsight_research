@@ -73,8 +73,12 @@ cmd_start() {
         # Build if dist/ doesn't exist or is older than src/
         if [ ! -d "frontend/dist" ] || [ "$(find frontend/src -newer frontend/dist -print -quit 2>/dev/null)" ]; then
             info "Building frontend ..."
-            (cd frontend && npm run build 2>&1 | tail -3)
-            success "Build complete"
+            if (cd frontend && npm run build 2>&1 | tail -5); then
+                success "Build complete"
+            else
+                error "Frontend build failed. Check frontend for errors."
+                exit 1
+            fi
         else
             info "Using existing frontend/dist/ build"
         fi
@@ -85,11 +89,13 @@ cmd_start() {
             sed -i "s|target: 'http://localhost:[0-9]*'|target: 'http://localhost:$BACKEND_PORT'|g" "$VITE_CFG"
         fi
 
-        (cd frontend && nohup npx vite preview \
+        cd frontend
+        nohup npx vite preview \
             --port "$FRONTEND_PORT" \
             --host 0.0.0.0 \
             > "../$LOG_DIR/frontend.log" 2>&1 &
-        write_pid frontend $!)
+        write_pid frontend $!
+        cd ..
 
         if wait_for_url "http://localhost:$FRONTEND_PORT" 10 "frontend"; then
             success "Frontend ready  ->  http://localhost:$FRONTEND_PORT"

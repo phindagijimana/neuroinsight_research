@@ -229,9 +229,11 @@ class LocalDockerBackend(ExecutionBackend):
                 command_template = spec_dict.get("command_template", "")
                 if command_template:
                     command = command_template
+                    from backend.execution.celery_tasks import _sanitize_param
                     for key, value in resolved_params.items():
-                        command = command.replace(f"{{{key}}}", str(value))
-                        command = command.replace(f"${{{key}}}", str(value))
+                        safe_value = _sanitize_param(str(value))
+                        command = command.replace(f"{{{key}}}", safe_value)
+                        command = command.replace(f"${{{key}}}", safe_value)
                 else:
                     command = None
 
