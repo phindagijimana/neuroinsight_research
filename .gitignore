@@ -62,5 +62,10 @@ Thumbs.db
 # Docker
 docker-compose.override.yml
 
+# Dev scripts (local only)
+research-dev
+start_dev.sh
+stop_dev.sh
+
 # Misc
 backend_new.log
