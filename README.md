@@ -142,6 +142,61 @@ On the **Jobs** page, choose your execution backend:
 
 The app uses `paramiko` (Python SSH library) which talks to your local `ssh-agent`. Your private key never leaves your machine and is never stored by the app. If you can `ssh` into a server from your terminal, you can connect from NeuroInsight -- it uses the exact same keys.
 
+## Pipeline Licenses
+
+Some pipelines require free license files before they can run. Obtain these **before** submitting your first job.
+
+### FreeSurfer License (required by FreeSurfer, FastSurfer, fMRIPrep, MELD Graph)
+
+FreeSurfer requires a `license.txt` file for all operations. FastSurfer, fMRIPrep, and MELD Graph also use FreeSurfer internally and need this same license.
+
+1. Go to **https://surfer.nmr.mgh.harvard.edu/registration.html**
+2. Fill in the form (name, institution, email, OS)
+3. A `license.txt` file will be emailed to you
+4. Place it in your NeuroInsight project root:
+
+```bash
+# Copy the license file you received by email
+cp ~/Downloads/license.txt ./license.txt
+```
+
+NeuroInsight auto-detects the license in these locations (checked in order):
+- `./license.txt` (project root)
+- `./data/license.txt`
+- `$FREESURFER_HOME/license.txt`
+- `~/.freesurfer/license.txt`
+
+Or set it explicitly in `.env`:
+
+```bash
+FS_LICENSE_PATH=/path/to/your/license.txt
+```
+
+### MELD Graph License (required by MELD Graph v2.2.4+)
+
+MELD Graph requires its own separate license in addition to the FreeSurfer license.
+
+1. Fill the registration form: **https://docs.google.com/forms/d/e/1FAIpQLSdocMWtxbmh9T7Sv8NT4f0Kpev-tmRI-kngDhUeBF9VcZXcfg/viewform**
+2. You will receive a `meld_license.txt` file by email
+3. Place it alongside your FreeSurfer license:
+
+```bash
+cp ~/Downloads/meld_license.txt ./meld_license.txt
+```
+
+Registration also adds you to the MELD mailing list for bug fixes and new releases. For questions, contact the MELD team at `meld.study@gmail.com`.
+
+More details: [MELD Graph GitHub](https://github.com/MELDProject/meld_graph) | [MELD Graph Documentation](https://meld-graph.readthedocs.io/en/latest/)
+
+### Summary
+
+| License | Required By | Registration URL |
+|---|---|---|
+| FreeSurfer `license.txt` | FreeSurfer, FastSurfer, fMRIPrep, MELD Graph | https://surfer.nmr.mgh.harvard.edu/registration.html |
+| MELD `meld_license.txt` | MELD Graph (v2.2.4+) | [MELD Registration Form](https://docs.google.com/forms/d/e/1FAIpQLSdocMWtxbmh9T7Sv8NT4f0Kpev-tmRI-kngDhUeBF9VcZXcfg/viewform) |
+| QSIPrep / XCP-D | No license needed | -- |
+| dcm2niix (HeuDiConv) | No license needed | -- |
+
 ## Container Runtimes
 
 | Backend | Container Runtime | Notes |

@@ -218,6 +218,10 @@ def _prepare_volumes(spec_dict: dict, output_dir: Path) -> dict:
         license_path = settings.fs_license_resolved
         if license_path:
             volumes[license_path] = {"bind": "/license/license.txt", "mode": "ro"}
+        # MELD Graph license (mounted at /run/secrets/meld_license.txt per compose.yml convention)
+        meld_license_path = settings.meld_license_resolved
+        if meld_license_path:
+            volumes[meld_license_path] = {"bind": "/run/secrets/meld_license.txt", "mode": "ro"}
     except Exception:
         pass
 

@@ -712,12 +712,14 @@ class SLURMBackend(ExecutionBackend):
             f"{job_dir}/outputs:/data/outputs:rw",
         ]
 
-        # Add FreeSurfer license if needed
+        # Add FreeSurfer and MELD licenses if available
         try:
             from backend.core.config import get_settings
             settings = get_settings()
             if settings.fs_license_resolved:
                 bind_mounts.append(f"{settings.fs_license_resolved}:/license/license.txt:ro")
+            if settings.meld_license_resolved:
+                bind_mounts.append(f"{settings.meld_license_resolved}:/run/secrets/meld_license.txt:ro")
         except Exception:
             pass
 

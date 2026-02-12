@@ -49,6 +49,7 @@ input_format:
     - "The file should be skull-on (not skull-stripped)"
     - "Both .nii and .nii.gz are accepted"
     - "Processing takes 6-8 hours per subject"
+    - "Requires FreeSurfer license (free): https://surfer.nmr.mgh.harvard.edu/registration.html"
   example_structure: |
     any_folder/
       sub-01_T1w.nii.gz

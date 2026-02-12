@@ -51,6 +51,7 @@ input_format:
     - "The dataset must pass BIDS validation (bids-validator)"
     - "At minimum, an anatomical T1w and functional BOLD are required"
     - "Fieldmaps are optional but recommended for distortion correction"
+    - "Requires FreeSurfer license (free): https://surfer.nmr.mgh.harvard.edu/registration.html"
   example_structure: |
     bids_dir/
       dataset_description.json

@@ -42,6 +42,12 @@ inputs:
     - key: subject_id
       type: string
       description: "Subject identifier within SUBJECTS_DIR"
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license file (get free at https://surfer.nmr.mgh.harvard.edu/registration.html)"
+    - key: meld_license
+      type: path
+      description: "MELD Graph license file (register at https://docs.google.com/forms/d/e/1FAIpQLSdocMWtxbmh9T7Sv8NT4f0Kpev-tmRI-kngDhUeBF9VcZXcfg/viewform)"
   optional:
     - key: fastsurfer
       type: bool
@@ -63,7 +69,8 @@ input_format:
     - "Full recon-all must be completed (not just segmentation)"
     - "Surface files (lh.white, rh.white, lh.pial, rh.pial) are required"
     - "FLAIR images improve lesion detection but are optional"
-    - "MELD requires a MELD license (register at meld.study@gmail.com)"
+    - "Requires FreeSurfer license: https://surfer.nmr.mgh.harvard.edu/registration.html"
+    - "Requires MELD license (v2.2.4+): https://docs.google.com/forms/d/e/1FAIpQLSdocMWtxbmh9T7Sv8NT4f0Kpev-tmRI-kngDhUeBF9VcZXcfg/viewform"
   example_structure: |
     freesurfer_subjects_dir/
       sub-01/

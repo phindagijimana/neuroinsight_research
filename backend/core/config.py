@@ -126,6 +126,31 @@ class Settings(BaseSettings):
                 return str(resolved)
         return None
 
+    # -- MELD Graph License --
+    meld_license_path: Optional[str] = Field(
+        default=None,
+        description="Path to MELD Graph meld_license.txt file. Auto-detected if not set.",
+    )
+
+    @property
+    def meld_license_resolved(self) -> Optional[str]:
+        """Resolve the MELD Graph license path."""
+        if self.meld_license_path:
+            p = Path(self.meld_license_path).resolve()
+            if p.is_file():
+                return str(p)
+
+        search_paths = [
+            Path("./meld_license.txt"),
+            Path("./data/meld_license.txt"),
+            Path.home() / ".meld" / "meld_license.txt",
+        ]
+        for candidate in search_paths:
+            resolved = candidate.resolve()
+            if resolved.is_file():
+                return str(resolved)
+        return None
+
     # -- Execution Backend --
     backend_type: str = Field(default="local", description="Execution backend: 'local', 'remote_docker', or 'slurm'")
 
