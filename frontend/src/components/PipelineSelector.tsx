@@ -290,7 +290,11 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   // Live data from API (or fallback to mock)
   const [livePlugins, setLivePlugins] = useState<Plugin[]>([]);
   const [liveWorkflows, setLiveWorkflows] = useState<Workflow[]>([]);
-  const [licenseStatus, setLicenseStatus] = useState<{ found: boolean; path: string | null; hint: string } | null>(null);
+  const [licenseStatus, setLicenseStatus] = useState<{
+    freesurfer: { found: boolean; path: string | null; registration_url: string };
+    meld_graph: { found: boolean; path: string | null; registration_url: string };
+    hint: string;
+  } | null>(null);
 
   // Decide which data source to use
   const activePlugins = usingLiveData ? livePlugins : MOCK_PLUGINS;
@@ -522,18 +526,33 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
           }
         </div>
         {licenseStatus && (
-          <div className={`text-xs flex items-center gap-1 ${licenseStatus.found ? 'text-green-600' : 'text-amber-600'}`}>
-            {licenseStatus.found ? (
-              <>
-                <CheckCircle className="w-3 h-3" />
-                FreeSurfer license detected
-              </>
-            ) : (
-              <>
-                <AlertTriangle className="w-3 h-3" />
-                <span>No FreeSurfer license — place <code className="bg-gray-100 px-1 rounded text-[10px]">license.txt</code> in app directory</span>
-              </>
-            )}
+          <div className="space-y-0.5">
+            <div className={`text-xs flex items-center gap-1 ${licenseStatus.freesurfer.found ? 'text-green-600' : 'text-amber-600'}`}>
+              {licenseStatus.freesurfer.found ? (
+                <>
+                  <CheckCircle className="w-3 h-3" />
+                  FreeSurfer license detected
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-3 h-3" />
+                  <span>No FreeSurfer license — place <code className="bg-gray-100 px-1 rounded text-[10px]">license.txt</code> in project root</span>
+                </>
+              )}
+            </div>
+            <div className={`text-xs flex items-center gap-1 ${licenseStatus.meld_graph.found ? 'text-green-600' : 'text-amber-600'}`}>
+              {licenseStatus.meld_graph.found ? (
+                <>
+                  <CheckCircle className="w-3 h-3" />
+                  MELD Graph license detected
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-3 h-3" />
+                  <span>No MELD license — place <code className="bg-gray-100 px-1 rounded text-[10px]">meld_license.txt</code> in project root</span>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>

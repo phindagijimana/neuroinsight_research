@@ -227,9 +227,13 @@ export const apiService = {
   // ================================================================================
 
   /**
-   * Check FreeSurfer license status
+   * Check pipeline license status (FreeSurfer + MELD Graph)
    */
-  async getLicenseStatus(): Promise<{ found: boolean; path: string | null; hint: string }> {
+  async getLicenseStatus(): Promise<{
+    freesurfer: { found: boolean; path: string | null; required_by: string[]; registration_url: string };
+    meld_graph: { found: boolean; path: string | null; required_by: string[]; registration_url: string };
+    hint: string;
+  }> {
     const response = await api.get('/api/license/status');
     return response.data;
   },

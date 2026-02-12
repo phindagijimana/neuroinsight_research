@@ -423,18 +423,34 @@ def get_docs_all():
 
 @app.get("/api/license/status")
 def license_status():
-    """Check FreeSurfer license status."""
-    path = settings.fs_license_resolved
+    """Check FreeSurfer and MELD Graph license status."""
+    fs_path = settings.fs_license_resolved
+    meld_path = settings.meld_license_resolved
     return {
-        "found": path is not None,
-        "path": path,
-        "search_locations": [
-            "./license.txt (app directory)",
-            "./data/license.txt",
-            "$FREESURFER_HOME/license.txt",
-            "~/.freesurfer/license.txt",
-        ],
-        "hint": "Place your FreeSurfer license.txt in the app directory (next to start_dev.sh)",
+        "freesurfer": {
+            "found": fs_path is not None,
+            "path": fs_path,
+            "required_by": ["FreeSurfer", "FastSurfer", "fMRIPrep", "MELD Graph"],
+            "registration_url": "https://surfer.nmr.mgh.harvard.edu/registration.html",
+            "search_locations": [
+                "./license.txt",
+                "./data/license.txt",
+                "$FREESURFER_HOME/license.txt",
+                "~/.freesurfer/license.txt",
+            ],
+        },
+        "meld_graph": {
+            "found": meld_path is not None,
+            "path": meld_path,
+            "required_by": ["MELD Graph (v2.2.4+)"],
+            "registration_url": "https://docs.google.com/forms/d/e/1FAIpQLSdocMWtxbmh9T7Sv8NT4f0Kpev-tmRI-kngDhUeBF9VcZXcfg/viewform",
+            "search_locations": [
+                "./meld_license.txt",
+                "./data/meld_license.txt",
+                "~/.meld/meld_license.txt",
+            ],
+        },
+        "hint": "Place license files in the project root directory (same folder as ./research).",
     }
 
 
@@ -449,6 +465,47 @@ class PluginJobSubmitRequest(BaseModel):
     custom_resources: Optional[dict] = None
 
 
+# Plugins that require the MELD Graph license (meld_license.txt)
+MELD_LICENSE_PLUGINS = {"meld_graph"}
+
+# Plugins that require the FreeSurfer license (license.txt)
+FS_LICENSE_PLUGINS = {
+    "freesurfer_recon", "fastsurfer", "fmriprep", "meld_graph",
+    "segmentha_t1", "segmentha_t2", "freesurfer_longitudinal",
+    "freesurfer_longitudinal_stats",
+}
+
+
+def _check_licenses(plugin_ids: List[str]):
+    """Check that required license files are present before job submission.
+
+    Raises HTTPException with a clear message if a license is missing.
+    """
+    needs_fs = any(pid in FS_LICENSE_PLUGINS for pid in plugin_ids)
+    needs_meld = any(pid in MELD_LICENSE_PLUGINS for pid in plugin_ids)
+
+    if needs_fs and not settings.fs_license_resolved:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "FreeSurfer license.txt not found. "
+                "Register for free at https://surfer.nmr.mgh.harvard.edu/registration.html "
+                "and place the license.txt file in the project root directory."
+            ),
+        )
+
+    if needs_meld and not settings.meld_license_resolved:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "MELD Graph meld_license.txt not found. "
+                "Register at https://docs.google.com/forms/d/e/1FAIpQLSdocMWtxbmh9T7Sv8NT4f0Kpev-tmRI-kngDhUeBF9VcZXcfg/viewform "
+                "and place the meld_license.txt file in the project root directory "
+                "(same location as your FreeSurfer license.txt)."
+            ),
+        )
+
+
 @app.post("/api/plugins/{plugin_id}/submit")
 def submit_plugin_job(plugin_id: str, request: PluginJobSubmitRequest, db: Session = Depends(get_db)):
     """Submit a job that runs a single plugin."""
@@ -456,6 +513,9 @@ def submit_plugin_job(plugin_id: str, request: PluginJobSubmitRequest, db: Sessi
     plugin = pw_registry.get_plugin(plugin_id)
     if not plugin:
         raise HTTPException(status_code=404, detail=f"Plugin '{plugin_id}' not found")
+
+    # Check required licenses before submitting
+    _check_licenses([plugin_id])
 
     # Resolve resources
     res = plugin.resources if isinstance(plugin.resources, dict) else {}
@@ -516,12 +576,17 @@ def submit_workflow_job(workflow_id: str, request: WorkflowJobSubmitRequest, db:
         raise HTTPException(status_code=404, detail=f"Workflow '{workflow_id}' not found")
 
     # Validate all steps reference valid plugins
+    step_plugin_ids = []
     for step in workflow.steps:
         if not pw_registry.get_plugin(step.uses):
             raise HTTPException(
                 status_code=500,
                 detail=f"Workflow references unknown plugin: {step.uses}",
             )
+        step_plugin_ids.append(step.uses)
+
+    # Check required licenses for all plugins in the workflow
+    _check_licenses(step_plugin_ids)
 
     # Use first step's plugin for container image and resources
     first_plugin = pw_registry.get_plugin(workflow.steps[0].uses)
