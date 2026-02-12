@@ -1,7 +1,7 @@
 # Plugin 10: MELD Graph
 id: meld_graph
 name: "MELD Graph"
-version: "1.0.0"
+version: "2.2.4"
 type: plugin
 domain: epilepsy
 
@@ -11,31 +11,50 @@ visibility:
   ui_label: "MELD Graph"
 
 description: >
-  Cortical dysplasia detection for epilepsy research using graph neural
-  networks. Operates on FreeSurfer outputs to produce lesion probability
-  maps and detection metrics.
+  Cortical dysplasia detection for drug-resistant epilepsy using graph
+  neural networks (Wagstyl et al., 2025). Operates on FreeSurfer
+  recon-all outputs to produce lesion probability maps and detection
+  reports. Uses the official meldproject/meld_graph Docker container
+  which bundles FreeSurfer 7.2, FastSurfer 1.1.2, and the MELD
+  classifier. On HPC, runs via Apptainer/Singularity.
 
 authors:
-  - "NeuroInsight Research Team"
-  - "Based on MELD Graph (Wagstyl et al., 2022)"
+  - "Mathilde Ripart, Hannah Spitzer, Sophie Adler, Konrad Wagstyl"
+  - "MELD Project (meld.study@gmail.com)"
 
 references:
-  - "Wagstyl, K., et al. (2022). Atlas of lesion locations and postsurgical seizure freedom in focal cortical dysplasia. Brain Communications, 4(4)."
+  - "Ripart, M. et al. (2025). Detection of epileptogenic focal cortical dysplasia using graph neural networks: a MELD study. JAMA Neurology."
+  - "Spitzer, H., Ripart, M. et al. (2022). Interpretable surface-based detection of focal cortical dysplasias. Brain, 145(11)."
+  - "https://github.com/MELDProject/meld_graph"
 
 container:
   runtime: docker
   image: "meldproject/meld_graph:v2.2.4"
   digest: "sha256:64917b746047a5395ecc5a298cfc097fc0194ee4c483e0730e49f97fe3590ff7"
+  # HPC: pull with `apptainer pull docker://meldproject/meld_graph:v2.2.4`
+  # Result: meld_graph_v2.2.4.sif (~13 GB)
 
 inputs:
   required:
     - key: freesurfer_subjects_dir
       type: path
-      description: "FreeSurfer SUBJECTS_DIR with completed recon-all"
+      description: "FreeSurfer SUBJECTS_DIR with completed recon-all output"
     - key: subject_id
       type: string
       description: "Subject identifier within SUBJECTS_DIR"
-  optional: []
+  optional:
+    - key: fastsurfer
+      type: bool
+      default: false
+      description: "Use FastSurfer instead of FreeSurfer for segmentation (faster if GPU available)"
+    - key: harmo_code
+      type: string
+      default: ""
+      description: "Harmonisation code (e.g. H1) if scanner harmonisation was computed"
+    - key: skip_segmentation
+      type: bool
+      default: true
+      description: "Skip FreeSurfer/FastSurfer segmentation (use when recon-all already complete)"
 
 input_format:
   format_name: "FreeSurfer SUBJECTS_DIR"
@@ -43,7 +62,8 @@ input_format:
   notes:
     - "Full recon-all must be completed (not just segmentation)"
     - "Surface files (lh.white, rh.white, lh.pial, rh.pial) are required"
-    - "FLAIR images improve lesion detection if available"
+    - "FLAIR images improve lesion detection but are optional"
+    - "MELD requires a MELD license (register at meld.study@gmail.com)"
   example_structure: |
     freesurfer_subjects_dir/
       sub-01/
@@ -74,9 +94,14 @@ resources:
   profiles:
     default:
       cpus: 4
-      mem_gb: 16
-      time_hours: 1
+      mem_gb: 24
+      time_hours: 2
       gpus: 0
+    gpu:
+      cpus: 4
+      mem_gb: 24
+      time_hours: 1
+      gpus: 1
 
 execution:
   style: single_stage
@@ -95,12 +120,51 @@ execution:
         mkdir -p /data/outputs/native/meld
         mkdir -p /data/outputs/logs/meld
 
-        # Run MELD Graph prediction
-        python -m meld_graph.predict \
-          --subjects-dir /data/inputs/freesurfer_subjects_dir \
-          --subject-id {subject_id} \
-          --output-dir /data/outputs/native/meld \
-          --threshold {threshold}
+        # ---------------------------------------------------------------
+        # MELD Graph expects data under /data with a specific layout:
+        #   /data/input/<subject_id>/T1/<file>.nii.gz
+        #   /data/output/fs_outputs/<subject_id>/  (FreeSurfer recon-all)
+        # The container mounts host data at /data via compose or bind.
+        #
+        # When run after recon-all (workflow), we link existing FS output
+        # into the expected MELD data layout.
+        # ---------------------------------------------------------------
+
+        # Link FreeSurfer output into MELD's expected /data/output/fs_outputs/
+        mkdir -p /data/output/fs_outputs
+        if [ -d "/data/inputs/freesurfer_subjects_dir/{subject_id}" ]; then
+          ln -sf /data/inputs/freesurfer_subjects_dir/{subject_id} \
+                 /data/output/fs_outputs/{subject_id}
+        fi
+
+        # Build MELD command
+        # Official pipeline: scripts/new_patient_pipeline/new_pt_pipeline.py
+        MELD_CMD="python scripts/new_patient_pipeline/new_pt_pipeline.py"
+        MELD_CMD="$MELD_CMD -id {subject_id}"
+
+        # Skip FreeSurfer segmentation if already done (default in workflow)
+        if [ "{skip_segmentation}" = "true" ]; then
+          MELD_CMD="$MELD_CMD --skip_feature_extraction"
+        fi
+
+        # Use FastSurfer for segmentation if requested
+        if [ "{fastsurfer}" = "true" ]; then
+          MELD_CMD="$MELD_CMD --fastsurfer"
+        fi
+
+        # Harmonisation code if provided
+        if [ -n "{harmo_code}" ] && [ "{harmo_code}" != "" ]; then
+          MELD_CMD="$MELD_CMD -harmo_code {harmo_code}"
+        fi
+
+        echo "Running MELD Graph: $MELD_CMD"
+        eval $MELD_CMD
+
+        # Copy predictions and reports to our standard output layout
+        if [ -d "/data/output/predictions_reports/{subject_id}" ]; then
+          cp -r /data/output/predictions_reports/{subject_id}/* \
+                /data/outputs/native/meld/ 2>/dev/null || true
+        fi
 
         echo "MELD Graph completed successfully"
 
@@ -113,15 +177,15 @@ bundle:
   root: "{run_root}/bundle"
   extraction:
     volumes:
-      - from: "{native_root}/{subject_id}/*lesion_probability*.nii.gz"
+      - from: "{native_root}/predictions/*lesion*.nii.gz"
         to: "{bundle.root}/volumes/"
         method: copy
     metrics:
-      - from: "{native_root}/{subject_id}/*detection_metrics*.json"
+      - from: "{native_root}/predictions/*metrics*.json"
         to: "{bundle.root}/metrics/"
         method: copy
     qc:
-      - from: "{native_root}/{subject_id}/figures/*.png"
+      - from: "{native_root}/predictions/reports/*.pdf"
         to: "{bundle.root}/qc/"
         method: copy
 

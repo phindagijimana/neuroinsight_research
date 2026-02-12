@@ -11,9 +11,9 @@ visibility:
   ui_label: "DICOM to NIfTI Converter"
 
 description: >
-  Convert DICOM images to NIfTI format with JSON sidecars using dcm2niix
-  (via HeuDiConv). Supports all standard DICOM formats and produces
-  BIDS-compatible output.
+  Convert DICOM images to NIfTI format with JSON sidecars using dcm2niix.
+  Supports all standard DICOM formats and produces NIfTI files with
+  BIDS-style naming. Uses the HeuDiConv container which includes dcm2niix.
 
 authors:
   - "NeuroInsight Research Team"
@@ -100,12 +100,30 @@ execution:
         mkdir -p /data/outputs/native/dcm2niix
         mkdir -p /data/outputs/logs/dcm2niix
 
-        # Run dcm2niix
-        dcm2niix \
-          -z y \
-          -f "%p_%s" \
-          -o /data/outputs/native/dcm2niix \
-          /data/inputs/dicom_dir
+        # Build dcm2niix command with parameters
+        DCM2NIIX_CMD="dcm2niix"
+
+        # Compression
+        if [ "{compress}" = "true" ]; then
+          DCM2NIIX_CMD="$DCM2NIIX_CMD -z y"
+        else
+          DCM2NIIX_CMD="$DCM2NIIX_CMD -z n"
+        fi
+
+        # Merge 2D slices
+        if [ "{merge_2d}" = "true" ]; then
+          DCM2NIIX_CMD="$DCM2NIIX_CMD -m y"
+        fi
+
+        # Anonymize DICOM headers
+        if [ "{anonymize}" = "true" ]; then
+          DCM2NIIX_CMD="$DCM2NIIX_CMD -ba y"
+        fi
+
+        DCM2NIIX_CMD="$DCM2NIIX_CMD -f \"%p_%s\" -o /data/outputs/native/dcm2niix /data/inputs/dicom_dir"
+
+        echo "Running: $DCM2NIIX_CMD"
+        eval $DCM2NIIX_CMD
 
         echo "DICOM to NIfTI conversion completed"
 

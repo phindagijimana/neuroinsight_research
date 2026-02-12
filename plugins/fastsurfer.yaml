@@ -1,7 +1,7 @@
 # Plugin 3: FastSurfer
 id: fastsurfer
 name: "FastSurfer"
-version: "2.0.0"
+version: "2.4.2"
 type: plugin
 domain: structural_mri
 
@@ -125,7 +125,7 @@ execution:
           --sid {subject_id} \
           --sd $SUBJECTS_DIR \
           --device $DEVICE \
-          --batch_size {batch_size} \
+          --batch {batch_size} \
           $RUN_MODE
 
         # Extract metrics if volume computation enabled

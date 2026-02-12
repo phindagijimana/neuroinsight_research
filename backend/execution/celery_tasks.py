@@ -290,7 +290,7 @@ def run_docker_job(self, job_id: str, spec_dict: dict) -> dict:
     import docker as _docker
     from docker.errors import ImageNotFound
 
-    data_dir = Path(spec_dict.get("data_dir", "./data"))
+    data_dir = Path(spec_dict.get("data_dir", "./data")).resolve()
     output_dir = data_dir / "outputs" / job_id
 
     # Create output directory structure
@@ -710,7 +710,7 @@ def run_workflow_job(self, job_id: str, spec_dict: dict) -> dict:
     """
     from celery.exceptions import Reject
 
-    data_dir = Path(spec_dict.get("data_dir", "./data"))
+    data_dir = Path(spec_dict.get("data_dir", "./data")).resolve()
     output_dir = data_dir / "outputs" / job_id
 
     for sub in ("native", "bundle/volumes", "bundle/metrics", "bundle/qc", "logs", "_inputs"):

@@ -4,11 +4,12 @@ Neuroimaging pipeline platform for processing, monitoring, and visualizing brain
 
 ## Features
 
-- Run containerized pipelines (FreeSurfer, FastSurfer, fMRIPrep, QSIPrep, XCP-D) with configurable CPU/RAM/GPU
+- Run containerized pipelines (FreeSurfer, FastSurfer, fMRIPrep, QSIPrep, XCP-D, MELD Graph) with configurable CPU/RAM/GPU
 - Real-time job monitoring with progress tracking
 - Built-in NIfTI viewer with segmentation overlays (Niivue)
 - Plugin architecture with YAML-based pipeline definitions
 - Three execution backends: Local Docker, Remote Server (EC2/cloud VMs via SSH), or HPC SLURM
+- Docker as primary container runtime; Apptainer/Singularity fallback for HPC environments
 
 ## Tech Stack
 
@@ -16,16 +17,23 @@ Neuroimaging pipeline platform for processing, monitoring, and visualizing brain
 **Backend:** Python 3.10+, FastAPI, Celery, SQLAlchemy
 **Infrastructure:** PostgreSQL, Redis, MinIO, Docker
 
-## Quick Start
-
-Prerequisites: Python 3.9+, Node.js 18+, Docker with Compose v2
+## Clone and Install
 
 ```bash
-./research install    # Install deps, start infra, init DB
-./research start      # Start backend + celery + frontend
+# Clone the repository
+git clone git@github.com:phindagijimana/neuroinsight_research.git
+cd neuroinsight_research
+
+# Install dependencies, start infrastructure, initialize database
+./research install
+
+# Start the application
+./research start
 # Frontend: http://localhost:3000
 # API docs: http://localhost:3001/docs
 ```
+
+**Prerequisites:** Python 3.9+, Node.js 18+, Docker with Compose v2
 
 ## Docker Compose Deployment
 
@@ -128,12 +136,38 @@ On the **Jobs** page, choose your execution backend:
    - Work Directory (e.g., `/scratch/jsmith/neuroinsight`)
    - Partition (dropdown populated from the cluster)
    - Account (your SLURM allocation, e.g., `neuroscience_lab`)
-5. Browse files on the HPC, select a plugin, and submit -- jobs are submitted via `sbatch` and run in Singularity containers
+5. Browse files on the HPC, select a plugin, and submit -- jobs are submitted via `sbatch` and run in Apptainer/Singularity containers (auto-detected)
 
 ### How Authentication Works
 
 The app uses `paramiko` (Python SSH library) which talks to your local `ssh-agent`. Your private key never leaves your machine and is never stored by the app. If you can `ssh` into a server from your terminal, you can connect from NeuroInsight -- it uses the exact same keys.
 
+## Container Runtimes
+
+| Backend | Container Runtime | Notes |
+|---|---|---|
+| Local | Docker | Jobs run via Docker SDK (`docker run`) |
+| Remote Server | Docker | Jobs run via `docker run` over SSH |
+| HPC (SLURM) | Apptainer / Singularity | Auto-detected; pulls from `docker://` URIs |
+
+All pipeline containers (FreeSurfer, FastSurfer, fMRIPrep, etc.) are available as Docker images on Docker Hub. On HPC, the SLURM backend automatically converts these to Singularity Image Format (SIF) using `apptainer pull docker://image:tag` or `singularity pull docker://image:tag`.
+
+## Citing This Software
+
+If you use NeuroInsight Research in your work, please cite:
+
+```bibtex
+@software{neuroinsight_research,
+  author       = {Phindagijimana},
+  title        = {NeuroInsight Research: Neuroimaging Pipeline Platform},
+  year         = {2026},
+  url          = {https://github.com/phindagijimana/neuroinsight_research},
+  version      = {1.0.0}
+}
+```
+
+Please also cite the individual tools you use (FreeSurfer, FastSurfer, fMRIPrep, QSIPrep, XCP-D, MELD Graph, etc.) as required by their respective licenses.
+
 ## License
 
-See [license.txt](license.txt).
+See license.txt (local only, not tracked in Git).

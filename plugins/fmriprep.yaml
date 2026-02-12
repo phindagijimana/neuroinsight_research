@@ -122,7 +122,7 @@ execution:
         FMRIPREP_CMD="$FMRIPREP_CMD --output-spaces {output_spaces}"
         FMRIPREP_CMD="$FMRIPREP_CMD --nthreads {threads}"
         FMRIPREP_CMD="$FMRIPREP_CMD --omp-nthreads {omp_nthreads}"
-        FMRIPREP_CMD="$FMRIPREP_CMD --mem_mb $((1000 * {mem_gb}))"
+        FMRIPREP_CMD="$FMRIPREP_CMD --mem-mb $((1000 * {mem_gb}))"
         FMRIPREP_CMD="$FMRIPREP_CMD --fs-license-file /opt/freesurfer/license.txt"
 
         if [ -n "{task}" ]; then

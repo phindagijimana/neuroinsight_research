@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 class SLURMBackend(ExecutionBackend):
     """SLURM HPC execution backend.
-
+    
     Submits jobs to SLURM scheduler via SSH connection.
     Data and processing stay on HPC -- no local data transfer.
     """
@@ -61,7 +61,7 @@ class SLURMBackend(ExecutionBackend):
         ssh_manager: Optional[SSHManager] = None,
     ):
         """Initialize SLURM backend.
-
+        
         Args:
             ssh_host: HPC hostname
             ssh_user: SSH username
@@ -787,7 +787,7 @@ class SLURMBackend(ExecutionBackend):
         if match:
             return match.group(1)
         raise ExecutionError(f"Failed to parse SLURM job ID from: {sbatch_output}")
-
+    
     def _parse_slurm_status(self, status_str: str) -> JobStatus:
         """Map SLURM state string to JobStatus enum."""
         status_map = {

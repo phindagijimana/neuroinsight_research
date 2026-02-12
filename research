@@ -89,12 +89,17 @@ cmd_start() {
             sed -i "s|target: 'http://localhost:[0-9]*'|target: 'http://localhost:$BACKEND_PORT'|g" "$VITE_CFG"
         fi
 
+        local ABS_LOG_DIR
+        ABS_LOG_DIR="$(cd "$LOG_DIR" && pwd)"
+        local ABS_PID_DIR
+        ABS_PID_DIR="$(cd "$PID_DIR" && pwd)"
+
         cd frontend
         nohup npx vite preview \
             --port "$FRONTEND_PORT" \
             --host 0.0.0.0 \
-            > "../$LOG_DIR/frontend.log" 2>&1 &
-        write_pid frontend $!
+            > "$ABS_LOG_DIR/frontend.log" 2>&1 &
+        echo "$!" > "$ABS_PID_DIR/frontend.pid"
         cd ..
 
         if wait_for_url "http://localhost:$FRONTEND_PORT" 10 "frontend"; then

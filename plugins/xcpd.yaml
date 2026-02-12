@@ -118,7 +118,7 @@ execution:
           --smoothing {smoothing} \
           --fd-threshold {fd_threshold} \
           --low-pass {low_pass} \
-          -p {atlases} \
+          --atlases {atlases} \
           --nthreads {threads} \
           --omp-nthreads {omp_nthreads}
 

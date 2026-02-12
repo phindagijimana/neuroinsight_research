@@ -300,9 +300,10 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   useEffect(() => {
     async function fetchData() {
       try {
-        // Try fetching real plugins, workflows, and license status from API
+        // Fetch ALL plugins (including utilities for workflow step lookups),
+        // workflows, and license status from API
         const [pluginsRes, workflowsRes, licenseRes] = await Promise.all([
-          apiService.getPlugins(true),
+          apiService.getPlugins(false),
           apiService.getWorkflows(),
           apiService.getLicenseStatus().catch(() => null),
         ]);
@@ -419,7 +420,12 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
 
   const selectedPlugin = activePlugins.find(p => p.id === selectedPluginId);
   const selectedWorkflow = activeWorkflows.find(w => w.id === selectedWorkflowId);
-  const workflowPlugins = selectedWorkflow ? activePlugins.filter(p => selectedWorkflow.plugins.includes(p.id)) : [];
+  // Preserve workflow step order (plugin_ids from YAML) rather than activePlugins array order
+  const workflowPlugins = selectedWorkflow
+    ? selectedWorkflow.plugins
+        .map(pid => activePlugins.find(p => p.id === pid))
+        .filter((p): p is Plugin => p !== undefined)
+    : [];
 
   if (loading) {
     return (

@@ -405,7 +405,13 @@ def get_docs_all():
             }
             for p in plugins
         ],
-        "workflows": [w.to_api_dict(plugin_registry=pw_registry.plugins) for w in workflows],
+        "workflows": [
+            {
+                **w.to_api_dict(plugin_registry=pw_registry.plugins),
+                "yaml": yaml.dump(w.raw_yaml, default_flow_style=False, sort_keys=False),
+            }
+            for w in workflows
+        ],
         "total_plugins": len(plugins),
         "total_workflows": len(workflows),
     }

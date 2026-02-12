@@ -109,6 +109,18 @@ execution:
           -parallel \
           -openmp {threads}
 
+        # Optional: hippocampal subfields segmentation
+        if [ "{hippocampal_subfields}" = "true" ]; then
+          echo "Running hippocampal subfields segmentation..."
+          segmentHA_T1.sh {subject_id}
+        fi
+
+        # Optional: brainstem substructures segmentation
+        if [ "{brainstem}" = "true" ]; then
+          echo "Running brainstem substructures segmentation..."
+          segmentBS.sh {subject_id}
+        fi
+
         echo "FreeSurfer recon-all completed"
 
 native_outputs:

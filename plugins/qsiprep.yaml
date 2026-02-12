@@ -118,7 +118,7 @@ execution:
         QSIPREP_CMD="$QSIPREP_CMD --output-resolution {output_resolution}"
         QSIPREP_CMD="$QSIPREP_CMD --nthreads {threads}"
         QSIPREP_CMD="$QSIPREP_CMD --omp-nthreads {omp_nthreads}"
-        QSIPREP_CMD="$QSIPREP_CMD --mem_mb $((1000 * {mem_gb}))"
+        QSIPREP_CMD="$QSIPREP_CMD --mem-mb $((1000 * {mem_gb}))"
         QSIPREP_CMD="$QSIPREP_CMD --hmc-model {hmc_model}"
 
         if [ "{denoise}" = "true" ]; then
