@@ -1,0 +1,155 @@
+name: freesurfer_hippocampus
+version: 1.0.0
+description: |
+  FreeSurfer hippocampal segmentation and asymmetry analysis.
+  
+  Performs automated segmentation of hippocampus and calculates
+  asymmetry metrics for hippocampal sclerosis detection.
+  
+  Based on FreeSurfer 7.4.1 with hippocampal subfields module.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on FreeSurfer (Fischl et al., 2002)"
+
+references:
+  - "Fischl, B. (2012). FreeSurfer. Neuroimage, 62(2), 774-781."
+  - "Iglesias, J.E. et al. (2015). A computational atlas of the hippocampal formation using ex vivo, ultra-high resolution MRI. Neuroimage, 115, 117-137."
+
+container_image: freesurfer/freesurfer:7.4.1
+
+inputs:
+  - name: t1w
+    type: nifti
+    required: true
+    description: T1-weighted MRI scan (MPRAGE or equivalent)
+    pattern: "*.nii.gz"
+  
+  - name: flair
+    type: nifti
+    required: false
+    description: FLAIR sequence (optional, improves hippocampal segmentation)
+    pattern: "*.nii.gz"
+
+parameters:
+  - name: threads
+    type: int
+    default: 8
+    min_value: 1
+    max_value: 32
+    description: Number of CPU threads for parallel processing
+  
+  - name: skip_recon
+    type: bool
+    default: false
+    description: Skip full recon-all (faster, for testing only)
+  
+  - name: hippocampal_subfields
+    type: bool
+    default: true
+    description: Run hippocampal subfields segmentation
+  
+  - name: asymmetry_threshold
+    type: float
+    default: 0.15
+    min_value: 0.0
+    max_value: 1.0
+    description: Asymmetry threshold for flagging potential abnormalities
+
+resources:
+  memory_gb: 32
+  cpus: 8
+  time_hours: 6
+  gpu: false
+
+command: |
+  #!/bin/bash
+  set -e
+  
+  export SUBJECTS_DIR=/data/outputs
+  export FREESURFER_HOME=/usr/local/freesurfer
+  
+  # Run recon-all with hippocampal subfields
+  recon-all \
+    -i /data/inputs/t1w.nii.gz \
+    -subject subject \
+    -all \
+    -parallel \
+    -openmp {threads} \
+    -hippocampal-subfields-T1
+  
+  # Extract metrics
+  python3 << 'EOF'
+  import json
+  import pandas as pd
+  from pathlib import Path
+  
+  # Read aseg.stats
+  stats_file = Path("/data/outputs/subject/stats/aseg.stats")
+  
+  # Extract hippocampal volumes
+  left_hippo = None
+  right_hippo = None
+  
+  with open(stats_file) as f:
+      for line in f:
+          if "Left-Hippocampus" in line:
+              left_hippo = float(line.split()[3])
+          if "Right-Hippocampus" in line:
+              right_hippo = float(line.split()[3])
+  
+  # Calculate asymmetry
+  asymmetry = abs(left_hippo - right_hippo) / ((left_hippo + right_hippo) / 2)
+  
+  # Create metrics JSON
+  metrics = {
+      "left_hippocampus_volume_mm3": left_hippo,
+      "right_hippocampus_volume_mm3": right_hippo,
+      "asymmetry_index": round(asymmetry, 4),
+      "asymmetry_percentage": round(asymmetry * 100, 2),
+      "flagged_abnormal": asymmetry > {asymmetry_threshold}
+  }
+  
+  with open("/data/outputs/metrics.json", "w") as f:
+      json.dump(metrics, f, indent=2)
+  
+  print("Metrics extracted successfully")
+  EOF
+  
+  echo "Pipeline completed successfully"
+
+outputs:
+  - name: segmentation
+    path: subject/mri/aseg.mgz
+    required: true
+    description: Whole-brain segmentation
+  
+  - name: hippocampus_left
+    path: subject/mri/lh.hippoSfVolumes-T1.v21.txt
+    required: true
+    description: Left hippocampal subfield volumes
+  
+  - name: hippocampus_right
+    path: subject/mri/rh.hippoSfVolumes-T1.v21.txt
+    required: true
+    description: Right hippocampal subfield volumes
+  
+  - name: metrics
+    path: metrics.json
+    required: true
+    description: Extracted hippocampal metrics and asymmetry index
+  
+  - name: surf_left
+    path: subject/surf/lh.pial
+    required: true
+    description: Left hemisphere pial surface
+  
+  - name: surf_right
+    path: subject/surf/rh.pial
+    required: true
+    description: Right hemisphere pial surface
+  
+  - name: logs
+    path: subject/scripts/recon-all.log
+    required: false
+    description: FreeSurfer processing log

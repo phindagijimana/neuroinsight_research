@@ -1,0 +1,117 @@
+# Workflow: Hippocampal Sclerosis Detection (T1w)
+id: wf_hs_detection_v1
+name: "Hippocampal Sclerosis Detection (T1w)"
+version: "1.0.0"
+type: workflow
+domain: structural_mri
+
+description: >
+  Runs FreeSurfer volumetric processing (autorecon1 + autorecon2-volonly), computes hippocampal
+  volumes and asymmetry index with calibrated thresholds (AI = (L-R)/(L+R)), generates a PDF
+  report (with slices 3-6), produces Top10 QC overlays from hippo-guided slice selection,
+  and prepares Niivue viewer assets for interactive NIfTI overlay inspection.
+
+developer_contract: >
+  This workflow strictly calls plugins only. hs_postprocess is a utility plugin that does not
+  need to be shown in the UI plugin list.
+
+authors:
+  - "NeuroInsight Research Team"
+
+inputs:
+  required:
+    - key: T1w
+      type: nifti
+      description: "T1-weighted MRI scan (.nii or .nii.gz)"
+    - key: subject_id
+      type: string
+      description: "Subject identifier"
+  optional:
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license file path"
+    - key: subjects_dir
+      type: path
+      description: "Override SUBJECTS_DIR"
+    - key: resume
+      type: bool
+      default: true
+
+    # Advanced overrides (collapsed in UI by default)
+    - key: left_hs_threshold
+      type: float
+      default: -0.070839747728063
+      description: "Left HS threshold for asymmetry index"
+    - key: right_hs_threshold
+      type: float
+      default: 0.046915816971433
+      description: "Right HS threshold for asymmetry index"
+    - key: qc_orientation
+      type: string
+      default: "coronal"
+    - key: report_pick
+      type: string
+      default: "3,4,5,6"
+      description: "1-based indices of QC slices to include in the PDF report"
+    - key: niivue_overlay_opacity
+      type: float
+      default: 0.35
+
+input_format:
+  format_name: "Single NIfTI"
+  description: "A single T1-weighted MRI scan in NIfTI format."
+  notes:
+    - "1mm isotropic resolution recommended"
+    - "The file should be skull-on (not skull-stripped)"
+    - "Both .nii and .nii.gz are accepted"
+    - "Full pipeline takes 2-5 hours depending on hardware"
+    - "Requires FreeSurfer license (free): https://surfer.nmr.mgh.harvard.edu/registration.html"
+  example_structure: |
+    any_folder/
+      sub-01_T1w.nii.gz
+
+validation:
+  preflight_checks:
+    - "nifti_readable(T1w)"
+    - "non_empty(subject_id)"
+
+steps:
+  - id: freesurfer_volonly
+    uses: freesurfer_autorecon_volonly
+    with:
+      T1w: "{inputs.T1w}"
+      subject_id: "{inputs.subject_id}"
+      fs_license: "{inputs.fs_license}"
+      subjects_dir: "{inputs.subjects_dir}"
+      resume: "{inputs.resume}"
+
+  - id: hs_postprocess
+    uses: hs_postprocess
+    with:
+      subject_id: "{inputs.subject_id}"
+      subjects_dir: "{steps.freesurfer_volonly.execution.workdirs.subjects_dir}"
+      bundle_root: "{run_root}/bundle"
+      left_hs_threshold: "{inputs.left_hs_threshold}"
+      right_hs_threshold: "{inputs.right_hs_threshold}"
+      qc_orientation: "{inputs.qc_orientation}"
+      report_pick: "{inputs.report_pick}"
+      niivue_overlay_opacity: "{inputs.niivue_overlay_opacity}"
+
+outputs:
+  primary_artifacts:
+    - "{run_root}/bundle/reports/hs_report.pdf"
+    - "{run_root}/bundle/metrics/hs_metrics.json"
+    - "{run_root}/bundle/viewer/niivue_viewer.json"
+  viewer_assets:
+    - "{run_root}/bundle/volumes/{inputs.subject_id}/T1.nii.gz"
+    - "{run_root}/bundle/labels/{inputs.subject_id}/hippo_labels.nii.gz"
+    - "{run_root}/bundle/qc/hs"
+  native:
+    - "{run_root}/native/freesurfer/SUBJECTS_DIR/{inputs.subject_id}"
+  bundle:
+    - "{run_root}/bundle"
+
+reproducibility:
+  pin_containers: true
+  write_run_manifest: true
+  store_exact_commands: true

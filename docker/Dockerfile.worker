@@ -1,0 +1,45 @@
+# NeuroInsight Worker Dockerfile
+FROM python:3.9-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/app
+
+# Install system dependencies (same as backend plus additional for FreeSurfer if needed)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libgthread-2.0-0 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY ./backend/requirements.txt .
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+# Cache invalidation comment - build v2
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir matplotlib==3.7.2 && \
+    pip install --no-cache-dir celery
+
+# Copy application code
+COPY backend/ ./backend/
+COPY workers/ ./workers/
+COPY pipeline/ ./pipeline/
+
+# Create data directories
+RUN mkdir -p /data/uploads /data/outputs /data/logs
+
+# Set proper permissions
+RUN chmod +x /app/workers/
+
+# Run Celery worker
+CMD ["celery", "-A", "workers.tasks.processing_web", "worker", "--loglevel=info", "--concurrency=1"]

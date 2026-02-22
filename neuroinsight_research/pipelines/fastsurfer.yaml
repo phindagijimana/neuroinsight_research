@@ -1,0 +1,167 @@
+name: fastsurfer
+version: 1.0.0
+description: |
+  FastSurfer: Fast and accurate deep-learning based neuroimaging pipeline.
+  
+  Performs whole-brain segmentation and cortical surface reconstruction
+  in under 1 minute on GPU (vs 6-8 hours for FreeSurfer).
+  
+  Provides FreeSurfer-compatible outputs with comparable accuracy.
+  Based on FastSurfer v2.2 with deep learning segmentation.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on FastSurfer (Henschel et al., 2020)"
+
+references:
+  - "Henschel, L., et al. (2020). FastSurfer - A fast and accurate deep learning based neuroimaging pipeline. NeuroImage, 219, 117012."
+  - "Fischl, B. (2012). FreeSurfer. Neuroimage, 62(2), 774-781."
+
+container_image: deepmi/fastsurfer:latest
+
+inputs:
+  - name: t1w
+    type: nifti
+    required: true
+    description: T1-weighted MRI scan (MPRAGE or equivalent, 1mm isotropic recommended)
+    pattern: "*.nii.gz"
+
+parameters:
+  - name: seg_only
+    type: bool
+    default: false
+    description: Run segmentation only (skip surface reconstruction for faster processing)
+  
+  - name: use_cpu
+    type: bool
+    default: false
+    description: Force CPU processing (slower, use if GPU unavailable)
+  
+  - name: batch_size
+    type: int
+    default: 1
+    min_value: 1
+    max_value: 8
+    description: Batch size for network inference (higher values use more GPU memory)
+  
+  - name: compute_volumes
+    type: bool
+    default: true
+    description: Compute regional volumes from segmentation
+
+resources:
+  memory_gb: 16
+  cpus: 4
+  time_hours: 1
+  gpu: true
+
+command: |
+  #!/bin/bash
+  set -e
+  
+  export SUBJECTS_DIR=/data/outputs
+  
+  # Set GPU/CPU flag
+  if [ "{use_cpu}" = "true" ]; then
+    DEVICE="cpu"
+  else
+    DEVICE="auto"
+  fi
+  
+  # Set segmentation mode
+  if [ "{seg_only}" = "true" ]; then
+    RUN_MODE="--seg_only"
+  else
+    RUN_MODE=""
+  fi
+  
+  # Run FastSurfer
+  /fastsurfer/run_fastsurfer.sh \
+    --t1 /data/inputs/t1w.nii.gz \
+    --sid subject \
+    --sd /data/outputs \
+    --device ${DEVICE} \
+    --batch_size {batch_size} \
+    ${RUN_MODE}
+  
+  # Extract metrics if volume computation enabled
+  if [ "{compute_volumes}" = "true" ]; then
+    python3 << 'EOF'
+  import json
+  import pandas as pd
+  from pathlib import Path
+  
+  # Read aseg.stats (FastSurfer compatible output)
+  stats_file = Path("/data/outputs/subject/stats/aseg.stats")
+  
+  if stats_file.exists():
+      metrics = {}
+      
+      with open(stats_file) as f:
+          for line in f:
+              if "Left-Hippocampus" in line:
+                  metrics["left_hippocampus_volume_mm3"] = float(line.split()[3])
+              if "Right-Hippocampus" in line:
+                  metrics["right_hippocampus_volume_mm3"] = float(line.split()[3])
+              if "Left-Lateral-Ventricle" in line:
+                  metrics["left_ventricle_volume_mm3"] = float(line.split()[3])
+              if "Right-Lateral-Ventricle" in line:
+                  metrics["right_ventricle_volume_mm3"] = float(line.split()[3])
+              if "BrainSegVol," in line:
+                  metrics["total_brain_volume_mm3"] = float(line.split()[3])
+      
+      # Calculate asymmetry for hippocampus
+      if "left_hippocampus_volume_mm3" in metrics and "right_hippocampus_volume_mm3" in metrics:
+          left = metrics["left_hippocampus_volume_mm3"]
+          right = metrics["right_hippocampus_volume_mm3"]
+          asymmetry = abs(left - right) / ((left + right) / 2)
+          metrics["hippocampal_asymmetry_index"] = round(asymmetry, 4)
+          metrics["hippocampal_asymmetry_percentage"] = round(asymmetry * 100, 2)
+      
+      # Save metrics
+      with open("/data/outputs/metrics.json", "w") as f:
+          json.dump(metrics, f, indent=2)
+      
+      print("Metrics extracted successfully")
+  else:
+      print("Warning: aseg.stats not found, skipping metrics extraction")
+  EOF
+  fi
+  
+  echo "FastSurfer pipeline completed successfully"
+
+outputs:
+  - name: segmentation
+    path: subject/mri/aparc.DKTatlas+aseg.deep.mgz
+    required: true
+    description: Deep learning-based whole-brain segmentation
+  
+  - name: aseg
+    path: subject/mri/aseg.mgz
+    required: true
+    description: Subcortical segmentation (FreeSurfer compatible)
+  
+  - name: orig
+    path: subject/mri/orig.mgz
+    required: true
+    description: Original conformed volume
+  
+  - name: metrics
+    path: metrics.json
+    required: false
+    description: Extracted volumetric metrics
+  
+  - name: surf_left
+    path: subject/surf/lh.pial
+    required: false
+    description: Left hemisphere pial surface (if surface reconstruction run)
+  
+  - name: surf_right
+    path: subject/surf/rh.pial
+    required: false
+    description: Right hemisphere pial surface (if surface reconstruction run)
+  
+  - name: stats
+    path: subject/stats/aseg.stats
+    required: false
+    description: Segmentation statistics (if computed)

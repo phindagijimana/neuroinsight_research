@@ -1,0 +1,68 @@
+{
+    "name": "neuroinsight-fastsurfer",
+    "label": "NeuroInsight FastSurfer",
+    "description": "Run FastSurfer segmentation via NeuroInsight adapter",
+    "version": "2.4.2",
+    "schema-version": "1.0",
+    "image": "neuroinsight/fastsurfer-xnat:latest",
+    "type": "docker",
+    "command-line": "/entrypoint.sh",
+    "mounts": [
+        {
+            "name": "input",
+            "writable": false,
+            "path": "/input"
+        },
+        {
+            "name": "output",
+            "writable": true,
+            "path": "/output"
+        }
+    ],
+    "environment-variables": {
+        "SUBJECT_ID": "#SUBJECT_ID#"
+    },
+    "inputs": [
+        {
+            "name": "SUBJECT_ID",
+            "description": "Subject identifier",
+            "type": "string",
+            "default-value": "sub-01",
+            "required": false
+        }
+    ],
+    "outputs": [
+        {
+            "name": "fastsurfer-output",
+            "description": "FastSurfer segmentation output",
+            "mount": "output",
+            "required": true
+        }
+    ],
+    "xnat": [
+        {
+            "name": "Run FastSurfer on MR Session",
+            "description": "Run FastSurfer segmentation on a T1-weighted MR session",
+            "contexts": ["xnat:imageScanData"],
+            "external-inputs": [
+                {
+                    "name": "scan",
+                    "description": "Input scan",
+                    "type": "Scan",
+                    "required": true,
+                    "provides-files-for-command-mount": "input"
+                }
+            ],
+            "derived-inputs": [],
+            "output-handlers": [
+                {
+                    "name": "output-resource",
+                    "accepts-command-output": "fastsurfer-output",
+                    "as-a-child-of": "scan",
+                    "type": "Resource",
+                    "label": "FASTSURFER"
+                }
+            ]
+        }
+    ]
+}

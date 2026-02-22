@@ -1,0 +1,87 @@
+# ==============================================================================
+#  NeuroInsight Research -- CI Pipeline
+#
+#  Runs on every push/PR to main. Tests backend (Python), frontend (TS), and
+#  builds the Docker image.
+# ==============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'neuroinsight_research/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'neuroinsight_research/**'
+
+defaults:
+  run:
+    working-directory: neuroinsight_research
+
+jobs:
+  # --------------------------------------------------------------------------
+  #  Backend tests (Python)
+  # --------------------------------------------------------------------------
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest httpx pytest-cov
+
+      - name: Run tests
+        run: |
+          PYTHONPATH=. python -m pytest tests/ -v --tb=short --cov=backend --cov-report=term-missing
+        env:
+          DATABASE_URL: sqlite:///test.db
+          ENVIRONMENT: development
+
+  # --------------------------------------------------------------------------
+  #  Frontend build (TypeScript + Vite)
+  # --------------------------------------------------------------------------
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: neuroinsight_research/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: cd frontend && npm ci
+
+      - name: TypeScript check
+        run: cd frontend && npx tsc --noEmit
+
+      - name: Production build
+        run: cd frontend && npm run build
+
+  # --------------------------------------------------------------------------
+  #  Docker build (smoke test)
+  # --------------------------------------------------------------------------
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t neuroinsight-research:test .
+
+      - name: Verify image
+        run: docker run --rm neuroinsight-research:test python -c "import backend.main; print('OK')"

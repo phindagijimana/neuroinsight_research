@@ -1,0 +1,167 @@
+# Plugin: HS Detection Postprocess (Utility - hidden from UI)
+id: hs_postprocess
+name: "HS Detection Postprocess (Utility)"
+version: "1.0.0"
+type: plugin
+domain: structural_mri
+
+visibility:
+  user_selectable: false
+  ui_category: internal_utility
+  ui_label: "HS Postprocess Utility"
+
+description: >
+  Reads FreeSurfer outputs, extracts hippocampal volumes, computes asymmetry index and
+  lateralization using calibrated thresholds (AI = (L-R)/(L+R)), generates QC overlays
+  (Top10 hippo-guided slices) and Report overlays (slices 3-6), writes a PDF report,
+  and produces a Niivue viewer manifest.
+  Hidden from UI; invoked exclusively by the HS detection workflow.
+
+authors:
+  - "NeuroInsight Research Team"
+
+container:
+  runtime: docker
+  image: "neuroinsight/hs-postprocess:1.0.0"
+  digest: null
+
+inputs:
+  required:
+    - key: subject_id
+      type: string
+      description: "FreeSurfer subject ID"
+    - key: subjects_dir
+      type: path
+      description: "SUBJECTS_DIR that contains <subject_id>/ from FreeSurfer"
+    - key: bundle_root
+      type: path
+      description: "NIR bundle root (usually {run_root}/bundle)"
+  optional:
+    - key: left_hs_threshold
+      type: float
+      default: -0.070839747728063
+      description: "Left HS (Right-dominant) if AI < this value"
+    - key: right_hs_threshold
+      type: float
+      default: 0.046915816971433
+      description: "Right HS (Left-dominant) if AI > this value"
+    - key: ai_formula
+      type: string
+      default: "(L-R)/(L+R)"
+      description: "Asymmetry index formula (fixed)"
+    - key: left_hippo_label
+      type: int
+      default: 17
+      description: "FreeSurfer label ID for left hippocampus"
+    - key: right_hippo_label
+      type: int
+      default: 53
+      description: "FreeSurfer label ID for right hippocampus"
+    - key: qc_orientation
+      type: string
+      default: "coronal"
+      description: "Orientation for QC slice extraction"
+    - key: qc_slice_axis
+      type: int
+      default: 2
+      description: "Slice axis in LIA space (0=sagittal, 1=axial, 2=coronal)"
+    - key: qc_top10_count
+      type: int
+      default: 10
+      description: "Number of top hippocampal slices for QC"
+    - key: qc_thresh_frac
+      type: float
+      default: 0.05
+      description: "5% of max hippo voxel count threshold"
+    - key: pdf_overlay_opacity
+      type: float
+      default: 0.55
+      description: "Overlay opacity for PDF report images"
+    - key: report_pick
+      type: string
+      default: "3,4,5,6"
+      description: "1-based indices of QC slices to include in the PDF report"
+    - key: report_title
+      type: string
+      default: "NeuroInsight Hippocampal Analysis Report"
+      description: "Title for the PDF report"
+    - key: niivue_overlay_opacity
+      type: float
+      default: 0.35
+      description: "Default overlay opacity for Niivue viewer"
+    - key: niivue_orientation
+      type: string
+      default: "coronal"
+      description: "Default orientation for Niivue viewer"
+
+resources:
+  profiles:
+    default:
+      cpus: 4
+      mem_gb: 16
+      time_hours: 1
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    logs_dir: "{run_root}/logs/hs_postprocess"
+
+  stages:
+    - id: hs_postprocess_all
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+
+        export SUBJECTS_DIR=/data/outputs/native/freesurfer/SUBJECTS_DIR
+        export BUNDLE_ROOT=/data/outputs/bundle
+        mkdir -p $BUNDLE_ROOT/metrics $BUNDLE_ROOT/reports $BUNDLE_ROOT/qc/hs $BUNDLE_ROOT/viewer $BUNDLE_ROOT/volumes $BUNDLE_ROOT/labels
+
+        python -m neuroinsight_hs.postprocess \
+          --subject-id "{subject_id}" \
+          --subjects-dir "$SUBJECTS_DIR" \
+          --bundle-root "$BUNDLE_ROOT" \
+          --left-label "{left_hippo_label}" \
+          --right-label "{right_hippo_label}" \
+          --ai-left-th "{left_hs_threshold}" \
+          --ai-right-th "{right_hs_threshold}" \
+          --qc-orientation "{qc_orientation}" \
+          --qc-slice-axis "{qc_slice_axis}" \
+          --qc-top10 "{qc_top10_count}" \
+          --qc-thresh-frac "{qc_thresh_frac}" \
+          --pdf-opacity "{pdf_overlay_opacity}" \
+          --report-pick "{report_pick}" \
+          --report-title "{report_title}" \
+          --niivue-opacity "{niivue_overlay_opacity}" \
+          --niivue-orientation "{niivue_orientation}"
+
+bundle:
+  bundle_version: 1
+  root: "{inputs.bundle_root}"
+  extraction:
+    metrics:
+      - from: "{bundle.root}/metrics/hs_metrics.json"
+        to: "{bundle.root}/metrics/hs_metrics.json"
+        method: "identity"
+    reports:
+      - from: "{bundle.root}/reports/hs_report.pdf"
+        to: "{bundle.root}/reports/hs_report.pdf"
+        method: "identity"
+    overlays:
+      - from: "{bundle.root}/overlays/report"
+        to: "{bundle.root}/overlays/report"
+        method: "identity"
+      - from: "{bundle.root}/qc/hs"
+        to: "{bundle.root}/qc/hs"
+        method: "identity"
+    viewer:
+      - from: "{bundle.root}/viewer/niivue_viewer.json"
+        to: "{bundle.root}/viewer/niivue_viewer.json"
+        method: "identity"
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true

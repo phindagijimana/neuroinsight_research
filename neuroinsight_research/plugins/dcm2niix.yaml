@@ -1,0 +1,151 @@
+# Plugin 1: DICOM to NIfTI Conversion
+id: dcm2niix
+name: "DICOM to NIfTI Converter"
+version: "1.0.0"
+type: plugin
+domain: conversion
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "DICOM to NIfTI Converter"
+
+description: >
+  Convert DICOM images to NIfTI format with JSON sidecars using dcm2niix.
+  Supports all standard DICOM formats and produces NIfTI files with
+  BIDS-style naming. Uses the HeuDiConv container which includes dcm2niix.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on dcm2niix (Li et al., 2016)"
+
+references:
+  - "Li, X., et al. (2016). The first step for neuroimaging data analysis: DICOM to NIfTI conversion. Journal of Neuroscience Methods, 264, 47-56."
+
+container:
+  runtime: docker
+  image: "nipy/heudiconv:1.3.4"
+  digest: "sha256:6ecbf13e3f77a0b10dd7876da7ae5f73fc3e5e6789649f65bbcfb477aabb16e8"
+
+inputs:
+  required:
+    - key: dicom_dir
+      type: directory
+      description: "Directory containing DICOM files"
+  optional:
+    - key: heuristic
+      type: string
+      description: "HeuDiConv heuristic file for BIDS conversion"
+    - key: subject_id
+      type: string
+      default: "sub-01"
+      description: "Subject identifier for BIDS naming"
+
+input_format:
+  format_name: "DICOM Directory"
+  description: "A folder containing DICOM files from the scanner."
+  notes:
+    - "DICOM files can be nested in subdirectories (the tool searches recursively)"
+    - "Common extensions: .dcm, .ima, or no extension"
+    - "Multiple series can be in the same directory"
+  example_structure: |
+    dicom_dir/
+      series001/
+        IM-0001-0001.dcm
+        IM-0001-0002.dcm
+        ...
+      series002/
+        IM-0002-0001.dcm
+        ...
+  file_types:
+    - ".dcm or .ima (DICOM images)"
+    - "DICOMDIR (optional index file)"
+
+parameters:
+  - name: compress
+    type: bool
+    default: true
+    description: "Compress output NIfTI files (.nii.gz)"
+  - name: merge_2d
+    type: bool
+    default: false
+    description: "Merge 2D slices into 3D volumes"
+  - name: anonymize
+    type: bool
+    default: false
+    description: "Remove identifying information from DICOM headers"
+
+resources:
+  profiles:
+    default:
+      cpus: 2
+      mem_gb: 8
+      time_hours: 1
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/dcm2niix"
+    logs_dir: "{run_root}/logs/dcm2niix"
+
+  stages:
+    - id: convert
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+
+        mkdir -p /data/outputs/native/dcm2niix
+        mkdir -p /data/outputs/logs/dcm2niix
+
+        # Build dcm2niix command with parameters
+        DCM2NIIX_CMD="dcm2niix"
+
+        # Compression
+        if [ "{compress}" = "true" ]; then
+          DCM2NIIX_CMD="$DCM2NIIX_CMD -z y"
+        else
+          DCM2NIIX_CMD="$DCM2NIIX_CMD -z n"
+        fi
+
+        # Merge 2D slices
+        if [ "{merge_2d}" = "true" ]; then
+          DCM2NIIX_CMD="$DCM2NIIX_CMD -m y"
+        fi
+
+        # Anonymize DICOM headers
+        if [ "{anonymize}" = "true" ]; then
+          DCM2NIIX_CMD="$DCM2NIIX_CMD -ba y"
+        fi
+
+        DCM2NIIX_CMD="$DCM2NIIX_CMD -f \"%p_%s\" -o /data/outputs/native/dcm2niix /data/inputs/dicom_dir"
+
+        echo "Running: $DCM2NIIX_CMD"
+        eval $DCM2NIIX_CMD
+
+        echo "DICOM to NIfTI conversion completed"
+
+native_outputs:
+  preserved: true
+  layout: "native/dcm2niix/*.nii.gz + *.json"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  extraction:
+    volumes:
+      - from: "{native_root}/*.nii.gz"
+        to: "{bundle.root}/volumes/"
+        method: copy
+    metadata:
+      - from: "{native_root}/*.json"
+        to: "{bundle.root}/metadata/"
+        method: copy
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true
+  record_inputs_hashes: true

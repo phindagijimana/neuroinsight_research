@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  neuroinsight:
+    image: phindagijimana321/neuroinsight:latest
+    container_name: neuroinsight
+    ports:
+      - "8000:8000"    # Web interface
+      - "9000:9000"    # MinIO API
+      - "9001:9001"    # MinIO Console
+    volumes:
+      # Docker socket for FreeSurfer container spawning
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persistent data storage
+      - neuroinsight-data:/data
+      # FreeSurfer license (auto-detected from current directory)
+      # Place license.txt in the same folder as this docker-compose.yml
+      - ./license.txt:/app/license.txt:ro
+    environment:
+      # Override default passwords (recommended for production)
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-neuroinsight_secure_password}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis_secure_password}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin_secure}
+      # Host paths for Docker-in-Docker FreeSurfer spawning
+      - HOST_UPLOAD_DIR=/var/lib/docker/volumes/neuroinsight-data/_data/uploads
+      - HOST_OUTPUT_DIR=/var/lib/docker/volumes/neuroinsight-data/_data/outputs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/app/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  neuroinsight-data:
+    driver: local
+
+networks:
+  default:
+    name: neuroinsight-network

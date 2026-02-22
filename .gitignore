@@ -1,0 +1,135 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# Logs
+*.log
+logs/
+*.out
+*.pid
+
+# Data directories
+data/uploads/
+data/outputs/
+data/processed/
+freesurfer_subjects/
+singularity_cache/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Docker volumes
+docker-volumes/
+
+# Node modules (if any)
+node_modules/
+frontend/node_modules/
+neuroinsight_research/frontend/node_modules/
+
+# Build outputs
+frontend/dist/
+neuroinsight_research/frontend/dist/
+*.pyc
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
+nohup.out
+
+# Development logs (should be cleaned before commit)
+*.log
+logs/
+
+# Process IDs
+*.pid
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment and secrets
+.env*
+secrets/
+config.local.*
+*.local.md
+
+# SSL certificates and keys
+ssl/*.pem
+ssl/*.key
+ssl/*.crt
+
+# FreeSurfer License (keep example, ignore real license)
+license.txt
+!license.txt.example
+meld_license.txt
+
+# Data directories (neuroinsight_research)
+neuroinsight_research/data/uploads/
+neuroinsight_research/data/outputs/
+neuroinsight_research/data/processed/
+neuroinsight_research/data/temp/
+neuroinsight_research/*.db
+neuroinsight_research/*.sqlite
+
+# Large binary files (added for GitHub push)
+*.nii.gz
+*.raw
+*.pdf
+!sample_reports/*.pdf  # Allow sample report PDFs as examples
+large_files/
+test_data/
+
+# Backup files (prevent future clutter)
+*.backup
+*.old
+*.OLD
+*_BACKUP.*
+
+# Temporary helper scripts
+dual_env_status.sh
+fix.md
+
+# Planning documents (internal use only)
+DESKTOP_APP_PLAN.md
+DOCKER_DISTRIBUTION_PLAN.md
+AUTO_INSTALL_SUMMARY.md
+SYSTEMD_QUICKSTART.md
+
+# Deployment documentation (keep local only)
+DEPLOYMENT.md
+PRODUCTION_CHECKLIST.md
+PRODUCTION_READINESS.md
+
+# Internal documentation (keep local only)
+docs/PUSH_TO_GITHUB.md
+docs/SETUP_SUMMARY.txt
+docs/REPOSITORY_STRUCTURE.md
+docs/FREESURFER_LICENSE_README.md
+docs/WSL_INSTALLATION.md
