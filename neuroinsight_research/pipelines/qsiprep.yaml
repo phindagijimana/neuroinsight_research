@@ -1,0 +1,258 @@
+name: qsiprep
+version: 1.0.0
+description: |
+  QSIPrep: Preprocessing and reconstruction of diffusion MRI (dMRI) data.
+  
+  Configures pipelines for processing diffusion MRI data, including:
+  - Distortion correction (susceptibility and eddy current)
+  - Motion correction
+  - Coregistration to structural images
+  - Reconstruction methods (DTI, CSD, NODDI, etc.)
+  
+  Based on QSIPrep 0.20.0 with BIDS-compatible outputs.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on QSIPrep (Cieslak et al., 2021)"
+
+references:
+  - "Cieslak, M., et al. (2021). QSIPrep: an integrative platform for preprocessing and reconstructing diffusion MRI data. Nature Methods, 18(7), 775-778."
+  - "Garyfallidis, E., et al. (2014). Dipy, a library for the analysis of diffusion MRI data. Frontiers in Neuroinformatics, 8, 8."
+
+container_image: pennbbl/qsiprep:latest
+
+inputs:
+  - name: dwi
+    type: nifti
+    required: true
+    description: Diffusion-weighted imaging data (4D NIfTI)
+    pattern: "*dwi*.nii.gz"
+  
+  - name: bval
+    type: text
+    required: true
+    description: B-values file (FSL format)
+    pattern: "*.bval"
+  
+  - name: bvec
+    type: text
+    required: true
+    description: B-vectors file (FSL format)
+    pattern: "*.bvec"
+  
+  - name: t1w
+    type: nifti
+    required: false
+    description: T1-weighted anatomical image (for coregistration)
+    pattern: "*T1w*.nii.gz"
+  
+  - name: fieldmap
+    type: nifti
+    required: false
+    description: Field map for distortion correction (optional)
+    pattern: "*fieldmap*.nii.gz"
+
+parameters:
+  - name: output_resolution
+    type: float
+    default: 1.5
+    min_value: 0.5
+    max_value: 5.0
+    description: Isotropic voxel size (mm) for outputs
+  
+  - name: denoise
+    type: bool
+    default: true
+    description: Apply denoising with dwidenoise (Veraart et al., 2016)
+  
+  - name: unringing
+    type: bool
+    default: true
+    description: Apply Gibbs unringing (Kellner et al., 2016)
+  
+  - name: dwi_denoise_window
+    type: int
+    default: 5
+    min_value: 3
+    max_value: 7
+    description: Window size for dwidenoise (must be odd)
+  
+  - name: hmc_model
+    type: choice
+    default: eddy
+    choices: ["eddy", "3dSHORE", "none"]
+    description: Head motion correction model
+  
+  - name: distortion_correction
+    type: choice
+    default: pepolar
+    choices: ["pepolar", "fieldmap", "none"]
+    description: Susceptibility distortion correction method
+  
+  - name: recon_spec
+    type: choice
+    default: mrtrix_multishell_msmt
+    choices: ["mrtrix_multishell_msmt", "mrtrix_singleshell_ss3t", "dipy_dki", "dipy_mapmri", "csd", "none"]
+    description: Reconstruction pipeline specification
+  
+  - name: combine_all_dwis
+    type: bool
+    default: true
+    description: Combine all DWI series into a single output
+
+resources:
+  memory_gb: 32
+  cpus: 8
+  time_hours: 4
+  gpu: false
+
+command: |
+  #!/bin/bash
+  set -e
+  
+  # Create BIDS-compatible directory structure
+  mkdir -p /data/bids/sub-01/dwi
+  mkdir -p /data/bids/sub-01/anat
+  
+  # Copy DWI data
+  cp /data/inputs/dwi.nii.gz /data/bids/sub-01/dwi/sub-01_dwi.nii.gz
+  cp /data/inputs/bval /data/bids/sub-01/dwi/sub-01_dwi.bval
+  cp /data/inputs/bvec /data/bids/sub-01/dwi/sub-01_dwi.bvec
+  
+  # Copy T1w if provided
+  if [ -f /data/inputs/t1w.nii.gz ]; then
+    cp /data/inputs/t1w.nii.gz /data/bids/sub-01/anat/sub-01_T1w.nii.gz
+  fi
+  
+  # Create dataset_description.json
+  cat > /data/bids/dataset_description.json << EOF
+  {
+    "Name": "NeuroInsight Research DWI Dataset",
+    "BIDSVersion": "1.6.0"
+  }
+  EOF
+  
+  # Build QSIPrep command
+  QSIPREP_CMD="qsiprep /data/bids /data/outputs participant"
+  QSIPREP_CMD="${QSIPREP_CMD} --participant-label 01"
+  QSIPREP_CMD="${QSIPREP_CMD} --output-resolution {output_resolution}"
+  QSIPREP_CMD="${QSIPREP_CMD} --nthreads {cpus}"
+  QSIPREP_CMD="${QSIPREP_CMD} --omp-nthreads 4"
+  QSIPREP_CMD="${QSIPREP_CMD} --mem_mb $((1000 * {memory_gb}))"
+  
+  # Add denoising options
+  if [ "{denoise}" = "true" ]; then
+    QSIPREP_CMD="${QSIPREP_CMD} --denoise-method dwidenoise"
+    QSIPREP_CMD="${QSIPREP_CMD} --dwi-denoise-window {dwi_denoise_window}"
+  fi
+  
+  # Add unringing
+  if [ "{unringing}" = "true" ]; then
+    QSIPREP_CMD="${QSIPREP_CMD} --unringing-method mrdegibbs"
+  fi
+  
+  # Add distortion correction
+  if [ "{distortion_correction}" != "none" ]; then
+    QSIPREP_CMD="${QSIPREP_CMD} --distortion-group-merge {distortion_correction}"
+  fi
+  
+  # Add motion correction
+  QSIPREP_CMD="${QSIPREP_CMD} --hmc-model {hmc_model}"
+  
+  # Add reconstruction spec
+  if [ "{recon_spec}" != "none" ]; then
+    QSIPREP_CMD="${QSIPREP_CMD} --recon-spec {recon_spec}"
+  fi
+  
+  # Add combine option
+  if [ "{combine_all_dwis}" = "true" ]; then
+    QSIPREP_CMD="${QSIPREP_CMD} --combine-all-dwis"
+  fi
+  
+  # Run QSIPrep
+  ${QSIPREP_CMD}
+  
+  # Extract basic DTI metrics if available
+  if [ -f /data/outputs/qsiprep/sub-01/dwi/*FA.nii.gz ]; then
+    python3 << 'EOF'
+  import json
+  import nibabel as nib
+  import numpy as np
+  from pathlib import Path
+  
+  # Find FA map
+  fa_files = list(Path("/data/outputs/qsiprep/sub-01/dwi").glob("*FA.nii.gz"))
+  
+  if fa_files:
+      fa_img = nib.load(str(fa_files[0]))
+      fa_data = fa_img.get_fdata()
+      
+      # Calculate basic stats (excluding zeros)
+      fa_nonzero = fa_data[fa_data > 0]
+      
+      metrics = {
+          "mean_fa": float(np.mean(fa_nonzero)),
+          "median_fa": float(np.median(fa_nonzero)),
+          "std_fa": float(np.std(fa_nonzero)),
+          "min_fa": float(np.min(fa_nonzero)),
+          "max_fa": float(np.max(fa_nonzero)),
+          "voxels_processed": int(len(fa_nonzero))
+      }
+      
+      # Save metrics
+      with open("/data/outputs/metrics.json", "w") as f:
+          json.dump(metrics, f, indent=2)
+      
+      print("DTI metrics extracted successfully")
+  else:
+      print("Warning: FA map not found, skipping metrics extraction")
+  EOF
+  fi
+  
+  echo "QSIPrep pipeline completed successfully"
+
+outputs:
+  - name: preprocessed_dwi
+    path: qsiprep/sub-01/dwi/sub-01_space-T1w_desc-preproc_dwi.nii.gz
+    required: true
+    description: Preprocessed DWI data in T1w space
+  
+  - name: preprocessed_bval
+    path: qsiprep/sub-01/dwi/sub-01_space-T1w_desc-preproc_dwi.bval
+    required: true
+    description: B-values for preprocessed data
+  
+  - name: preprocessed_bvec
+    path: qsiprep/sub-01/dwi/sub-01_space-T1w_desc-preproc_dwi.bvec
+    required: true
+    description: B-vectors for preprocessed data
+  
+  - name: brain_mask
+    path: qsiprep/sub-01/dwi/sub-01_space-T1w_desc-brain_mask.nii.gz
+    required: true
+    description: Brain mask in T1w space
+  
+  - name: fa_map
+    path: qsiprep/sub-01/dwi/sub-01_space-T1w_model-DTI_FA.nii.gz
+    required: false
+    description: Fractional anisotropy (FA) map
+  
+  - name: md_map
+    path: qsiprep/sub-01/dwi/sub-01_space-T1w_model-DTI_MD.nii.gz
+    required: false
+    description: Mean diffusivity (MD) map
+  
+  - name: metrics
+    path: metrics.json
+    required: false
+    description: Extracted DTI metrics
+  
+  - name: html_report
+    path: qsiprep/sub-01.html
+    required: false
+    description: QSIPrep HTML quality control report
+  
+  - name: preprocessing_report
+    path: qsiprep/logs/CITATION.md
+    required: false
+    description: Processing details and citations

@@ -1,0 +1,20 @@
+# FreeSurfer License File - EXAMPLE
+#
+# Get your free license at: https://surfer.nmr.mgh.harvard.edu/registration.html
+#
+# Instructions:
+# 1. Register at the URL above (free for research)
+# 2. You'll receive a license via email
+# 3. Copy this file to: license.txt
+# 4. Replace this content with your license text
+# 5. Keep the file in the same folder as NeuroInsight
+#
+# Example license format:
+# your.email@institution.edu
+# 12345
+# *A1B2C3D4E5F6G7H8
+
+# REPLACE THIS EXAMPLE CONTENT WITH YOUR ACTUAL LICENSE:
+your.email@institution.edu
+12345
+*A1B2C3D4E5F6G7H8

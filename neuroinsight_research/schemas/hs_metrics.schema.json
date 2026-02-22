@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HS Detection Metrics",
+  "description": "Output schema for hippocampal sclerosis detection metrics (hs_metrics.json)",
+  "type": "object",
+  "required": ["subject_id", "volumes_mm3", "asymmetry_index", "thresholds", "classification"],
+  "properties": {
+    "subject_id": {
+      "type": "string",
+      "description": "FreeSurfer subject identifier"
+    },
+    "volumes_mm3": {
+      "type": "object",
+      "required": ["left", "right"],
+      "properties": {
+        "left": { "type": "number", "description": "Left hippocampus volume in mm³" },
+        "right": { "type": "number", "description": "Right hippocampus volume in mm³" }
+      }
+    },
+    "asymmetry_index": {
+      "type": "number",
+      "description": "AI = (L-R)/(L+R)"
+    },
+    "thresholds": {
+      "type": "object",
+      "required": ["left_hs", "right_hs"],
+      "properties": {
+        "left_hs": { "type": "number", "description": "Left HS threshold (Right-dominant)" },
+        "right_hs": { "type": "number", "description": "Right HS threshold (Left-dominant)" }
+      }
+    },
+    "classification": {
+      "type": "string",
+      "enum": [
+        "Left HS (Right-dominant)",
+        "Right HS (Left-dominant)",
+        "No HS (Balanced)"
+      ]
+    },
+    "formula": {
+      "type": "string",
+      "description": "The asymmetry index formula used"
+    },
+    "qc": {
+      "type": "object",
+      "properties": {
+        "orientation": { "type": "string" },
+        "top10_indices": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "description": "Slice indices selected by hippo-guided Top10 logic"
+        },
+        "threshold_fraction_of_max": {
+          "type": "number",
+          "description": "Fraction of max hippo voxel count used as threshold"
+        }
+      }
+    }
+  }
+}

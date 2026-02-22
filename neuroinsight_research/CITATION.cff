@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "NeuroInsight Research: Neuroimaging Pipeline Platform"
+version: 1.0.0
+date-released: 2026-02-12
+url: "https://github.com/phindagijimana/neuroinsight_research"
+repository-code: "https://github.com/phindagijimana/neuroinsight_research"
+license: MIT
+authors:
+  - family-names: Phindagijimana
+    alias: phindagijimana
+keywords:
+  - neuroimaging
+  - brain-mri
+  - freesurfer
+  - fastsurfer
+  - fmriprep
+  - qsiprep
+  - pipeline
+  - docker
+  - hpc
+  - slurm
+abstract: >
+  NeuroInsight Research is a neuroimaging pipeline platform for
+  processing, monitoring, and visualizing brain MRI data. It supports
+  containerized pipelines (FreeSurfer, FastSurfer, fMRIPrep, QSIPrep,
+  XCP-D, MELD Graph) with three execution backends: local Docker,
+  remote servers via SSH, and HPC clusters via SLURM with
+  Apptainer/Singularity.

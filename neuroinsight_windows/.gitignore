@@ -1,0 +1,20 @@
+# FreeSurfer License (sensitive)
+license.txt
+
+# Backup files
+*.tar.gz
+*.zip
+neuroinsight-backup-*
+
+# Windows specific
+Thumbs.db
+desktop.ini
+*.lnk
+
+# Logs
+*.log
+*.pid
+
+# Temporary files
+*.tmp
+*.temp

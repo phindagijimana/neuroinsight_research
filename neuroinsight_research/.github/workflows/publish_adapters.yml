@@ -1,0 +1,118 @@
+name: Publish Platform Adapters
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Platforms to build (comma-separated: pennsieve,xnat)'
+        required: false
+        default: 'pennsieve,xnat'
+
+env:
+  REGISTRY: docker.io
+
+jobs:
+  build-pennsieve-adapters:
+    name: Build Pennsieve Adapters
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'release' ||
+      contains(github.event.inputs.platforms, 'pennsieve')
+    strategy:
+      matrix:
+        adapter:
+          - name: freesurfer_recon
+            image: neuroinsight/freesurfer-recon-pennsieve
+            context: adapters/pennsieve/freesurfer_recon
+          - name: fastsurfer
+            image: neuroinsight/fastsurfer-pennsieve
+            context: adapters/pennsieve/fastsurfer
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract version tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.adapter.context }}
+          push: true
+          tags: |
+            ${{ matrix.adapter.image }}:${{ steps.version.outputs.tag }}
+            ${{ matrix.adapter.image }}:latest
+
+      - name: Create Pennsieve branch
+        run: |
+          BRANCH_NAME="pennsieve-${{ matrix.adapter.name }}"
+          git checkout --orphan "$BRANCH_NAME"
+          git rm -rf .
+          cp "${{ matrix.adapter.context }}/Dockerfile" .
+          cp "${{ matrix.adapter.context }}/entrypoint.sh" .
+          git add Dockerfile entrypoint.sh
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "Pennsieve adapter: ${{ matrix.adapter.name }} ${{ steps.version.outputs.tag }}"
+          git push origin "$BRANCH_NAME" --force
+
+  build-xnat-adapters:
+    name: Build XNAT Adapters
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'release' ||
+      contains(github.event.inputs.platforms, 'xnat')
+    strategy:
+      matrix:
+        adapter:
+          - name: freesurfer_recon
+            image: neuroinsight/freesurfer-recon-xnat
+            context: adapters/xnat/freesurfer_recon
+          - name: fastsurfer
+            image: neuroinsight/fastsurfer-xnat
+            context: adapters/xnat/fastsurfer
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract version tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.adapter.context }}
+          push: true
+          tags: |
+            ${{ matrix.adapter.image }}:${{ steps.version.outputs.tag }}
+            ${{ matrix.adapter.image }}:latest

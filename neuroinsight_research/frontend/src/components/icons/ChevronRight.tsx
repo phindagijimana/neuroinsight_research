@@ -1,0 +1,14 @@
+import React from 'react';
+
+interface IconProps extends React.SVGProps<SVGSVGElement> {}
+
+const ChevronRight: React.FC<IconProps> = (props) => (
+  <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+  </svg>
+);
+
+export default ChevronRight;
+
+
+

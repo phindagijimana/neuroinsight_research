@@ -1,0 +1,47 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.eggs
+venv
+.venv
+env
+*.egg
+
+# Node
+frontend/node_modules
+frontend/.cache
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local data & logs
+data/
+logs/
+*.log
+
+# Environment files (secrets)
+.env
+.env.local
+.env.production
+
+# Test files
+tests/
+htmlcov/
+.coverage
+.pytest_cache
+
+# Build artifacts (we build inside Docker)
+frontend/dist

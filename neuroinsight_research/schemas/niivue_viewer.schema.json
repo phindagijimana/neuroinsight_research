@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Niivue Viewer Manifest",
+  "description": "Schema for niivue_viewer.json produced by HS postprocess (and other plugins)",
+  "type": "object",
+  "required": ["viewer_type", "subject_id", "volumes", "qc_sets", "defaults"],
+  "properties": {
+    "viewer_type": {
+      "type": "string",
+      "enum": ["niivue"],
+      "description": "Viewer engine identifier"
+    },
+    "subject_id": {
+      "type": "string"
+    },
+    "volumes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "role", "path"],
+        "properties": {
+          "id": { "type": "string", "description": "Unique volume identifier" },
+          "role": {
+            "type": "string",
+            "enum": ["anatomy", "label"],
+            "description": "Whether this volume is the base anatomy or a label overlay"
+          },
+          "path": { "type": "string", "description": "Relative path from bundle root" },
+          "is_label": { "type": "boolean" },
+          "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+          "label_map": {
+            "type": "object",
+            "description": "Mapping of label IDs to names/colors",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "color": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "properties": {
+        "orientation": {
+          "type": "string",
+          "enum": ["coronal", "axial", "sagittal"]
+        },
+        "overlay_opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "report_slices": {
+          "type": "object",
+          "properties": {
+            "indexing": {
+              "type": "string",
+              "enum": ["one_based", "zero_based"]
+            },
+            "indices": {
+              "type": "array",
+              "items": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    "qc_sets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "orientation": { "type": "string" },
+          "image_dir": { "type": "string" },
+          "manifest": { "type": "string" }
+        }
+      }
+    }
+  }
+}

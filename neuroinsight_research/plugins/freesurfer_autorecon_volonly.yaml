@@ -1,0 +1,154 @@
+# Plugin: FreeSurfer Volumetric (autorecon1 + autorecon2-volonly)
+id: freesurfer_autorecon_volonly
+name: "FreeSurfer Volumetric (autorecon1 + autorecon2-volonly)"
+version: "1.0.0"
+type: plugin
+domain: structural_mri
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "FreeSurfer VolOnly"
+
+description: >
+  Runs FreeSurfer recon-all for volumetric processing only (autorecon1 + autorecon2-volonly),
+  then computes aseg.stats using mri_segstats. Faster than full recon-all when only volumetric
+  measures are needed. Intended for standalone use or as the first step in HS detection workflows.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on FreeSurfer (Fischl, 2012)"
+
+references:
+  - "Fischl, B. (2012). FreeSurfer. Neuroimage, 62(2), 774-781."
+
+container:
+  runtime: docker
+  image: "freesurfer/freesurfer:7.4.1"
+  digest: "sha256:10b6468cbd9fcd2db3708f4651d59ad75d4da849a2c5d8bb6dba217f08b8c46b"
+
+inputs:
+  required:
+    - key: T1w
+      type: nifti
+      description: "T1-weighted MRI scan (.nii or .nii.gz)"
+  optional:
+    - key: subject_id
+      type: string
+      default: "subject"
+      description: "FreeSurfer subject ID (-s)"
+    - key: fs_license
+      type: path
+      description: "Path to FreeSurfer license file"
+    - key: subjects_dir
+      type: path
+      description: "Override SUBJECTS_DIR. If omitted, NIR uses per-run SUBJECTS_DIR."
+    - key: resume
+      type: bool
+      default: true
+    - key: recon_all_extra_args
+      type: string
+      default: ""
+      description: "Additional arguments to pass to recon-all"
+
+input_format:
+  format_name: "Single NIfTI"
+  description: "A single T1-weighted MRI scan in NIfTI format."
+  notes:
+    - "1mm isotropic resolution recommended for best results"
+    - "The file should be skull-on (not skull-stripped)"
+    - "Both .nii and .nii.gz are accepted"
+    - "Processing takes 2-4 hours (faster than full recon-all)"
+    - "Requires FreeSurfer license (free): https://surfer.nmr.mgh.harvard.edu/registration.html"
+  example_structure: |
+    any_folder/
+      sub-01_T1w.nii.gz
+  file_types:
+    - ".nii.gz or .nii (T1-weighted NIfTI image)"
+
+parameters:
+  - name: threads
+    type: int
+    default: 8
+    min_value: 1
+    max_value: 32
+    description: "Number of CPU threads for parallel processing"
+
+resources:
+  profiles:
+    default:
+      cpus: 8
+      mem_gb: 32
+      time_hours: 10
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/freesurfer"
+    subjects_dir: "{run_root}/native/freesurfer/SUBJECTS_DIR"
+    logs_dir: "{run_root}/logs/freesurfer_volonly"
+  environment:
+    SUBJECTS_DIR: "{execution.workdirs.subjects_dir}"
+    FS_LICENSE: "{inputs.fs_license}"
+
+  stages:
+    - id: recon_and_segstats
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+
+        export SUBJECTS_DIR=/data/outputs/native/freesurfer/SUBJECTS_DIR
+        mkdir -p $SUBJECTS_DIR
+        mkdir -p /data/outputs/logs/freesurfer_volonly
+
+        echo "Running FreeSurfer autorecon1 + autorecon2-volonly..."
+        EXTRA_ARGS="{recon_all_extra_args}"
+        recon-all \
+          -i /data/inputs/T1w.nii.gz \
+          -s {subject_id} \
+          -autorecon1 \
+          -autorecon2-volonly \
+          -parallel \
+          -openmp {threads} \
+          $EXTRA_ARGS
+
+        echo "Running mri_segstats on aseg..."
+        mri_segstats \
+          --seg "$SUBJECTS_DIR/{subject_id}/mri/aseg.auto.mgz" \
+          --excludeid 0 \
+          --sum "$SUBJECTS_DIR/{subject_id}/stats/aseg.stats" \
+          --i "$SUBJECTS_DIR/{subject_id}/mri/brain.mgz"
+
+        echo "FreeSurfer VolOnly + segstats completed"
+
+native_outputs:
+  preserved: true
+  layout: "SUBJECTS_DIR/{subject_id}/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  policy:
+    prefer_symlinks: true
+    convert_for_viewing: true
+  extraction:
+    conversions:
+      - from: "{subjects_dir}/{subject_id}/mri/brain.mgz"
+        to: "{bundle.root}/volumes/{subject_id}/T1.nii.gz"
+        method: "mri_convert"
+      - from: "{subjects_dir}/{subject_id}/mri/aseg.auto.mgz"
+        to: "{bundle.root}/labels/{subject_id}/aseg_auto.nii.gz"
+        method: "mri_convert"
+    metrics:
+      - from: "{subjects_dir}/{subject_id}/stats/aseg.stats"
+        to: "{bundle.root}/metrics/{subject_id}/aseg.stats"
+        method: "identity"
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true
+  record_inputs_hashes: true

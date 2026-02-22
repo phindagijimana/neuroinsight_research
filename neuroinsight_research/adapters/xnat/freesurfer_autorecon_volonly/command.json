@@ -1,0 +1,76 @@
+{
+    "name": "neuroinsight-freesurfer-volonly",
+    "label": "NeuroInsight FreeSurfer VolOnly (autorecon1 + autorecon2-volonly)",
+    "description": "Run FreeSurfer volumetric processing (autorecon1 + autorecon2-volonly) and mri_segstats via NeuroInsight adapter",
+    "version": "7.4.1",
+    "schema-version": "1.0",
+    "image": "neuroinsight/freesurfer-volonly-xnat:latest",
+    "type": "docker",
+    "command-line": "/entrypoint.sh",
+    "mounts": [
+        {
+            "name": "input",
+            "writable": false,
+            "path": "/input"
+        },
+        {
+            "name": "output",
+            "writable": true,
+            "path": "/output"
+        }
+    ],
+    "environment-variables": {
+        "SUBJECT_ID": "#SUBJECT_ID#",
+        "THREADS": "#THREADS#"
+    },
+    "inputs": [
+        {
+            "name": "SUBJECT_ID",
+            "description": "Subject identifier for FreeSurfer",
+            "type": "string",
+            "default-value": "sub-01",
+            "required": false
+        },
+        {
+            "name": "THREADS",
+            "description": "Number of CPU threads for parallel processing",
+            "type": "string",
+            "default-value": "8",
+            "required": false
+        }
+    ],
+    "outputs": [
+        {
+            "name": "volonly-output",
+            "description": "FreeSurfer volumetric processing output including aseg.stats",
+            "mount": "output",
+            "required": true
+        }
+    ],
+    "xnat": [
+        {
+            "name": "Run FreeSurfer VolOnly on MR Session",
+            "description": "Run FreeSurfer autorecon1 + autorecon2-volonly and mri_segstats on a T1-weighted MR session",
+            "contexts": ["xnat:imageScanData"],
+            "external-inputs": [
+                {
+                    "name": "scan",
+                    "description": "Input T1-weighted scan",
+                    "type": "Scan",
+                    "required": true,
+                    "provides-files-for-command-mount": "input"
+                }
+            ],
+            "derived-inputs": [],
+            "output-handlers": [
+                {
+                    "name": "output-resource",
+                    "accepts-command-output": "volonly-output",
+                    "as-a-child-of": "scan",
+                    "type": "Resource",
+                    "label": "FREESURFER_VOLONLY"
+                }
+            ]
+        }
+    ]
+}

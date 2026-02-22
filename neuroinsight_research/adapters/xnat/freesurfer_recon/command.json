@@ -1,0 +1,68 @@
+{
+    "name": "neuroinsight-freesurfer-recon",
+    "label": "NeuroInsight FreeSurfer recon-all",
+    "description": "Run FreeSurfer recon-all via NeuroInsight adapter",
+    "version": "7.4.1",
+    "schema-version": "1.0",
+    "image": "neuroinsight/freesurfer-recon-xnat:latest",
+    "type": "docker",
+    "command-line": "/entrypoint.sh",
+    "mounts": [
+        {
+            "name": "input",
+            "writable": false,
+            "path": "/input"
+        },
+        {
+            "name": "output",
+            "writable": true,
+            "path": "/output"
+        }
+    ],
+    "environment-variables": {
+        "SUBJECT_ID": "#SUBJECT_ID#"
+    },
+    "inputs": [
+        {
+            "name": "SUBJECT_ID",
+            "description": "Subject identifier",
+            "type": "string",
+            "default-value": "sub-01",
+            "required": false
+        }
+    ],
+    "outputs": [
+        {
+            "name": "recon-output",
+            "description": "FreeSurfer recon-all output",
+            "mount": "output",
+            "required": true
+        }
+    ],
+    "xnat": [
+        {
+            "name": "Run FreeSurfer on MR Session",
+            "description": "Run FreeSurfer recon-all on a T1-weighted MR session",
+            "contexts": ["xnat:imageScanData"],
+            "external-inputs": [
+                {
+                    "name": "scan",
+                    "description": "Input scan",
+                    "type": "Scan",
+                    "required": true,
+                    "provides-files-for-command-mount": "input"
+                }
+            ],
+            "derived-inputs": [],
+            "output-handlers": [
+                {
+                    "name": "output-resource",
+                    "accepts-command-output": "recon-output",
+                    "as-a-child-of": "scan",
+                    "type": "Resource",
+                    "label": "FREESURFER"
+                }
+            ]
+        }
+    ]
+}

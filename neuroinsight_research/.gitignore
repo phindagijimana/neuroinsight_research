@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+
+# PID files
+.pids/
+
+# Data directories
+data/
+uploads/
+outputs/
+
+# Environment
+.env
+
+# FreeSurfer license (contains personal info)
+license.txt
+
+# Local-only documents
+improve.md
+pennsieve.md
+
+# Sample data (large binaries)
+sample_data/
+frontend/public/sample_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SQLite (dev fallback)
+*.db
+*.db-wal
+*.db-shm
+
+# Docker
+docker-compose.override.yml
+
+# Dev scripts (local only)
+research-dev
+start_dev.sh
+stop_dev.sh
+
+# Misc
+backend_new.log

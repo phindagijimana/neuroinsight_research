@@ -1,0 +1,180 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: neuroinsight-postgres
+    environment:
+      POSTGRES_DB: neuroinsight
+      POSTGRES_USER: neuroinsight
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password_change_me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neuroinsight"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: neuroinsight-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secure_password}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: neuroinsight-minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-neuroinsight_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_secure_password}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # NeuroInsight API (Web Application)
+  neuroinsight-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: neuroinsight-api
+    environment:
+      - DATABASE_URL=postgresql://neuroinsight:${POSTGRES_PASSWORD:-secure_password_change_me}@postgres:5432/neuroinsight
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/0
+      - UPLOAD_DIR=/data/uploads
+      - OUTPUT_DIR=/data/outputs
+      - API_BRIDGE_URL=http://freesurfer-api-bridge:8080
+      - USE_REAL_FREESURFER=true
+    volumes:
+      - ./frontend/dist:/app/frontend/dist:ro
+      - ./data/uploads:/data/uploads
+      - ./data/outputs:/data/outputs
+    ports:
+      - "8002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      freesurfer-api-bridge:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # NeuroInsight Worker (Background Processing)
+  neuroinsight-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    container_name: neuroinsight-worker
+    environment:
+      - DATABASE_URL=postgresql://neuroinsight:${POSTGRES_PASSWORD:-secure_password_change_me}@postgres:5432/neuroinsight
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/0
+      - UPLOAD_DIR=/data/uploads
+      - OUTPUT_DIR=/data/outputs
+      - API_BRIDGE_URL=http://freesurfer-api-bridge:8080
+      - USE_REAL_FREESURFER=true
+    volumes:
+      - ./data/uploads:/data/uploads:ro
+      - ./data/outputs:/data/outputs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      freesurfer-api-bridge:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import redis; redis.Redis.from_url('${REDIS_URL}').ping()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # FreeSurfer API Bridge (Docker Operations Manager)
+  freesurfer-api-bridge:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api-bridge
+    container_name: neuroinsight-api-bridge
+    environment:
+      - FREESURFER_IMAGE=freesurfer/freesurfer:7.4.1
+      - FREESURFER_MEMORY=8g
+      - FREESURFER_CPUS=2.0
+      - FREESURFER_LICENSE=/usr/local/freesurfer/license.txt
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./data/uploads:/data/uploads:ro
+      - ./data/outputs:/data/outputs
+      - ./freesurfer_license.txt:/usr/local/freesurfer/license.txt:ro
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # FreeSurfer MRI Processing Service (Base Image)
+  freesurfer:
+    image: freesurfer/freesurfer:7.4.1
+    container_name: neuroinsight-freesurfer
+    environment:
+      - FREESURFER_HOME=/usr/local/freesurfer
+      - SUBJECTS_DIR=/data/freesurfer/subjects
+      - FS_LICENSE=/usr/local/freesurfer/license.txt
+    volumes:
+      - ./data/freesurfer:/data/freesurfer
+      - ./data/uploads:/data/uploads:ro
+      - ./data/outputs:/data/outputs
+      - ./freesurfer_license.txt:/usr/local/freesurfer/license.txt:ro
+    command: ["/bin/bash", "-c", "mkdir -p /data/freesurfer/subjects && chmod 755 /data/freesurfer && echo 'FreeSurfer ready' && tail -f /dev/null"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "which", "recon-all"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  default:
+    name: neuroinsight-network

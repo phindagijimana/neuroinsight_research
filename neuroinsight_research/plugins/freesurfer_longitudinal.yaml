@@ -1,0 +1,186 @@
+# Plugin 11: FreeSurfer Longitudinal
+id: freesurfer_longitudinal
+name: "FreeSurfer Longitudinal (CROSS->BASE->LONG)"
+version: "1.0.0"
+type: plugin
+domain: structural_mri
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "FreeSurfer Longitudinal"
+
+description: >
+  Runs the full FreeSurfer longitudinal stream for a subject with >=2
+  timepoints: (1) CROSS recon-all per timepoint, (2) BASE within-subject
+  template, (3) LONG recon-all per timepoint against BASE.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on FreeSurfer (Reuter et al., 2012)"
+
+references:
+  - "Reuter, M., et al. (2012). Within-subject template estimation for unbiased longitudinal image analysis. NeuroImage, 61(4), 1402-1418."
+
+container:
+  runtime: docker
+  image: "freesurfer/freesurfer:7.4.1"
+  digest: "sha256:10b6468cbd9fcd2db3708f4651d59ad75d4da849a2c5d8bb6dba217f08b8c46b"
+
+inputs:
+  required:
+    - key: input_dir
+      type: path
+      description: >
+        Directory containing T1w NIfTI files for each timepoint.
+        Files should be named with their timepoint ID
+        (e.g., sub-01_ses-01_T1w.nii.gz, sub-01_ses-02_T1w.nii.gz).
+  optional:
+    - key: base_id
+      type: string
+      description: "Base template id (default: derived from input filenames)"
+    - key: subjects_dir
+      type: path
+      description: "SUBJECTS_DIR path (default: /data/outputs/native/freesurfer/SUBJECTS_DIR)"
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license file path"
+    - key: resume
+      type: bool
+      default: true
+      description: "Skip completed stages using recon-all.done markers"
+
+input_format:
+  format_name: "Multiple Timepoint NIfTIs"
+  description: "Two or more T1-weighted scans from different time points for the same subject."
+  notes:
+    - "At least 2 timepoints are required"
+    - "Each file should include a unique timepoint ID in its name"
+    - "All scans should be from the same subject"
+  example_structure: |
+    input_dir/
+      sub-01_ses-baseline_T1w.nii.gz
+      sub-01_ses-followup_T1w.nii.gz
+      sub-01_ses-year2_T1w.nii.gz    (optional additional timepoints)
+  file_types:
+    - ".nii.gz or .nii (T1-weighted NIfTI images, one per timepoint)"
+
+parameters:
+  - name: threads
+    type: int
+    default: 8
+    min_value: 1
+    max_value: 32
+    description: "Number of CPU threads per stage"
+  - name: base_id
+    type: string
+    default: "base_template"
+    description: "Identifier for the unbiased base template"
+  - name: resume
+    type: bool
+    default: true
+    description: "Skip completed stages (check recon-all.done markers)"
+
+resources:
+  profiles:
+    default:
+      cpus: 8
+      mem_gb: 48
+      time_hours: 28
+      gpus: 0
+
+execution:
+  style: single_stage
+  command_template: |
+    #!/bin/bash
+    set -e
+
+    export SUBJECTS_DIR=/data/outputs/native/freesurfer/SUBJECTS_DIR
+    mkdir -p "$SUBJECTS_DIR"
+    mkdir -p /data/outputs/logs/freesurfer_longitudinal
+
+    THREADS={threads}
+    BASE_ID={base_id}
+    RESUME={resume}
+    INPUT_DIR=/data/inputs
+
+    # Discover timepoints from input NIfTI files
+    echo "=== Discovering timepoints from $INPUT_DIR ==="
+    TP_IDS=()
+    for nii in "$INPUT_DIR"/*.nii.gz "$INPUT_DIR"/*.nii; do
+      [ -f "$nii" ] || continue
+      fname=$(basename "$nii")
+      tp_id="${fname%%_T1w*}"
+      [ -z "$tp_id" ] && tp_id="${fname%%.nii*}"
+      TP_IDS+=("$tp_id")
+      echo "  Found timepoint: $tp_id -> $nii"
+    done
+
+    if [ ${#TP_IDS[@]} -lt 2 ]; then
+      echo "ERROR: Need at least 2 timepoints, found ${#TP_IDS[@]}"
+      exit 1
+    fi
+    echo "Total timepoints: ${#TP_IDS[@]}"
+
+    # STAGE 1: CROSS-SECTIONAL recon-all per timepoint
+    echo "=== STAGE 1: Cross-sectional processing ==="
+    for nii in "$INPUT_DIR"/*.nii.gz "$INPUT_DIR"/*.nii; do
+      [ -f "$nii" ] || continue
+      fname=$(basename "$nii")
+      tp_id="${fname%%_T1w*}"
+      [ -z "$tp_id" ] && tp_id="${fname%%.nii*}"
+
+      if [ "$RESUME" = "true" ] && [ -f "$SUBJECTS_DIR/$tp_id/scripts/recon-all.done" ]; then
+        echo "  SKIP $tp_id (already completed)"
+        continue
+      fi
+      echo "  Processing CROSS: $tp_id"
+      recon-all -subjid "$tp_id" -i "$nii" -all -openmp "$THREADS" \
+        2>&1 | tee "/data/outputs/logs/freesurfer_longitudinal/cross_${tp_id}.log"
+    done
+
+    # STAGE 2: BASE template
+    echo "=== STAGE 2: Base template ($BASE_ID) ==="
+    if [ "$RESUME" = "true" ] && [ -f "$SUBJECTS_DIR/$BASE_ID/scripts/recon-all.done" ]; then
+      echo "  SKIP $BASE_ID (already completed)"
+    else
+      TP_ARGS=""
+      for tp_id in "${TP_IDS[@]}"; do
+        TP_ARGS="$TP_ARGS -tp $tp_id"
+      done
+      echo "  Building base template with: $TP_ARGS"
+      recon-all -base "$BASE_ID" $TP_ARGS -all -openmp "$THREADS" \
+        2>&1 | tee "/data/outputs/logs/freesurfer_longitudinal/base.log"
+    fi
+
+    # STAGE 3: LONGITUDINAL recon-all per timepoint
+    echo "=== STAGE 3: Longitudinal processing ==="
+    for tp_id in "${TP_IDS[@]}"; do
+      long_dir="${tp_id}.long.${BASE_ID}"
+      if [ "$RESUME" = "true" ] && [ -f "$SUBJECTS_DIR/$long_dir/scripts/recon-all.done" ]; then
+        echo "  SKIP $long_dir (already completed)"
+        continue
+      fi
+      echo "  Processing LONG: $tp_id against $BASE_ID"
+      recon-all -long "$tp_id" "$BASE_ID" -all -openmp "$THREADS" \
+        2>&1 | tee "/data/outputs/logs/freesurfer_longitudinal/long_${tp_id}.log"
+    done
+
+    echo "=== FreeSurfer longitudinal processing complete ==="
+
+native_outputs:
+  preserved: true
+  layout: "SUBJECTS_DIR/<tp>/, SUBJECTS_DIR/<base_id>/, SUBJECTS_DIR/<tp>.long.<base_id>/"
+
+bundle:
+  bundle_version: 1
+  root: "/data/outputs/bundle"
+  policy:
+    prefer_symlinks: true
+    convert_for_viewing: true
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true
+  record_inputs_hashes: true
