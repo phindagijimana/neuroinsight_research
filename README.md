@@ -234,7 +234,7 @@ See the [User Guide](docs/USER_GUIDE.md#compute-and-data-sources) for detailed c
 
 ## Further Documentation
 
-- [User Guide](docs/USER_GUIDE.md) - Complete usage instructions
+- [User Guide](https://github.com/phindagijimana/neuroinsight_research/blob/master/docs/USER_GUIDE.md) - Complete setup, connection, and usage instructions
 - [Troubleshooting](docs/TROUBLESHOUTING.md) - Common issues
 - [FreeSurfer License Setup](https://surfer.nmr.mgh.harvard.edu/registration.html) - Get your license
 
