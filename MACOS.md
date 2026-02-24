@@ -14,10 +14,10 @@ Docker Desktop on macOS runs in a VM. Volume paths are translated:
 
 ```
 Linux Native:
-  /var/lib/docker/volumes/... → Exists on host filesystem ✅
+  /var/lib/docker/volumes/... → Exists on host filesystem
 
 macOS Docker Desktop:
-  /var/lib/docker/volumes/... → Exists inside VM, NOT on macOS ❌
+  /var/lib/docker/volumes/... → Exists inside VM, NOT on macOS
   
 Result: FreeSurfer container can't find files
 ```
@@ -60,9 +60,9 @@ NeuroInsight Container (parent)
 
 FreeSurfer Container (child)
   └─ --volumes-from neuroinsight
-      ✅ Automatically gets same /data volume
-      ✅ No path translation needed
-      ✅ Works on Linux, Windows, macOS
+       Automatically gets same /data volume
+      No path translation needed
+      Works on Linux, Windows, macOS
 ```
 
 ---
@@ -124,7 +124,7 @@ if mount_strategy['use_volumes_from']:
     
     docker_cmd = [
         "docker", "run",
-        "--volumes-from", mount_strategy['parent_container'],  # ✅ Key change
+        "--volumes-from", mount_strategy['parent_container'],  # Key change
         "-v", f"{abs_license_path}:/usr/local/freesurfer/license.txt:ro",
         ...
         FREESURFER_CONTAINER_IMAGE,
@@ -163,7 +163,7 @@ environment:
 | Linux | Yes | Uses host paths (current) |
 | Linux | No | Uses --volumes-from (new) |
 | Windows | Yes/No | Uses --volumes-from |
-| macOS | Yes/No | Uses --volumes-from ✅ **FIXED** |
+| macOS | Yes/No | Uses --volumes-from **FIXED** |
 
 ---
 
@@ -178,7 +178,7 @@ environment:
 ### macOS
 - [ ] Start container → No errors
 - [ ] Upload MRI file → Saves successfully
-- [ ] Process job → FreeSurfer finds input file ✅
+- [ ] Process job → FreeSurfer finds input file
 - [ ] Job completes → Output accessible
 - [ ] Check logs → No path errors
 
@@ -190,7 +190,7 @@ environment:
 
 ## Backward Compatibility
 
-✅ **100% Backward Compatible**
+**100% Backward Compatible**
 
 - Existing deployments with `HOST_*` → No changes
 - New deployments without `HOST_*` → Uses --volumes-from

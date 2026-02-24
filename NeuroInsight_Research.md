@@ -97,13 +97,13 @@ B. **Remote HPC Access** (via Desktop App)
 
 | Feature | Description | Local Mode | HPC-Native Mode |
 |---------|-------------|------------|-----------------|
-| **Upload Files** | Upload MRI data from local machine | ✅ Yes | ❌ Not needed (data on HPC) |
-| **Browse Files** | Navigate filesystem to select inputs | ✅ Local + Remote HPC | ✅ HPC filesystem |
-| **Select Pipeline** | Choose from production-ready pipelines | ✅ Yes | ✅ Yes |
-| **Submit Jobs** | Execute pipeline with parameters | ✅ Docker or SLURM | ✅ SLURM |
-| **Monitor Progress** | Real-time job status and progress | ✅ Yes | ✅ Yes |
-| **View Results** | NIfTI viewer, metrics, QC images | ✅ Yes | ✅ Yes |
-| **Download Results** | Selective download of outputs | ✅ Yes | ✅ Optional |
+| **Upload Files** | Upload MRI data from local machine | Yes | No (data on HPC) |
+| **Browse Files** | Navigate filesystem to select inputs | Local + Remote HPC | HPC filesystem |
+| **Select Pipeline** | Choose from production-ready pipelines | Yes | Yes |
+| **Submit Jobs** | Execute pipeline with parameters | Docker or SLURM | SLURM |
+| **Monitor Progress** | Real-time job status and progress | Yes | Yes |
+| **View Results** | NIfTI viewer, metrics, QC images | Yes | Yes |
+| **Download Results** | Selective download of outputs | Yes | Optional |
 
 ### 4.3 Key Design Principle: Data Stays on HPC
 
@@ -449,7 +449,7 @@ results/
 
 ## 14. Implementation Roadmap
 
-### Phase 1: Local Web Platform (Months 1-3) ✅ **IN PROGRESS**
+### Phase 1: Local Web Platform (Months 1-3) **IN PROGRESS**
 
 **Focus:** Build and test locally with Docker backend
 
@@ -516,15 +516,15 @@ results/
 
 ### Key Advantages:
 
-- ✅ **Two deployment modes:** Local/Desktop (rapid development) + HPC-Native (production)
-- ✅ **Data stays on HPC:** No bulk transfers, respects institutional governance
-- ✅ **No partnership required:** Users bring their own HPC credentials via desktop app
-- ✅ **Execution abstraction:** Same code runs locally (Docker) or on HPC (SLURM)
-- ✅ **Pipeline-agnostic:** YAML-based plugin system for easy extensibility
-- ✅ **Production-ready:** FreeSurfer, FastSurfer, and custom pipelines included
-- ✅ **UI-first:** Web and desktop interfaces eliminate terminal workflows
-- ✅ **Secure by design:** Users operate within their own permissions
-- ✅ **Open source:** Core platform freely available, sustainable via services
+- **Two deployment modes:** Local/Desktop (rapid development) + HPC-Native (production)
+- **Data stays on HPC:** No bulk transfers, respects institutional governance
+- **No partnership required:** Users bring their own HPC credentials via desktop app
+- **Execution abstraction:** Same code runs locally (Docker) or on HPC (SLURM)
+- **Pipeline-agnostic:** YAML-based plugin system for easy extensibility
+- **Production-ready:** FreeSurfer, FastSurfer, and custom pipelines included
+- **UI-first:** Web and desktop interfaces eliminate terminal workflows
+- **Secure by design:** Users operate within their own permissions
+- **Open source:** Core platform freely available, sustainable via services
 
 ### Current Status:
 

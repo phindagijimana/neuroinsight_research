@@ -415,8 +415,8 @@ docker exec neuroinsight docker pull hello-world
 **Why This Happens:**
 
 The NeuroInsight container needs to spawn FreeSurfer containers for processing. This requires:
-1. Docker socket mounted: `/var/run/docker.sock:/var/run/docker.sock` ✓
-2. Container user has permission to access socket ✗ (missing)
+1. Docker socket mounted: `/var/run/docker.sock:/var/run/docker.sock` [x]
+2. Container user has permission to access socket [ ] (missing)
 
 The fix adds the Docker group to the container, giving it permission to use Docker.
 

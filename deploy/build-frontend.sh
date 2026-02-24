@@ -10,7 +10,7 @@ echo "Frontend Build Check"
 echo "======================================"
 
 if [ -d "frontend/dist" ]; then
-    echo "✓ Frontend already built (frontend/dist exists)"
+    echo "[OK] Frontend already built (frontend/dist exists)"
     exit 0
 fi
 
@@ -45,7 +45,7 @@ case $choice in
         npm run build
         
         echo ""
-        echo "✓ Frontend built successfully"
+        echo "[OK] Frontend built successfully"
         ;;
     2)
         echo ""
@@ -117,7 +117,7 @@ case $choice in
 </body>
 </html>
 EOF
-        echo "✓ Placeholder created"
+        echo "[OK] Placeholder created"
         echo ""
         echo "Note: Web UI will not be available, but API will work"
         ;;

@@ -175,7 +175,7 @@ All production settings configured:
 
 ---
 
-## 🔧 How It Solves Worker Hang Issue
+## How It Solves Worker Hang Issue
 
 ### The Problem
 - Celery worker process gets stuck/hung after running for a while
@@ -198,7 +198,7 @@ With systemd:
 
 ---
 
-## 📈 Comparison Matrix
+## Comparison Matrix
 
 | Feature | Manual Start | Systemd (User) | System Systemd |
 |---------|-------------|----------------|----------------|
@@ -252,7 +252,7 @@ journalctl --user -u neuroinsight-worker -f
 
 ---
 
-## 🔍 Verification
+## Verification
 
 ### Installation Test
 
@@ -295,7 +295,7 @@ journalctl --user -u neuroinsight-worker -f
 
 ---
 
-## 📦 Distribution
+## Distribution
 
 ### For End Users
 
@@ -430,7 +430,7 @@ neuroinsight                        (added 100+ lines)
 
 ---
 
-## 🎓 Learning Resources
+## Learning Resources
 
 For users unfamiliar with systemd:
 

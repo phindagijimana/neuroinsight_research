@@ -21,17 +21,17 @@ WARNINGS_FOUND=0
 IS_WSL=false
 if grep -qEi "(microsoft|wsl)" /proc/version 2>/dev/null; then
     IS_WSL=true
-    echo -e "${GREEN}✓${NC} Running on Windows Subsystem for Linux (WSL)"
+    echo -e "${GREEN}[OK]${NC} Running on Windows Subsystem for Linux (WSL)"
     
     # Detect WSL version
     if grep -qEi "microsoft-standard-WSL2" /proc/version 2>/dev/null; then
-        echo -e "${GREEN}✓${NC} WSL2 detected"
+        echo -e "${GREEN}[OK]${NC} WSL2 detected"
     else
-        echo -e "${YELLOW}⚠${NC} WSL1 detected (WSL2 recommended for better Docker performance)"
+        echo -e "${YELLOW}[WARN]${NC} WSL1 detected (WSL2 recommended for better Docker performance)"
         WARNINGS_FOUND=$((WARNINGS_FOUND + 1))
     fi
 else
-    echo -e "${YELLOW}⚠${NC} Not running on WSL (this script is designed for WSL environments)"
+    echo -e "${YELLOW}[WARN]${NC} Not running on WSL (this script is designed for WSL environments)"
     exit 0
 fi
 
@@ -41,22 +41,22 @@ echo "----------------------------"
 
 # Check systemd
 if systemctl --version &> /dev/null; then
-    echo -e "${GREEN}✓${NC} systemd is available"
+    echo -e "${GREEN}[OK]${NC} systemd is available"
     
     # Check if systemd is enabled in wsl.conf
     if [ -f /etc/wsl.conf ]; then
         if grep -q "systemd=true" /etc/wsl.conf 2>/dev/null; then
-            echo -e "${GREEN}✓${NC} systemd is enabled in /etc/wsl.conf"
+            echo -e "${GREEN}[OK]${NC} systemd is enabled in /etc/wsl.conf"
         else
-            echo -e "${YELLOW}⚠${NC} systemd not explicitly enabled in /etc/wsl.conf"
+            echo -e "${YELLOW}[WARN]${NC} systemd not explicitly enabled in /etc/wsl.conf"
             WARNINGS_FOUND=$((WARNINGS_FOUND + 1))
         fi
     else
-        echo -e "${YELLOW}⚠${NC} /etc/wsl.conf not found"
+        echo -e "${YELLOW}[WARN]${NC} /etc/wsl.conf not found"
         WARNINGS_FOUND=$((WARNINGS_FOUND + 1))
     fi
 else
-    echo -e "${RED}✗${NC} systemd is not available"
+    echo -e "${RED}[FAIL]${NC} systemd is not available"
     echo "  → NeuroInsight requires systemd for auto-restart functionality"
     echo "  → Enable systemd in /etc/wsl.conf:"
     echo "    [boot]"
@@ -70,15 +70,15 @@ echo "Checking Docker..."
 echo "------------------"
 
 if command -v docker &> /dev/null; then
-    echo -e "${GREEN}✓${NC} Docker is installed"
+    echo -e "${GREEN}[OK]${NC} Docker is installed"
     
     # Check if Docker is running
     if docker ps &> /dev/null; then
-        echo -e "${GREEN}✓${NC} Docker daemon is running"
+        echo -e "${GREEN}[OK]${NC} Docker daemon is running"
     elif sg docker -c "docker ps" &> /dev/null; then
-        echo -e "${GREEN}✓${NC} Docker daemon is running (via docker group)"
+        echo -e "${GREEN}[OK]${NC} Docker daemon is running (via docker group)"
     else
-        echo -e "${RED}✗${NC} Docker daemon is not running"
+        echo -e "${RED}[FAIL]${NC} Docker daemon is not running"
         echo "  → Start Docker Desktop for Windows"
         echo "  → Or install Docker Engine in WSL"
         ISSUES_FOUND=$((ISSUES_FOUND + 1))
@@ -86,15 +86,15 @@ if command -v docker &> /dev/null; then
     
     # Check docker group membership
     if groups | grep -q docker; then
-        echo -e "${GREEN}✓${NC} User is in docker group"
+        echo -e "${GREEN}[OK]${NC} User is in docker group"
     else
-        echo -e "${YELLOW}⚠${NC} User is not in docker group"
+        echo -e "${YELLOW}[WARN]${NC} User is not in docker group"
         echo "  → Add with: sudo usermod -aG docker \$USER"
         echo "  → Then logout/login or run: newgrp docker"
         WARNINGS_FOUND=$((WARNINGS_FOUND + 1))
     fi
 else
-    echo -e "${RED}✗${NC} Docker is not installed"
+    echo -e "${RED}[FAIL]${NC} Docker is not installed"
     echo "  → Install Docker Desktop for Windows (recommended for WSL)"
     echo "  → Or install Docker Engine in WSL"
     ISSUES_FOUND=$((ISSUES_FOUND + 1))
@@ -107,12 +107,12 @@ echo "----------------------------"
 
 TOTAL_RAM=$(free -g | awk 'NR==2{printf "%.0f", $2}')
 if (( TOTAL_RAM >= 16 )); then
-    echo -e "${GREEN}✓${NC} RAM: ${TOTAL_RAM}GB (sufficient for MRI processing)"
+    echo -e "${GREEN}[OK]${NC} RAM: ${TOTAL_RAM}GB (sufficient for MRI processing)"
 elif (( TOTAL_RAM >= 11 )); then
-    echo -e "${YELLOW}⚠${NC} RAM: ${TOTAL_RAM}GB (minimum for testing, 16GB+ recommended)"
+    echo -e "${YELLOW}[WARN]${NC} RAM: ${TOTAL_RAM}GB (minimum for testing, 16GB+ recommended)"
     WARNINGS_FOUND=$((WARNINGS_FOUND + 1))
 else
-    echo -e "${RED}✗${NC} RAM: ${TOTAL_RAM}GB (insufficient - need 11GB minimum)"
+    echo -e "${RED}[FAIL]${NC} RAM: ${TOTAL_RAM}GB (insufficient - need 11GB minimum)"
     echo "  → Configure WSL memory in .wslconfig:"
     echo "    [wsl2]"
     echo "    memory=12GB"
@@ -122,9 +122,9 @@ fi
 # Check disk space
 AVAILABLE_SPACE=$(df / | tail -1 | awk '{print int($4/1024/1024)}')
 if (( AVAILABLE_SPACE >= 35 )); then
-    echo -e "${GREEN}✓${NC} Disk space: ${AVAILABLE_SPACE}GB available"
+    echo -e "${GREEN}[OK]${NC} Disk space: ${AVAILABLE_SPACE}GB available"
 else
-    echo -e "${RED}✗${NC} Disk space: ${AVAILABLE_SPACE}GB (need 35GB minimum)"
+    echo -e "${RED}[FAIL]${NC} Disk space: ${AVAILABLE_SPACE}GB (need 35GB minimum)"
     echo "  → Free up disk space in WSL"
     echo "  → Or increase WSL disk size"
     ISSUES_FOUND=$((ISSUES_FOUND + 1))
@@ -133,9 +133,9 @@ fi
 # Check CPU
 CPU_CORES=$(nproc)
 if (( CPU_CORES >= 4 )); then
-    echo -e "${GREEN}✓${NC} CPU cores: $CPU_CORES"
+    echo -e "${GREEN}[OK]${NC} CPU cores: $CPU_CORES"
 else
-    echo -e "${YELLOW}⚠${NC} CPU cores: $CPU_CORES (4+ recommended)"
+    echo -e "${YELLOW}[WARN]${NC} CPU cores: $CPU_CORES (4+ recommended)"
     WARNINGS_FOUND=$((WARNINGS_FOUND + 1))
 fi
 
@@ -146,27 +146,27 @@ echo "------------------------------"
 
 if command -v python3 &> /dev/null; then
     PYTHON_VERSION=$(python3 --version | awk '{print $2}')
-    echo -e "${GREEN}✓${NC} Python: $PYTHON_VERSION"
+    echo -e "${GREEN}[OK]${NC} Python: $PYTHON_VERSION"
     
     # Check python3-venv
     if python3 -c "import ensurepip" &> /dev/null; then
-        echo -e "${GREEN}✓${NC} python3-venv is installed"
+        echo -e "${GREEN}[OK]${NC} python3-venv is installed"
     else
-        echo -e "${YELLOW}⚠${NC} python3-venv is not installed"
+        echo -e "${YELLOW}[WARN]${NC} python3-venv is not installed"
         echo "  → Will be auto-installed during NeuroInsight installation"
         WARNINGS_FOUND=$((WARNINGS_FOUND + 1))
     fi
 else
-    echo -e "${RED}✗${NC} Python 3 is not installed"
+    echo -e "${RED}[FAIL]${NC} Python 3 is not installed"
     ISSUES_FOUND=$((ISSUES_FOUND + 1))
 fi
 
 # Check Node.js
 if command -v node &> /dev/null; then
     NODE_VERSION=$(node --version)
-    echo -e "${GREEN}✓${NC} Node.js: $NODE_VERSION"
+    echo -e "${GREEN}[OK]${NC} Node.js: $NODE_VERSION"
 else
-    echo -e "${YELLOW}⚠${NC} Node.js not found"
+    echo -e "${YELLOW}[WARN]${NC} Node.js not found"
     echo "  → Will be auto-installed via nvm during installation"
     WARNINGS_FOUND=$((WARNINGS_FOUND + 1))
 fi
@@ -178,17 +178,17 @@ echo "---------------------------"
 
 # Check if Windows filesystem is accessible
 if [ -d "/mnt/c" ]; then
-    echo -e "${GREEN}✓${NC} Windows filesystem accessible at /mnt/c"
+    echo -e "${GREEN}[OK]${NC} Windows filesystem accessible at /mnt/c"
 else
-    echo -e "${YELLOW}⚠${NC} Windows filesystem not mounted"
+    echo -e "${YELLOW}[WARN]${NC} Windows filesystem not mounted"
     WARNINGS_FOUND=$((WARNINGS_FOUND + 1))
 fi
 
 # Check for common WSL issues
 if [ -f /proc/sys/fs/binfmt_misc/WSLInterop ]; then
-    echo -e "${GREEN}✓${NC} WSL interop is enabled"
+    echo -e "${GREEN}[OK]${NC} WSL interop is enabled"
 else
-    echo -e "${YELLOW}⚠${NC} WSL interop is disabled"
+    echo -e "${YELLOW}[WARN]${NC} WSL interop is disabled"
     WARNINGS_FOUND=$((WARNINGS_FOUND + 1))
 fi
 
@@ -200,7 +200,7 @@ echo "=========================================="
 echo ""
 
 if [ $ISSUES_FOUND -eq 0 ] && [ $WARNINGS_FOUND -eq 0 ]; then
-    echo -e "${GREEN}✓ All checks passed!${NC}"
+    echo -e "${GREEN}[OK] All checks passed!${NC}"
     echo ""
     echo "Your WSL environment is ready for NeuroInsight installation."
     echo ""
@@ -210,7 +210,7 @@ if [ $ISSUES_FOUND -eq 0 ] && [ $WARNINGS_FOUND -eq 0 ]; then
     echo "  3. Run: ./neuroinsight install"
     exit 0
 elif [ $ISSUES_FOUND -eq 0 ]; then
-    echo -e "${YELLOW}⚠ $WARNINGS_FOUND warning(s) found${NC}"
+    echo -e "${YELLOW}[WARN] $WARNINGS_FOUND warning(s) found${NC}"
     echo ""
     echo "Your WSL environment should work, but some optimizations are recommended."
     echo "Review the warnings above and consider addressing them."
@@ -218,9 +218,9 @@ elif [ $ISSUES_FOUND -eq 0 ]; then
     echo "You can proceed with installation, but may need to manually install some dependencies."
     exit 0
 else
-    echo -e "${RED}✗ $ISSUES_FOUND critical issue(s) found${NC}"
+    echo -e "${RED}[FAIL] $ISSUES_FOUND critical issue(s) found${NC}"
     if [ $WARNINGS_FOUND -gt 0 ]; then
-        echo -e "${YELLOW}⚠ $WARNINGS_FOUND warning(s) found${NC}"
+        echo -e "${YELLOW}[WARN] $WARNINGS_FOUND warning(s) found${NC}"
     fi
     echo ""
     echo "Please fix the critical issues above before installing NeuroInsight."
