@@ -1195,11 +1195,15 @@ def _poll_slurm_status_batch(slurm_job_ids: list[str]) -> dict[str, str]:
 
         results: dict[str, str] = {}
         for line in stdout.strip().splitlines():
-            parts = line.split()
+            # sacct -P uses '|' delimiter, squeue uses spaces
+            if "|" in line:
+                parts = line.split("|")
+            else:
+                parts = line.split()
             if len(parts) >= 2:
-                jid = parts[0].split("|")[0].split(".")[0].strip()
-                state = parts[-1].split("+")[0].strip().upper()
-                if jid in slurm_job_ids or jid in {s.split("_")[0] for s in slurm_job_ids}:
+                jid = parts[0].split(".")[0].strip()
+                state = parts[1].split("+")[0].strip().upper()
+                if jid in slurm_job_ids:
                     mapped = _SLURM_STATUS_MAP.get(state)
                     if mapped and jid not in results:
                         results[jid] = mapped

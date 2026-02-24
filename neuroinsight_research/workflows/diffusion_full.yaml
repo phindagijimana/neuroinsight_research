@@ -30,6 +30,9 @@ inputs:
     - key: recon_spec
       type: choice
       default: "mrtrix_multishell_msmt_noACT"
+    - key: atlases
+      type: string
+      default: "AAL116 Brainnetome246Ext Gordon333Ext 4S156Parcels 4S256Parcels"
 
 input_format:
   format_name: "BIDS (with DWI)"
@@ -66,6 +69,7 @@ steps:
       subject_id: "{inputs.subject_id}"
       fs_license: "{inputs.fs_license}"
       recon_spec: "{inputs.recon_spec}"
+      atlases: "{inputs.atlases}"
 
 outputs:
   native:
