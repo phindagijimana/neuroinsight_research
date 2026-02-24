@@ -191,7 +191,45 @@ If she were working from home and the workstation were behind the university fir
 
 ### Step 1: Set Up SSH Key Authentication
 
-Follow the same SSH key setup as for HPC connections (see "Connecting to HPC" below, Step 1). The NeuroInsight server needs passwordless SSH access to the remote machine.
+The NeuroInsight server needs passwordless SSH access to the remote machine. Generate a key on the server and copy it to the remote machine.
+
+On the **NeuroInsight server**:
+
+```bash
+ssh-keygen -t ed25519 -C "neuroinsight" -f ~/.ssh/id_ed25519 -N ""
+```
+
+This creates two files:
+
+```
+~/.ssh/id_ed25519       (private key -- stays on this server, never share)
+~/.ssh/id_ed25519.pub   (public key -- copy to the remote machine)
+```
+
+Display the public key:
+
+```bash
+cat ~/.ssh/id_ed25519.pub
+```
+
+Example output:
+
+```
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGk7r0gF4QXBZ1dN8vRpJm2LkO3xEzPfCwU9t2Q4sRmN neuroinsight
+```
+
+Copy that line and add it to the remote machine:
+
+```bash
+ssh sreyes@brainlab-ws01.med.stanford.edu \
+    "mkdir -p ~/.ssh && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGk7r0gF4QXBZ1dN8vRpJm2LkO3xEzPfCwU9t2Q4sRmN neuroinsight' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
+```
+
+Verify it works (should print the hostname without asking for a password):
+
+```bash
+ssh -o BatchMode=yes sreyes@brainlab-ws01.med.stanford.edu hostname
+```
 
 ### Step 2: Connect in the NeuroInsight UI
 
@@ -264,17 +302,24 @@ James does not have the MRI files on his local machine -- they are only on Penns
 5. Enter a name (e.g., "NeuroInsight") and click **Create**
 6. **Copy both the API Key and the API Secret** -- the secret is only shown once
 
-If you lose the secret, delete the key and create a new one.
+Example of what you will see after clicking Create:
+
+```
+API Key:    a3f8e1d2-7b4c-49e1-8f6a-2d9c0e5b1a73
+API Secret: b91d4f7e-3a28-41c5-9e0b-8c6f2d5a4e17
+```
+
+The key is a permanent identifier; the secret acts as the password. If you lose the secret, delete the key and create a new one.
 
 ### Step 2: Connect in the NeuroInsight UI
 
 1. Open NeuroInsight and click **Get Started**
 2. Under **Data Source**, click the **Pennsieve** tab (blue database icon)
-3. Enter your credentials:
-   - **API Key** -- the key from Step 1 (format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`)
-   - **API Secret** -- the secret from Step 1
+3. Paste the credentials you copied:
+   - **API Key** -- e.g., `a3f8e1d2-7b4c-49e1-8f6a-2d9c0e5b1a73`
+   - **API Secret** -- e.g., `b91d4f7e-3a28-41c5-9e0b-8c6f2d5a4e17`
 4. Click **Connect**
-5. A green "Connected" badge confirms the connection, showing your email and workspace
+5. A green "Connected" badge confirms the connection, showing your email and workspace (e.g., "james.wright@upenn.edu -- Penn Epilepsy Center")
 
 ### Step 3: Browse Data
 
@@ -366,42 +411,55 @@ Before connecting, ensure you have:
 
 The NeuroInsight server needs passwordless SSH access to your HPC login node. You must copy the server's public key to your HPC account.
 
-#### 1a. Get the server's public key
+#### 1a. Generate or display the server's public key
 
-On the NeuroInsight server, display the public key:
+On the **NeuroInsight server**, check if a key already exists:
 
 ```bash
 cat ~/.ssh/id_ed25519.pub
 ```
 
-Copy the output (starts with `ssh-ed25519 ...`).
-
-If no key exists, generate one:
+If there is no key, generate one (press Enter through the prompts):
 
 ```bash
 ssh-keygen -t ed25519 -C "neuroinsight" -f ~/.ssh/id_ed25519 -N ""
 cat ~/.ssh/id_ed25519.pub
 ```
 
-#### 1b. Add the key to your HPC account
+Example output:
 
-From a machine that can reach the HPC (your laptop, or the HPC terminal itself), add the key:
-
-```bash
-ssh <your-username>@<hpc-login-node> "mkdir -p ~/.ssh && echo '<paste-public-key-here>' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
+```
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGk7r0gF4QXBZ1dN8vRpJm2LkO3xEzPfCwU9t2Q4sRmN neuroinsight
 ```
 
-Or log into the HPC directly and append the key manually to `~/.ssh/authorized_keys`.
+Copy the entire line (starting with `ssh-ed25519` and ending with `neuroinsight`).
+
+#### 1b. Add the key to your HPC account
+
+From a machine that can reach the HPC (your laptop or the HPC terminal), run a single command to append the key. Replace the username, hostname, and key with your own:
+
+```bash
+ssh priya@scc-login.bu.edu \
+    "mkdir -p ~/.ssh && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGk7r0gF4QXBZ1dN8vRpJm2LkO3xEzPfCwU9t2Q4sRmN neuroinsight' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
+```
+
+Alternatively, log into the HPC directly and paste the key into `~/.ssh/authorized_keys` with a text editor.
 
 #### 1c. Verify it works
 
-From the NeuroInsight server:
+From the **NeuroInsight server**, test that the connection works without a password prompt:
 
 ```bash
-ssh -o BatchMode=yes <your-username>@<hpc-login-node> hostname
+ssh -o BatchMode=yes priya@scc-login.bu.edu hostname
 ```
 
-If this prints the HPC hostname without asking for a password, you're ready.
+Expected output (the HPC hostname, no password prompt):
+
+```
+scc-login1
+```
+
+If this succeeds, the key is set up correctly.
 
 ### Step 2: Network Access (If HPC Is Behind a Firewall)
 
@@ -419,18 +477,22 @@ NeuroInsight Server (AWS)                    Your Laptop (VPN)                  
 On your **local machine** (with VPN connected), run:
 
 ```bash
-ssh -i /path/to/server-key.pem \
+ssh -i ~/.ssh/aws-neuroinsight.pem \
     -L 3000:localhost:3000 \
     -L 8000:localhost:8000 \
-    -R 2222:<hpc-login-node>:22 \
-    ubuntu@<neuroinsight-server-ip>
+    -R 2222:scc-login.bu.edu:22 \
+    ubuntu@54.89.123.45
 ```
 
 | Flag | Purpose |
 |------|---------|
+| `-i ~/.ssh/aws-neuroinsight.pem` | Private key for the AWS EC2 server |
 | `-L 3000:localhost:3000` | Forward the UI to your browser |
 | `-L 8000:localhost:8000` | Forward the API to your browser |
-| `-R 2222:<hpc-login-node>:22` | Reverse tunnel: server port 2222 reaches HPC via your VPN |
+| `-R 2222:scc-login.bu.edu:22` | Reverse tunnel: server port 2222 reaches HPC via your VPN |
+| `ubuntu@54.89.123.45` | Username and IP of the NeuroInsight server |
+
+Replace `scc-login.bu.edu` with your HPC login node and `54.89.123.45` with your server's IP.
 
 Keep this terminal open while using NeuroInsight.
 
@@ -449,9 +511,13 @@ Keep this terminal open while using NeuroInsight.
 1. Open NeuroInsight in your browser
 2. In the top toolbar, click the **HPC** tab (purple server icon)
 3. Fill in the SSH connection fields:
-   - **Host** -- HPC login node hostname (or `localhost` if using a reverse tunnel)
-   - **Username** -- your HPC username
-   - **Port** -- `22` (or `2222` if using a reverse tunnel)
+
+| Field | Direct access (on campus) | Via reverse tunnel (off campus) |
+|-------|---------------------------|--------------------------------|
+| Host | `scc-login.bu.edu` | `localhost` |
+| Username | `priya` | `priya` |
+| Port | `22` | `2222` |
+
 4. Click **Connect**
 5. A green "Connected" badge appears on success
 
@@ -459,12 +525,12 @@ Keep this terminal open while using NeuroInsight.
 
 After connecting:
 
-1. Set the **Work Directory** -- the path on the HPC where jobs will run (e.g., `/scratch/<username>` or `/home/<username>/neuroinsight`)
+1. Set the **Work Directory** -- the path on the HPC where job scripts and logs are written (e.g., `/scratch/priya/neuroinsight`)
 2. Click **Show SLURM Settings** to expand advanced options:
-   - **Partition** -- dropdown auto-populated from the cluster's `sinfo` output
-   - **Account** -- your SLURM allocation/account name (if required by your cluster)
+   - **Partition** -- dropdown auto-populated from the cluster (e.g., `general`, `gpu`, `short`)
+   - **Account** -- your SLURM allocation name, if required (e.g., `epilepsy-lab`)
    - **QoS** -- quality of service tier (optional)
-   - **Modules** -- comma-separated list of modules to load before each job (e.g., `singularity/3.8, cuda/11.8`)
+   - **Modules** -- comma-separated list of modules to load before each job (e.g., `singularity/3.10`)
 3. Click **Activate SLURM Backend**
 
 All subsequent neuroimaging jobs will be submitted to the cluster via `sbatch`.
@@ -547,9 +613,14 @@ If the XNAT server were publicly accessible (e.g., `https://central.xnat.org`), 
 1. Open NeuroInsight and click **Get Started**
 2. Under **Data Source**, click the **XNAT** tab
 3. Fill in:
-   - **XNAT URL** -- the full URL of the XNAT instance (e.g., `https://xnat.example.edu`)
-   - **Username** -- your XNAT username
-   - **Password** -- your XNAT password
+
+| Field | Direct access | Via SSH tunnel |
+|-------|---------------|----------------|
+| XNAT URL | `https://xnat.urmc.rochester.edu` | `https://localhost:8443` |
+| Skip SSL verification | unchecked | **checked** |
+| Username | `dnakamura` | `dnakamura` |
+| Password | (your XNAT password) | (your XNAT password) |
+
 4. Click **Connect**
 5. A green "Connected" badge confirms the connection
 
@@ -614,11 +685,13 @@ ssh -L 8443:<xnat-hostname>:443 <username>@<intermediary-host> -N
 
 Keep this terminal open while using XNAT.
 
-**Example** (tunneling through an HPC login node):
+**Example** (tunneling through an HPC login node to reach a hospital XNAT):
 
 ```bash
-ssh -L 8443:xnat.your-institution.edu:443 youruser@hpc-login.your-institution.edu -N
+ssh -L 8443:xnat.urmc.rochester.edu:443 dnakamura@smdodlogin01.urmc.rochester.edu -N
 ```
+
+In this example, `dnakamura` is the HPC username, `smdodlogin01.urmc.rochester.edu` is the HPC login node (which can reach XNAT), and `xnat.urmc.rochester.edu` is the XNAT server on the hospital network. Replace all three with your own values.
 
 #### Connect in the UI
 
