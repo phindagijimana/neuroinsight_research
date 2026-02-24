@@ -144,11 +144,11 @@ Requires=neuroinsight-backend.service
 
 [Service]
 Type=simple
-WorkingDirectory=/home/ubuntu/src/desktop_alone_web_1
-Environment="PYTHONPATH=/home/ubuntu/src/desktop_alone_web_1"
+WorkingDirectory=%h/src/NeuroInsight_Research_Tool/neuroinsight_research
+Environment="PYTHONPATH=%h/src/NeuroInsight_Research_Tool/neuroinsight_research"
 Environment="ENVIRONMENT=production"
 Environment="DATABASE_URL=postgresql://..."
-ExecStart=/home/ubuntu/src/desktop_alone_web_1/venv/bin/python -m celery ...
+ExecStart=%h/src/NeuroInsight_Research_Tool/venv/bin/python -m celery ...
 StandardOutput=append:/path/to/log
 StandardError=append:/path/to/log
 Restart=always

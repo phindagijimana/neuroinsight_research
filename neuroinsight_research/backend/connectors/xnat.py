@@ -65,7 +65,8 @@ class XNATConnector(BasePlatformConnector):
         if not username or not password:
             raise ValueError("Username and password are required")
 
-        verify_ssl = credentials.get("verify_ssl", "true").lower() != "false"
+        raw_ssl = credentials.get("verify_ssl", True)
+        verify_ssl = str(raw_ssl).lower() not in ("false", "0", "no")
         if verify_ssl != self._verify_ssl:
             self._verify_ssl = verify_ssl
             self._client.close()
@@ -215,34 +216,68 @@ class XNATConnector(BasePlatformConnector):
     ) -> List[PlatformItem]:
         """Browse XNAT hierarchy based on path depth.
 
-        path="/":                              list experiments for subject
-        path="/{experiment_id}":               list scans for experiment
-        path="/{experiment_id}/{scan_id}":     list resources for scan
-        path="/{exp}/{scan}/{resource}":       list files in resource
+        dataset_id is the **project** ID.  The subject→experiment→scan
+        hierarchy is traversed via the path parameter:
+
+        path="/":                                       list subjects
+        path="/{subject_id}":                           list experiments
+        path="/{subject_id}/{experiment_id}":           list scans
+        path="/{subject_id}/{exp_id}/{scan_id}":        list resources
+        path="/{subject_id}/{exp}/{scan}/{resource}":   list files
         """
         parts = [p for p in path.strip("/").split("/") if p]
+        project_id = dataset_id
 
         if len(parts) == 0:
-            return self._list_experiments(dataset_id)
+            return self._list_subjects(project_id)
         elif len(parts) == 1:
-            return self._list_scans(parts[0])
+            return self._list_experiments(project_id, parts[0])
         elif len(parts) == 2:
-            return self._list_resources(parts[0], parts[1])
+            return self._list_scans(project_id, parts[0], parts[1])
+        elif len(parts) == 3:
+            return self._list_resources(project_id, parts[0], parts[1], parts[2])
         else:
-            return self._list_resource_files(parts[0], parts[1], parts[2])
+            return self._list_resource_files(
+                project_id, parts[0], parts[1], parts[2], parts[3]
+            )
 
-    def _list_experiments(self, subject_id: str) -> List[PlatformItem]:
+    def _list_subjects(self, project_id: str) -> List[PlatformItem]:
         data = self._get(
-            f"/data/subjects/{quote(subject_id, safe='')}/experiments",
+            f"/data/projects/{quote(project_id, safe='')}/subjects",
+            params={"format": "json"},
+        )
+        items = []
+        for subj in self._result_set(data):
+            sid = subj.get("ID", "")
+            label = subj.get("label", sid)
+            items.append(
+                PlatformItem(
+                    id=sid,
+                    name=label,
+                    path=f"/{sid}",
+                    type="directory",
+                    platform=self.platform_name,
+                    extra={"group": subj.get("group", "")},
+                )
+            )
+        return items
+
+    def _list_experiments(
+        self, project_id: str, subject_id: str
+    ) -> List[PlatformItem]:
+        data = self._get(
+            f"/data/projects/{quote(project_id, safe='')}"
+            f"/subjects/{quote(subject_id, safe='')}/experiments",
             params={"format": "json"},
         )
         items = []
         for exp in self._result_set(data):
+            eid = exp.get("ID", "")
             items.append(
                 PlatformItem(
-                    id=exp.get("ID", ""),
-                    name=exp.get("label", exp.get("ID", "")),
-                    path=f"/{exp.get('ID', '')}",
+                    id=eid,
+                    name=exp.get("label", eid),
+                    path=f"/{subject_id}/{eid}",
                     type="directory",
                     modified=exp.get("date", exp.get("insert_date")),
                     platform=self.platform_name,
@@ -251,9 +286,13 @@ class XNATConnector(BasePlatformConnector):
             )
         return items
 
-    def _list_scans(self, experiment_id: str) -> List[PlatformItem]:
+    def _list_scans(
+        self, project_id: str, subject_id: str, experiment_id: str
+    ) -> List[PlatformItem]:
         data = self._get(
-            f"/data/experiments/{quote(experiment_id, safe='')}/scans",
+            f"/data/projects/{quote(project_id, safe='')}"
+            f"/subjects/{quote(subject_id, safe='')}"
+            f"/experiments/{quote(experiment_id, safe='')}/scans",
             params={"format": "json"},
         )
         items = []
@@ -263,7 +302,7 @@ class XNATConnector(BasePlatformConnector):
                 PlatformItem(
                     id=scan_id,
                     name=f"Scan {scan_id}: {scan.get('type', '')} - {scan.get('series_description', '')}",
-                    path=f"/{experiment_id}/{scan_id}",
+                    path=f"/{subject_id}/{experiment_id}/{scan_id}",
                     type="directory",
                     platform=self.platform_name,
                     extra={
@@ -275,10 +314,14 @@ class XNATConnector(BasePlatformConnector):
         return items
 
     def _list_resources(
-        self, experiment_id: str, scan_id: str
+        self, project_id: str, subject_id: str,
+        experiment_id: str, scan_id: str,
     ) -> List[PlatformItem]:
         data = self._get(
-            f"/data/experiments/{quote(experiment_id, safe='')}/scans/{quote(scan_id, safe='')}/resources",
+            f"/data/projects/{quote(project_id, safe='')}"
+            f"/subjects/{quote(subject_id, safe='')}"
+            f"/experiments/{quote(experiment_id, safe='')}"
+            f"/scans/{quote(scan_id, safe='')}/resources",
             params={"format": "json"},
         )
         items = []
@@ -288,7 +331,7 @@ class XNATConnector(BasePlatformConnector):
                 PlatformItem(
                     id=label,
                     name=label,
-                    path=f"/{experiment_id}/{scan_id}/{label}",
+                    path=f"/{subject_id}/{experiment_id}/{scan_id}/{label}",
                     type="directory",
                     size=int(res.get("file_size", 0) or 0),
                     platform=self.platform_name,
@@ -298,10 +341,13 @@ class XNATConnector(BasePlatformConnector):
         return items
 
     def _list_resource_files(
-        self, experiment_id: str, scan_id: str, resource_label: str
+        self, project_id: str, subject_id: str,
+        experiment_id: str, scan_id: str, resource_label: str,
     ) -> List[PlatformItem]:
         data = self._get(
-            f"/data/experiments/{quote(experiment_id, safe='')}"
+            f"/data/projects/{quote(project_id, safe='')}"
+            f"/subjects/{quote(subject_id, safe='')}"
+            f"/experiments/{quote(experiment_id, safe='')}"
             f"/scans/{quote(scan_id, safe='')}"
             f"/resources/{quote(resource_label, safe='')}/files",
             params={"format": "json"},
@@ -313,7 +359,7 @@ class XNATConnector(BasePlatformConnector):
                 PlatformItem(
                     id=f.get("URI", name),
                     name=name,
-                    path=f"/{experiment_id}/{scan_id}/{resource_label}/{name}",
+                    path=f"/{subject_id}/{experiment_id}/{scan_id}/{resource_label}/{name}",
                     type="file",
                     size=int(f.get("Size", 0) or 0),
                     platform=self.platform_name,

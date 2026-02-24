@@ -3,9 +3,8 @@ set -euo pipefail
 
 INPUT_DIR="/data/input"
 OUTPUT_DIR="/data/output"
-WORK_DIR="/data/work"
 
-mkdir -p "$OUTPUT_DIR" "$WORK_DIR"
+mkdir -p "$OUTPUT_DIR" /tmp/work/qsirecon
 
 QSIPREP_DIR=$(find "$INPUT_DIR" -name "dataset_description.json" -exec dirname {} \; | head -1)
 if [ -z "$QSIPREP_DIR" ]; then
@@ -23,7 +22,7 @@ qsirecon "$QSIPREP_DIR" "$OUTPUT_DIR" participant \
     --participant-label "${PARTICIPANT#sub-}" \
     --nprocs "$NPROCS" \
     --mem-mb "$MEM_MB" \
-    --work-dir "$WORK_DIR" \
+    --work-dir /tmp/work/qsirecon \
     --notrack
 
 echo "QSIRecon complete. Output in $OUTPUT_DIR"
