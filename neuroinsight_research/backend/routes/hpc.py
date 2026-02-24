@@ -53,7 +53,7 @@ class BackendSwitchRequest(BaseModel):
     ssh_host: Optional[str] = None
     ssh_user: Optional[str] = None
     ssh_port: int = 22
-    work_dir: str = "/scratch"
+    work_dir: str = "~"
     partition: str = "general"
     account: Optional[str] = None
     qos: Optional[str] = None

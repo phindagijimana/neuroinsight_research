@@ -1,8 +1,13 @@
 /**
- * DirectorySelector Component
+ * DirectorySelector Component (Batch Mode)
  *
- * Visual directory browser + input fields for batch processing.
- * Users can either type a path or click through a folder tree.
+ * Supports two discovery modes:
+ *   1. BIDS mode: Detects sub-* directories, shows subject checkboxes,
+ *      submits one SLURM job per selected subject.
+ *   2. File mode: Lists individual NIfTI files, submits one job per file.
+ *
+ * BIDS detection is automatic — if the scanned directory contains sub-*
+ * folders it switches to BIDS mode with select-all / deselect controls.
  *
  * Works in local, remote, and HPC modes.
  */
@@ -10,7 +15,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   FolderOpen, File, AlertCircle, CheckCircle2,
-  ChevronRight, ArrowUp, Loader2, FileText,
+  ChevronRight, ArrowUp, Loader2, FileText, Users,
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { DirectoryInfo } from '../types';
@@ -18,8 +23,8 @@ import type { DirectoryInfo } from '../types';
 interface DirectorySelectorProps {
   mode: 'local' | 'remote' | 'hpc';
   onSubmit: (inputDir: string, outputDir: string, files: string[]) => void;
-  onSubmitDirectory?: (inputDir: string, outputDir: string) => void;
-  onCancel?: () => void;
+  /** When set, the component passes subject IDs back through onBidsSubmit instead. */
+  onBidsSubmit?: (bidsDir: string, subjectIds: string[]) => void;
 }
 
 interface BrowseEntry {
@@ -34,14 +39,17 @@ const isNifti = (name: string) => /\.(nii|nii\.gz)$/i.test(name);
 export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
   mode,
   onSubmit,
-  onSubmitDirectory,
-  onCancel,
+  onBidsSubmit,
 }) => {
   const [inputDir, setInputDir] = useState('');
-  const [outputDir, setOutputDir] = useState('');
   const [directoryInfo, setDirectoryInfo] = useState<DirectoryInfo | null>(null);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // BIDS subject discovery
+  const [bidsSubjects, setBidsSubjects] = useState<string[]>([]);
+  const [selectedSubjects, setSelectedSubjects] = useState<Set<string>>(new Set());
+  const isBids = bidsSubjects.length > 0;
 
   const [browserOpen, setBrowserOpen] = useState(false);
   const [browserPath, setBrowserPath] = useState(mode === 'local' ? './data' : '~');
@@ -80,7 +88,6 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
 
   const handleBrowserSelect = (dirPath: string) => {
     setInputDir(dirPath);
-    setOutputDir(dirPath.replace(/\/?$/, '') + '_output');
     setBrowserOpen(false);
     scanDirectory(dirPath);
   };
@@ -92,12 +99,24 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
     }
     setScanning(true);
     setError(null);
+    setBidsSubjects([]);
+    setSelectedSubjects(new Set());
 
     try {
       const info = await apiService.browseDirectory(path, mode);
       setDirectoryInfo(info);
-      if (info.nifti_files.length === 0) {
-        setError('No NIfTI files at this level. For BIDS pipelines, use "Submit Directory as Input" below.');
+
+      // Detect BIDS: look for sub-* directories
+      const subDirs = (info.directories || [])
+        .map((d: any) => d.name as string)
+        .filter((n: string) => n.startsWith('sub-'));
+
+      if (subDirs.length > 0) {
+        const subjects = subDirs.map((d: string) => d.replace('sub-', '')).sort();
+        setBidsSubjects(subjects);
+        setSelectedSubjects(new Set(subjects));
+      } else if (info.nifti_files.length === 0) {
+        setError('No NIfTI files or BIDS sub-* directories found. Ensure this is a valid input directory.');
       }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to browse directory');
@@ -109,37 +128,69 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
 
   const handleBrowseInput = () => scanDirectory(inputDir);
 
+  const toggleSubject = (sid: string) => {
+    setSelectedSubjects(prev => {
+      const next = new Set(prev);
+      if (next.has(sid)) next.delete(sid);
+      else next.add(sid);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedSubjects.size === bidsSubjects.length) {
+      setSelectedSubjects(new Set());
+    } else {
+      setSelectedSubjects(new Set(bidsSubjects));
+    }
+  };
+
   const handleSubmit = () => {
-    if (!inputDir || !outputDir) {
-      setError('Please specify both input and output directories');
+    if (!inputDir) {
+      setError('Please specify an input directory');
       return;
     }
+
+    if (isBids) {
+      if (selectedSubjects.size === 0) {
+        setError('Please select at least one subject');
+        return;
+      }
+      if (onBidsSubmit) {
+        onBidsSubmit(inputDir, Array.from(selectedSubjects));
+      } else {
+        onSubmit(inputDir, '', Array.from(selectedSubjects));
+      }
+      return;
+    }
+
     if (!directoryInfo || directoryInfo.nifti_files.length === 0) {
       setError('No files to process. Please browse input directory first.');
       return;
     }
-    onSubmit(inputDir, outputDir, directoryInfo.nifti_files);
+    onSubmit(inputDir, '', directoryInfo.nifti_files);
   };
 
   const niftiInBrowser = browserEntries.filter(e => e.type === 'file' && isNifti(e.name)).length;
   const dirsInBrowser = browserEntries.filter(e => e.type === 'directory').length;
+  const subDirsInBrowser = browserEntries.filter(e => e.type === 'directory' && e.name.startsWith('sub-')).length;
 
   return (
     <div className="space-y-4">
       {/* Input Directory */}
       <div className="space-y-1.5">
         <label className="block text-xs font-semibold text-gray-700">
-          Input Directory <span className="text-red-500">*</span>
+          Batch Input Directory <span className="text-red-500">*</span>
         </label>
         <p className="text-[11px] text-gray-500">
-          Directory containing NIfTI files (.nii / .nii.gz)
+          BIDS dataset or folder with NIfTI files &mdash; one job per subject
         </p>
         <div className="flex gap-2">
           <input
             type="text"
             value={inputDir}
-            onChange={(e) => { setInputDir(e.target.value); setDirectoryInfo(null); }}
-            placeholder={mode === 'local' ? './data/uploads' : '/scratch/username/scans'}
+            onChange={(e) => { setInputDir(e.target.value); setDirectoryInfo(null); setBidsSubjects([]); }}
+            placeholder={mode === 'local' ? './data/uploads' : '/scratch/username/dataset'}
             className="flex-1 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#003d7a] focus:border-[#003d7a]"
             onKeyDown={(e) => e.key === 'Enter' && handleBrowseInput()}
           />
@@ -217,6 +268,7 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
 
             {!browserLoading && browserEntries.map((entry) => {
               const nifti = entry.type === 'file' && isNifti(entry.name);
+              const isSub = entry.type === 'directory' && entry.name.startsWith('sub-');
               return (
                 <div
                   key={entry.path}
@@ -226,18 +278,22 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
                   }}
                 >
                   {entry.type === 'directory' ? (
-                    <FolderOpen className="h-3.5 w-3.5 text-yellow-500 mr-2 flex-shrink-0" />
+                    <FolderOpen className={`h-3.5 w-3.5 mr-2 flex-shrink-0 ${isSub ? 'text-[#003d7a]' : 'text-yellow-500'}`} />
                   ) : nifti ? (
                     <FileText className="h-3.5 w-3.5 text-green-600 mr-2 flex-shrink-0" />
                   ) : (
                     <File className="h-3.5 w-3.5 text-gray-400 mr-2 flex-shrink-0" />
                   )}
                   <span className={`flex-1 truncate ${
+                    isSub ? 'font-medium text-[#003d7a]' :
                     entry.type === 'directory' ? 'font-medium text-gray-800' :
                     nifti ? 'text-green-700' : 'text-gray-600'
                   }`}>
                     {entry.name}
                   </span>
+                  {isSub && (
+                    <span className="text-[9px] bg-[#003d7a]/10 text-[#003d7a] px-1.5 py-0.5 rounded font-medium mr-2">Subject</span>
+                  )}
                   {nifti && (
                     <span className="text-[9px] bg-green-100 text-green-700 px-1 py-0.5 rounded font-medium mr-2">NIfTI</span>
                   )}
@@ -260,7 +316,9 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
           {/* Footer */}
           <div className="flex items-center justify-between px-3 py-1.5 border-t border-gray-200 bg-gray-50">
             <span className="text-[10px] text-gray-500">
-              {dirsInBrowser} folder{dirsInBrowser !== 1 ? 's' : ''}, {niftiInBrowser} NIfTI file{niftiInBrowser !== 1 ? 's' : ''}
+              {dirsInBrowser} folder{dirsInBrowser !== 1 ? 's' : ''}
+              {subDirsInBrowser > 0 && <> ({subDirsInBrowser} subject{subDirsInBrowser !== 1 ? 's' : ''})</>}
+              , {niftiInBrowser} NIfTI
             </span>
             <div className="flex gap-2">
               <button
@@ -280,23 +338,6 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
         </div>
       )}
 
-      {/* Output Directory */}
-      <div className="space-y-1.5">
-        <label className="block text-xs font-semibold text-gray-700">
-          Output Directory <span className="text-red-500">*</span>
-        </label>
-        <p className="text-[11px] text-gray-500">
-          Where results will be saved (created if it doesn't exist)
-        </p>
-        <input
-          type="text"
-          value={outputDir}
-          onChange={(e) => setOutputDir(e.target.value)}
-          placeholder={mode === 'local' ? './data/outputs' : '/scratch/username/results'}
-          className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#003d7a] focus:border-[#003d7a]"
-        />
-      </div>
-
       {/* Error */}
       {error && (
         <div className="p-2.5 bg-red-50 border border-red-200 rounded-md flex items-start gap-2">
@@ -305,8 +346,51 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
         </div>
       )}
 
-      {/* Files Found */}
-      {directoryInfo && directoryInfo.nifti_files.length > 0 && (
+      {/* BIDS Subjects Found */}
+      {isBids && (
+        <div className="p-3 bg-[#003d7a]/5 border border-[#003d7a]/20 rounded-md">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center">
+              <Users className="h-4 w-4 text-[#003d7a] mr-2" />
+              <span className="text-xs font-semibold text-[#003d7a]">
+                BIDS Dataset &mdash; {bidsSubjects.length} Subject{bidsSubjects.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <button
+              onClick={toggleAll}
+              className="text-[10px] font-medium text-[#003d7a] hover:underline"
+            >
+              {selectedSubjects.size === bidsSubjects.length ? 'Deselect All' : 'Select All'}
+            </button>
+          </div>
+          <div className="max-h-40 overflow-y-auto space-y-0.5 bg-white rounded p-2 border border-gray-100">
+            {bidsSubjects.map((sid) => (
+              <label
+                key={sid}
+                className="flex items-center py-1 px-1.5 rounded hover:bg-gray-50 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedSubjects.has(sid)}
+                  onChange={() => toggleSubject(sid)}
+                  className="h-3.5 w-3.5 rounded border-gray-300 text-[#003d7a] focus:ring-[#003d7a] mr-2"
+                />
+                <FolderOpen className="h-3 w-3 text-[#003d7a] mr-1.5 flex-shrink-0" />
+                <span className="text-[11px] text-gray-800 font-medium">sub-{sid}</span>
+              </label>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-[10px] text-gray-500">
+              {selectedSubjects.size} of {bidsSubjects.length} selected &mdash; each gets its own SLURM job
+            </span>
+            <span className="text-[10px] text-gray-400">{inputDir}</span>
+          </div>
+        </div>
+      )}
+
+      {/* NIfTI Files Found (non-BIDS fallback) */}
+      {!isBids && directoryInfo && directoryInfo.nifti_files.length > 0 && (
         <div className="p-3 bg-green-50 border border-green-200 rounded-md">
           <div className="flex items-center mb-2">
             <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
@@ -327,32 +411,32 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
               </p>
             )}
           </div>
-          <div className="mt-2 text-[10px] text-gray-600 space-y-0.5">
+          <div className="mt-2 text-[10px] text-gray-600">
             <p><strong>Input:</strong> {inputDir}</p>
-            <p><strong>Output:</strong> {outputDir || '(not set)'}</p>
           </div>
         </div>
       )}
 
-      {/* Submit buttons */}
+      {/* Submit button */}
       <div className="space-y-2">
-        <button
-          onClick={handleSubmit}
-          disabled={!inputDir || !outputDir || !directoryInfo || directoryInfo.nifti_files.length === 0}
-          className="w-full py-2 px-4 bg-[#003d7a] text-white rounded-md hover:bg-[#002b55] disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm flex items-center justify-center gap-2"
-        >
-          <CheckCircle2 className="h-4 w-4" />
-          Process {directoryInfo?.nifti_files.length || 0} File{directoryInfo?.nifti_files.length !== 1 ? 's' : ''} (one job per file)
-        </button>
-
-        {onSubmitDirectory && (
+        {isBids && selectedSubjects.size > 0 && (
           <button
-            onClick={() => { if (inputDir && outputDir) onSubmitDirectory(inputDir, outputDir); }}
-            disabled={!inputDir || !outputDir}
-            className="w-full py-2 px-4 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm flex items-center justify-center gap-2"
+            onClick={handleSubmit}
+            className="w-full py-2 px-4 bg-[#003d7a] text-white rounded-md hover:bg-[#002b55] disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm flex items-center justify-center gap-2"
           >
-            <FolderOpen className="h-4 w-4" />
-            Submit Directory as Input (BIDS / multi-file pipelines)
+            <Users className="h-4 w-4" />
+            Submit Batch &mdash; {selectedSubjects.size} Subject{selectedSubjects.size !== 1 ? 's' : ''} (one job each)
+          </button>
+        )}
+
+        {!isBids && directoryInfo && directoryInfo.nifti_files.length > 0 && (
+          <button
+            onClick={handleSubmit}
+            disabled={!inputDir || !directoryInfo || directoryInfo.nifti_files.length === 0}
+            className="w-full py-2 px-4 bg-[#003d7a] text-white rounded-md hover:bg-[#002b55] disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm flex items-center justify-center gap-2"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            Submit Batch &mdash; {directoryInfo.nifti_files.length} File{directoryInfo.nifti_files.length !== 1 ? 's' : ''} (one job per file)
           </button>
         )}
       </div>
@@ -360,8 +444,8 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
       {/* Help */}
       <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-md">
         <p className="text-[11px] text-gray-600">
-          <strong>Tip:</strong> Click <strong>Browse</strong> to visually navigate the server's filesystem,
-          or type a path directly and click <strong>Scan</strong> to find NIfTI files.
+          <strong>Tip:</strong> Point to a <strong>BIDS dataset</strong> (with sub-* folders) and each subject
+          will be submitted as a separate parallel job. For non-BIDS data, each NIfTI file becomes one job.
         </p>
       </div>
     </div>

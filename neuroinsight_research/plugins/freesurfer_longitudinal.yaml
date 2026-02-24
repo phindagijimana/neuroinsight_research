@@ -102,39 +102,141 @@ execution:
     THREADS={threads}
     BASE_ID={base_id}
     RESUME={resume}
-    INPUT_DIR=/data/inputs
 
-    # Discover timepoints from input NIfTI files
+    # Resolve input directory: check for input_dir symlink, fall back to /data/inputs
+    if [ -d /data/inputs/input_dir ]; then
+      INPUT_DIR=/data/inputs/input_dir
+    else
+      INPUT_DIR=/data/inputs
+    fi
+
+    # Discover T1w timepoints: supports both flat dirs and BIDS ses-*/anat/ structure
     echo "=== Discovering timepoints from $INPUT_DIR ==="
     TP_IDS=()
-    for nii in "$INPUT_DIR"/*.nii.gz "$INPUT_DIR"/*.nii; do
+    TP_PATHS=()
+
+    # Strategy 1: flat directory -- T1w NIfTIs directly in INPUT_DIR
+    for nii in "$INPUT_DIR"/*T1w*.nii.gz "$INPUT_DIR"/*T1w*.nii \
+               "$INPUT_DIR"/*.nii.gz "$INPUT_DIR"/*.nii; do
       [ -f "$nii" ] || continue
       fname=$(basename "$nii")
+      echo "$fname" | grep -qi "label-lesion\|_roi\." && continue
       tp_id="${fname%%_T1w*}"
       [ -z "$tp_id" ] && tp_id="${fname%%.nii*}"
+      already=false
+      for existing in "${TP_IDS[@]+"${TP_IDS[@]}"}"; do [ "$existing" = "$tp_id" ] && already=true; done
+      $already && continue
       TP_IDS+=("$tp_id")
+      TP_PATHS+=("$nii")
       echo "  Found timepoint: $tp_id -> $nii"
     done
 
+    # Strategy 2: BIDS structure -- search ses-*/anat/ for T1w files ONLY
+    if [ ${#TP_IDS[@]} -lt 2 ]; then
+      echo "  Flat scan found ${#TP_IDS[@]} timepoint(s), searching BIDS ses-*/anat/ ..."
+      TP_IDS=()
+      TP_PATHS=()
+      for ses_dir in "$INPUT_DIR"/ses-*/; do
+        [ -d "$ses_dir" ] || continue
+        anat_dir="${ses_dir}anat"
+        [ -d "$anat_dir" ] || anat_dir="$ses_dir"
+        for nii in "$anat_dir"/*T1w*.nii.gz "$anat_dir"/*T1w*.nii; do
+          [ -f "$nii" ] || continue
+          fname=$(basename "$nii")
+          echo "$fname" | grep -qi "label-lesion\|_roi\.\|_FLAIR\|_T2w\|_T2star\|_dwi\|_bold" && continue
+          tp_id="${fname%%_T1w*}"
+          [ -z "$tp_id" ] && tp_id="${fname%%.nii*}"
+          already=false
+          for existing in "${TP_IDS[@]+"${TP_IDS[@]}"}"; do [ "$existing" = "$tp_id" ] && already=true; done
+          $already && continue
+          TP_IDS+=("$tp_id")
+          TP_PATHS+=("$nii")
+          echo "  Found BIDS timepoint: $tp_id -> $nii"
+        done
+      done
+      # If T1w-specific search didn't find enough, try any NIfTI as last resort
+      if [ ${#TP_IDS[@]} -lt 2 ]; then
+        echo "  T1w-specific search found ${#TP_IDS[@]}, trying all NIfTIs in ses-*/anat/ ..."
+        TP_IDS=()
+        TP_PATHS=()
+        for ses_dir in "$INPUT_DIR"/ses-*/; do
+          [ -d "$ses_dir" ] || continue
+          anat_dir="${ses_dir}anat"
+          [ -d "$anat_dir" ] || anat_dir="$ses_dir"
+          for nii in "$anat_dir"/*.nii.gz "$anat_dir"/*.nii; do
+            [ -f "$nii" ] || continue
+            fname=$(basename "$nii")
+            echo "$fname" | grep -qi "label-lesion\|_roi\.\|_FLAIR\|_T2w\|_T2star\|_dwi\|_bold" && continue
+            tp_id="${fname%%.nii*}"
+            already=false
+            for existing in "${TP_IDS[@]+"${TP_IDS[@]}"}"; do [ "$existing" = "$tp_id" ] && already=true; done
+            $already && continue
+            TP_IDS+=("$tp_id")
+            TP_PATHS+=("$nii")
+            echo "  Found BIDS timepoint (any NIfTI): $tp_id -> $nii"
+          done
+        done
+      fi
+    fi
+
+    # Strategy 3: recursive find -- handles sub-*/ and any deeper nesting
+    if [ ${#TP_IDS[@]} -lt 2 ]; then
+      echo "  BIDS ses-* scan found ${#TP_IDS[@]} timepoint(s), searching recursively ..."
+      TP_IDS=()
+      TP_PATHS=()
+      while IFS= read -r nii; do
+        [ -f "$nii" ] || continue
+        fname=$(basename "$nii")
+        echo "$fname" | grep -qi "label-lesion\|_roi\." && continue
+        tp_id="${fname%%_T1w*}"
+        [ -z "$tp_id" ] && tp_id="${fname%%.nii*}"
+        already=false
+        for existing in "${TP_IDS[@]+"${TP_IDS[@]}"}"; do [ "$existing" = "$tp_id" ] && already=true; done
+        $already && continue
+        TP_IDS+=("$tp_id")
+        TP_PATHS+=("$nii")
+        echo "  Found timepoint (recursive): $tp_id -> $nii"
+      done < <(find "$INPUT_DIR" -maxdepth 4 \( -name "*T1w*.nii.gz" -o -name "*T1w*.nii" \) -type f 2>/dev/null | sort)
+
+      # If no T1w-labeled files found, try any NIfTI
+      if [ ${#TP_IDS[@]} -lt 2 ]; then
+        TP_IDS=()
+        TP_PATHS=()
+        while IFS= read -r nii; do
+          [ -f "$nii" ] || continue
+          fname=$(basename "$nii")
+          echo "$fname" | grep -qi "label-lesion\|_roi\." && continue
+          tp_id="${fname%%_T1w*}"
+          [ -z "$tp_id" ] && tp_id="${fname%%.nii*}"
+          already=false
+          for existing in "${TP_IDS[@]+"${TP_IDS[@]}"}"; do [ "$existing" = "$tp_id" ] && already=true; done
+          $already && continue
+          TP_IDS+=("$tp_id")
+          TP_PATHS+=("$nii")
+          echo "  Found timepoint (recursive): $tp_id -> $nii"
+        done < <(find "$INPUT_DIR" -maxdepth 4 \( -name "*.nii.gz" -o -name "*.nii" \) -type f 2>/dev/null | sort)
+      fi
+    fi
+
     if [ ${#TP_IDS[@]} -lt 2 ]; then
       echo "ERROR: Need at least 2 timepoints, found ${#TP_IDS[@]}"
+      echo "Directory contents:"
+      find "$INPUT_DIR" -maxdepth 4 \( -name "*.nii.gz" -o -name "*.nii" \) -type f 2>/dev/null | head -20
       exit 1
     fi
     echo "Total timepoints: ${#TP_IDS[@]}"
 
     # STAGE 1: CROSS-SECTIONAL recon-all per timepoint
     echo "=== STAGE 1: Cross-sectional processing ==="
-    for nii in "$INPUT_DIR"/*.nii.gz "$INPUT_DIR"/*.nii; do
-      [ -f "$nii" ] || continue
-      fname=$(basename "$nii")
-      tp_id="${fname%%_T1w*}"
-      [ -z "$tp_id" ] && tp_id="${fname%%.nii*}"
+    for i in "${!TP_IDS[@]}"; do
+      tp_id="${TP_IDS[$i]}"
+      nii="${TP_PATHS[$i]}"
 
       if [ "$RESUME" = "true" ] && [ -f "$SUBJECTS_DIR/$tp_id/scripts/recon-all.done" ]; then
         echo "  SKIP $tp_id (already completed)"
         continue
       fi
-      echo "  Processing CROSS: $tp_id"
+      echo "  Processing CROSS: $tp_id ($nii)"
       recon-all -subjid "$tp_id" -i "$nii" -all -openmp "$THREADS" \
         2>&1 | tee "/data/outputs/logs/freesurfer_longitudinal/cross_${tp_id}.log"
     done

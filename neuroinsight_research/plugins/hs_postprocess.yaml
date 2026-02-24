@@ -1,21 +1,21 @@
-# Plugin: HS Detection Postprocess (Utility - hidden from UI)
+# Plugin: HS Detection Postprocess
 id: hs_postprocess
-name: "HS Detection Postprocess (Utility)"
+name: "Hippocampal Sclerosis Detection"
 version: "1.0.0"
 type: plugin
 domain: structural_mri
 
 visibility:
-  user_selectable: false
-  ui_category: internal_utility
-  ui_label: "HS Postprocess Utility"
+  user_selectable: true
+  ui_category: primary
+  ui_label: "HS Detection (postprocess)"
 
 description: >
   Reads FreeSurfer outputs, extracts hippocampal volumes, computes asymmetry index and
   lateralization using calibrated thresholds (AI = (L-R)/(L+R)), generates QC overlays
   (Top10 hippo-guided slices) and Report overlays (slices 3-6), writes a PDF report,
   and produces a Niivue viewer manifest.
-  Hidden from UI; invoked exclusively by the HS detection workflow.
+  Can be used standalone with existing FreeSurfer results, or as part of the HS Detection workflow.
 
 authors:
   - "NeuroInsight Research Team"
@@ -115,7 +115,15 @@ execution:
         #!/bin/bash
         set -e
 
-        export SUBJECTS_DIR=/data/outputs/native/freesurfer/SUBJECTS_DIR
+        # Standalone mode: FreeSurfer results provided via /data/inputs/subjects_dir
+        # Workflow mode:   FreeSurfer results written to /data/outputs by previous step
+        if [ -d "/data/inputs/subjects_dir" ]; then
+          export SUBJECTS_DIR=/data/inputs/subjects_dir
+          echo "Using external FreeSurfer results from /data/inputs/subjects_dir"
+        else
+          export SUBJECTS_DIR=/data/outputs/native/freesurfer/SUBJECTS_DIR
+          echo "Using workflow FreeSurfer results from /data/outputs"
+        fi
         export BUNDLE_ROOT=/data/outputs/bundle
         mkdir -p $BUNDLE_ROOT/metrics $BUNDLE_ROOT/reports $BUNDLE_ROOT/qc/hs $BUNDLE_ROOT/viewer $BUNDLE_ROOT/volumes $BUNDLE_ROOT/labels
 

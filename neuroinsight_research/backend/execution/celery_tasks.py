@@ -602,6 +602,12 @@ def run_docker_job(self, job_id: str, spec_dict: dict) -> dict:
             except Exception as e:
                 logger.warning(f"Bundle extraction failed for {job_id[:8]}: {e}")
 
+            # Generate stats CSVs
+            try:
+                _generate_stats_csvs(job_id, spec_dict.get("pipeline_name", ""), output_dir)
+            except Exception as e:
+                logger.warning(f"Stats CSV generation failed for {job_id[:8]}: {e}")
+
             return {"status": "completed", "exit_code": 0, "output_dir": str(output_dir)}
         else:
             error_message = f"Container exited with code {exit_code}"
@@ -987,6 +993,12 @@ def run_workflow_job(self, job_id: str, spec_dict: dict) -> dict:
     except Exception as e:
         logger.warning(f"Bundle extraction failed for workflow {job_id[:8]}: {e}")
 
+    # Generate stats CSVs
+    try:
+        _generate_stats_csvs(job_id, spec_dict.get("pipeline_name", ""), output_dir)
+    except Exception as e:
+        logger.warning(f"Stats CSV generation failed for workflow {job_id[:8]}: {e}")
+
     return {"status": "completed", "exit_code": 0, "output_dir": str(output_dir)}
 
 
@@ -1001,6 +1013,36 @@ def _upload_outputs_to_minio(job_id: str, output_dir: Path) -> None:
         logger.info(f"Uploaded {count} output files to MinIO for job {job_id[:8]}")
     except Exception as e:
         logger.warning(f"Failed to upload outputs to MinIO for job {job_id[:8]}: {e}")
+
+
+def _generate_stats_csvs(job_id: str, pipeline_name: str, output_dir: Path) -> None:
+    """Generate structured CSV files from job statistics (post-processing step).
+
+    Writes CSVs into output_dir/bundle/csv/ so they are available as
+    permanent artifacts alongside the raw output.
+    """
+    from backend.services.stats_converter import FileProvider, generate_stats_csvs
+
+    if not pipeline_name:
+        logger.debug(f"No pipeline_name for job {job_id[:8]}, skipping CSV generation")
+        return
+
+    fp = FileProvider(local_dir=str(output_dir))
+    sheets = generate_stats_csvs(pipeline_name, fp)
+
+    if not sheets:
+        logger.debug(f"No stats CSVs generated for job {job_id[:8]} ({pipeline_name})")
+        return
+
+    csv_dir = output_dir / "bundle" / "csv"
+    csv_dir.mkdir(parents=True, exist_ok=True)
+
+    for sheet in sheets:
+        csv_path = csv_dir / sheet.filename
+        csv_path.write_text(sheet.to_csv_string(), encoding="utf-8")
+        logger.debug(f"Generated {sheet.filename} ({sheet.total_rows} rows) for job {job_id[:8]}")
+
+    logger.info(f"Generated {len(sheets)} stats CSVs for job {job_id[:8]}")
 
 
 def _extract_bundle(job_id: str, spec_dict: dict, output_dir: Path, docker_client=None) -> None:

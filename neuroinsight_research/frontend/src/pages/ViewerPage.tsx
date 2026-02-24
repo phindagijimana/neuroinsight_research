@@ -234,6 +234,7 @@ const ViewerPage: React.FC<ViewerPageProps> = ({ selectedJobId, setSelectedJobId
             <NiivueViewer
               imageUrl={imageUrl}
               segmentationUrl={segmentationUrl || undefined}
+              pipelineName={job?.pipeline_name}
               onLoad={() => setViewerReady(true)}
             />
 

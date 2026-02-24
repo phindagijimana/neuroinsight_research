@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+source /shared/detect_inputs.sh
+
 INPUT_DIR="/data/input"
 OUTPUT_DIR="/data/output"
 
@@ -15,23 +17,39 @@ THREADS="${THREADS:-4}"
 # STAGE 1: FreeSurfer Longitudinal recon-all (CROSS -> BASE -> LONG)
 # =========================================================================
 echo "=== FreeSurfer Longitudinal Full Workflow ==="
-echo "=== STAGE 1: Longitudinal recon-all ==="
+echo "Searching for T1w timepoints in $INPUT_DIR ..."
 
 TP_IDS=()
-for nii in "$INPUT_DIR"/*.nii.gz "$INPUT_DIR"/*.nii; do
-    [ -f "$nii" ] || continue
-    fname=$(basename "$nii" .nii.gz)
-    fname=$(basename "$fname" .nii)
-    TP_ID="tp_${fname}"
-    echo "=== CROSS: recon-all on $nii -> $TP_ID ==="
-    recon-all -i "$nii" -s "$TP_ID" -sd "$SUBJECTS_DIR" -all -openmp "$THREADS"
-    TP_IDS+=("$TP_ID")
-done
+TP_PATHS=()
+
+while IFS= read -r nii; do
+    [ -n "$nii" ] || continue
+    tp_id=$(extract_tp_id "$nii")
+    already=false
+    for existing in "${TP_IDS[@]+"${TP_IDS[@]}"}"; do
+        [ "$existing" = "$tp_id" ] && already=true
+    done
+    $already && continue
+    TP_IDS+=("$tp_id")
+    TP_PATHS+=("$nii")
+    echo "  Found timepoint: $tp_id -> $nii"
+done < <(find_all_t1w "$INPUT_DIR")
 
 if [ ${#TP_IDS[@]} -lt 2 ]; then
     echo "ERROR: Need at least 2 timepoints, found ${#TP_IDS[@]}" >&2
+    echo "Directory contents:" >&2
+    find "$INPUT_DIR" -name "*.nii.gz" -o -name "*.nii" | head -20 >&2
     exit 1
 fi
+echo "Total timepoints: ${#TP_IDS[@]}"
+
+echo "=== STAGE 1: Cross-sectional processing ==="
+for i in "${!TP_IDS[@]}"; do
+    tp_id="${TP_IDS[$i]}"
+    nii="${TP_PATHS[$i]}"
+    echo "=== CROSS: recon-all on $nii -> $tp_id ==="
+    recon-all -i "$nii" -s "$tp_id" -sd "$SUBJECTS_DIR" -all -openmp "$THREADS"
+done
 
 TP_FLAGS=""
 for tp in "${TP_IDS[@]}"; do TP_FLAGS="$TP_FLAGS -tp $tp"; done

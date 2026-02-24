@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+source /shared/detect_inputs.sh
+
 INPUT_DIR="/data/input"
 OUTPUT_DIR="/data/output"
 
@@ -9,6 +11,8 @@ export FS_LICENSE=/license/license.txt
 mkdir -p "$OUTPUT_DIR"
 
 SUBJECT_ID="${SUBJECT_ID:-sub-01}"
+
+# Locate FreeSurfer SUBJECTS_DIR from input
 SUBJECTS_DIR=$(find "$INPUT_DIR" -maxdepth 2 -name "surf" -exec dirname {} \; | head -1)
 if [ -z "$SUBJECTS_DIR" ]; then
     SUBJECTS_DIR="$INPUT_DIR"
@@ -19,12 +23,36 @@ fi
 
 export SUBJECTS_DIR
 
+# Stage T1w and FLAIR into MELD's expected layout
+mkdir -p /data/input/"$SUBJECT_ID"/T1
+
+T1W=$(find_t1w "$INPUT_DIR")
+if [ -n "$T1W" ]; then
+    ln -sf "$T1W" /data/input/"$SUBJECT_ID"/T1/
+    echo "Staged T1w: $(basename "$T1W")"
+fi
+
+FLAIR_FLAG=""
+FLAIR=$(find_flair "$INPUT_DIR")
+if [ -n "$FLAIR" ]; then
+    mkdir -p /data/input/"$SUBJECT_ID"/FLAIR
+    ln -sf "$FLAIR" /data/input/"$SUBJECT_ID"/FLAIR/
+    FLAIR_FLAG="--is_flair"
+    echo "Staged FLAIR: $(basename "$FLAIR") (will improve lesion detection)"
+else
+    echo "No FLAIR found (optional - detection will use T1w only)"
+fi
+
 echo "Running MELD Graph on: $SUBJECTS_DIR/$SUBJECT_ID"
 
 cd /app
-python scripts/new_patient_pipeline/new_pt_pipeline.py \
-    -id "$SUBJECT_ID" \
-    -sd "$SUBJECTS_DIR" \
-    -od "$OUTPUT_DIR"
+MELD_CMD="python scripts/new_patient_pipeline/new_pt_pipeline.py"
+MELD_CMD="$MELD_CMD -id $SUBJECT_ID"
+MELD_CMD="$MELD_CMD -sd $SUBJECTS_DIR"
+MELD_CMD="$MELD_CMD -od $OUTPUT_DIR"
+[ -n "$FLAIR_FLAG" ] && MELD_CMD="$MELD_CMD $FLAIR_FLAG"
+
+echo "Command: $MELD_CMD"
+eval $MELD_CMD
 
 echo "MELD Graph complete. Output in $OUTPUT_DIR"

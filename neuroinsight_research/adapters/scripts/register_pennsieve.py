@@ -15,6 +15,7 @@ Usage:
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 
@@ -158,14 +159,27 @@ ALL_ADAPTERS = {**PLUGIN_ADAPTERS, **WORKFLOW_ADAPTERS}
 def build(name: str, push: bool = False) -> None:
     info = ALL_ADAPTERS[name]
     image_tag = f"{info['image']}:{info['tag']}"
-    print(f"\nBuilding {image_tag} from {info['dir']}...")
+    adapter_dir = info["dir"]
+    print(f"\nBuilding {image_tag} from {adapter_dir}...")
     print(f"  Base: {info['base']}")
 
-    subprocess.run(
-        ["docker", "build", "-t", image_tag, info["dir"]],
-        check=True,
-    )
-    print(f"Built: {image_tag}")
+    # Copy shared/ into the adapter's build context so COPY works
+    shared_src = os.path.join(ADAPTERS_DIR, "shared")
+    shared_dst = os.path.join(adapter_dir, "shared")
+    if os.path.isdir(shared_src) and not os.path.isdir(shared_dst):
+        shutil.copytree(shared_src, shared_dst)
+
+    try:
+        subprocess.run(
+            ["docker", "build", "-t", image_tag, adapter_dir],
+            check=True,
+        )
+        print(f"Built: {image_tag}")
+    finally:
+        # Clean up copied shared/ to avoid bloating the repo
+        if os.path.isdir(shared_dst) and os.path.isdir(shared_src):
+            if os.path.realpath(shared_dst) != os.path.realpath(shared_src):
+                shutil.rmtree(shared_dst, ignore_errors=True)
 
     if push:
         print(f"Pushing {image_tag}...")

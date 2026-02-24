@@ -52,7 +52,7 @@ class SLURMBackend(ExecutionBackend):
         self,
         ssh_host: str,
         ssh_user: str,
-        work_dir: str = "/scratch",
+        work_dir: str = "~",
         partition: str = "general",
         account: Optional[str] = None,
         qos: Optional[str] = None,
@@ -65,7 +65,7 @@ class SLURMBackend(ExecutionBackend):
         Args:
             ssh_host: HPC hostname
             ssh_user: SSH username
-            work_dir: Working directory on HPC (e.g. /scratch/username)
+            work_dir: Working directory on HPC (defaults to ~ which resolves to $HOME)
             partition: Default SLURM partition
             account: SLURM account/allocation (optional)
             qos: SLURM QoS level (optional)
@@ -195,30 +195,30 @@ class SLURMBackend(ExecutionBackend):
         # the names expected by the command template (e.g. T1w.nii.gz).
         self._stage_inputs(spec, job_dir)
 
-        # Get command template from plugin or workflow steps
+        # Get command template from plugin, or collect per-step info for workflows
         command_template = ""
+        workflow_step_info: List[dict] = []
         try:
             from backend.core.plugin_registry import get_plugin_workflow_registry
             registry = get_plugin_workflow_registry()
 
             workflow_steps = spec.parameters.get("_workflow_steps", [])
             if workflow_steps:
-                # Workflow: chain all step command templates into one script
-                step_templates = []
-                for step_idx, step_plugin_id in enumerate(workflow_steps):
+                for step_plugin_id in workflow_steps:
                     step_plugin = registry.get_plugin(step_plugin_id)
                     if step_plugin:
                         tmpl = step_plugin.command_template or step_plugin.command or ""
                         if tmpl:
-                            step_templates.append(
-                                f'echo "=== WORKFLOW STEP {step_idx + 1}/{len(workflow_steps)}: '
-                                f'{step_plugin.name} ==="\n{tmpl}'
-                            )
-                if step_templates:
-                    command_template = "\n\n".join(step_templates)
+                            workflow_step_info.append({
+                                "plugin_id": step_plugin_id,
+                                "name": step_plugin.name or step_plugin_id,
+                                "image": step_plugin.container_image,
+                                "command_template": tmpl,
+                            })
+                if workflow_step_info:
                     logger.info(
-                        "Workflow %s: chained %d step command templates",
-                        spec.pipeline_name, len(step_templates),
+                        "Workflow %s: %d steps with separate containers",
+                        spec.pipeline_name, len(workflow_step_info),
                     )
             else:
                 plugin = registry.get_plugin(spec.plugin_id) if spec.plugin_id else None
@@ -228,7 +228,9 @@ class SLURMBackend(ExecutionBackend):
             logger.debug(f"Could not load plugin registry for command template: {e}")
 
         # Generate and upload sbatch script
-        sbatch_script = self._generate_sbatch_script(spec, job_id, job_dir, command_template)
+        sbatch_script = self._generate_sbatch_script(
+            spec, job_id, job_dir, command_template, workflow_step_info,
+        )
         script_path = f"{job_dir}/scripts/run.sh"
         self._ssh.write_file(script_path, sbatch_script, mode=0o755)
 
@@ -249,6 +251,18 @@ class SLURMBackend(ExecutionBackend):
             "workflow_id": spec.workflow_id,
         }, indent=2)
         self._ssh.write_file(f"{job_dir}/scripts/job_spec.json", spec_json)
+
+        # Upload stats_converter.py for post-container CSV generation
+        try:
+            converter_path = Path(__file__).parent.parent / "services" / "stats_converter.py"
+            if converter_path.exists():
+                self._ssh.write_file(
+                    f"{job_dir}/scripts/stats_converter.py",
+                    converter_path.read_text(encoding="utf-8"),
+                )
+                logger.debug("Uploaded stats_converter.py to HPC for job %s", job_id[:8])
+        except Exception as e:
+            logger.debug("Could not upload stats_converter.py: %s", e)
 
         # Submit via sbatch
         try:
@@ -321,6 +335,8 @@ class SLURMBackend(ExecutionBackend):
                 check=False,
             )
             status_str = stdout.strip().split("+")[0]  # Handle "CANCELLED+" etc.
+            if " " in status_str:
+                status_str = status_str.split()[0]  # Handle "CANCELLED by UID"
             if status_str:
                 return self._parse_slurm_status(status_str)
         except Exception as e:
@@ -718,30 +734,98 @@ class SLURMBackend(ExecutionBackend):
         Mirrors the smart name-matching logic used by the local Docker backend:
         match each input file against the plugin's expected input keys, then
         create a symlink named {key}{ext} (e.g. T1w.nii.gz).
+
+        When a directory is submitted but the plugin expects file-type inputs
+        (e.g. T1w of type nifti), the directory is also searched for matching
+        files (flat + BIDS ses-*/anat/ layout) and those are symlinked too.
+        This means *every* plugin that expects T1w.nii.gz automatically works
+        with folder input, without needing custom bash detection in the
+        command template.
         """
         input_files = spec.input_files or []
         if not input_files:
             return
 
+        # expected_inputs: list of (key, type) tuples for non-scalar inputs
+        expected_inputs: list[tuple[str, str]] = []
         expected_names: list[str] = []
         try:
             from backend.core.plugin_registry import get_plugin_workflow_registry
             registry = get_plugin_workflow_registry()
-            plugin = registry.get_plugin(spec.plugin_id) if spec.plugin_id else None
-            if plugin:
-                for inp in plugin.inputs_required:
+
+            plugin_ids_to_check: list[str] = []
+            if spec.plugin_id:
+                plugin_ids_to_check.append(spec.plugin_id)
+            else:
+                workflow_steps = spec.parameters.get("_workflow_steps", [])
+                if workflow_steps:
+                    plugin_ids_to_check.extend(workflow_steps)
+
+            workflow_id = spec.parameters.get("_workflow_id", "")
+            if workflow_id:
+                wf = registry.get_workflow(workflow_id)
+                if wf and hasattr(wf, "inputs_required"):
+                    for inp in wf.inputs_required:
+                        if isinstance(inp, dict):
+                            key, inp_type = inp.get("key", ""), inp.get("type", "")
+                        else:
+                            key, inp_type = getattr(inp, "key", ""), getattr(inp, "type", "")
+                        if key and inp_type not in ("string", "int", "float", "bool"):
+                            if key not in expected_names:
+                                expected_names.append(key)
+                                expected_inputs.append((key, inp_type))
+
+            for pid in plugin_ids_to_check:
+                plugin = registry.get_plugin(pid)
+                if not plugin:
+                    continue
+                all_inputs = list(plugin.inputs_required or [])
+                if hasattr(plugin, "inputs_optional") and plugin.inputs_optional:
+                    all_inputs.extend(plugin.inputs_optional)
+                for inp in all_inputs:
                     if isinstance(inp, dict):
                         key, inp_type = inp.get("key", ""), inp.get("type", "")
                     else:
                         key, inp_type = getattr(inp, "key", ""), getattr(inp, "type", "")
                     if key and inp_type not in ("string", "int", "float", "bool"):
-                        expected_names.append(key)
+                        if key not in expected_names:
+                            expected_names.append(key)
+                            expected_inputs.append((key, inp_type))
         except Exception as e:
             logger.debug("Could not resolve expected input names: %s", e)
 
         def _stem_lower(name: str) -> str:
             n = name.lower()
             return n[:-7] if n.endswith(".nii.gz") else PurePosixPath(n).stem
+
+        # Check which inputs are directories (remote first, then local fallback)
+        input_is_dir: dict[int, bool] = {}
+        input_is_local: dict[int, bool] = {}
+        for idx, input_file in enumerate(input_files):
+            try:
+                exit_code, stdout, _ = self._ssh.execute(
+                    f'test -e "{input_file}" && (test -d "{input_file}" && echo DIR || echo FILE) || echo MISSING',
+                    timeout=5,
+                )
+                result = stdout.strip()
+                if result == "MISSING":
+                    local_path = Path(input_file)
+                    if local_path.exists():
+                        input_is_local[idx] = True
+                        input_is_dir[idx] = local_path.is_dir()
+                        logger.info(
+                            "Input %s not found on remote; exists locally, will upload",
+                            input_file,
+                        )
+                    else:
+                        input_is_local[idx] = False
+                        input_is_dir[idx] = False
+                else:
+                    input_is_local[idx] = False
+                    input_is_dir[idx] = result == "DIR"
+            except Exception:
+                input_is_local[idx] = False
+                input_is_dir[idx] = False
 
         # Name-based matching
         matched: dict[int, str] = {}
@@ -756,26 +840,29 @@ class SLURMBackend(ExecutionBackend):
                     unmatched.remove(idx)
                     break
 
+        # For unmatched directory inputs, prefer directory-type keys
         remaining = [n for n in expected_names if n not in matched.values()]
+        dir_keys = [n for n in remaining if "dir" in n.lower()]
+        file_keys = [n for n in remaining if "dir" not in n.lower()]
+
         for idx in list(unmatched):
-            if remaining:
+            if input_is_dir.get(idx) and dir_keys:
+                matched[idx] = dir_keys.pop(0)
+                unmatched.remove(idx)
+            elif not input_is_dir.get(idx) and file_keys:
+                matched[idx] = file_keys.pop(0)
+                unmatched.remove(idx)
+            elif remaining:
                 matched[idx] = remaining.pop(0)
                 unmatched.remove(idx)
+
+        staged_keys: set[str] = set()
+        dir_inputs_staged: list[str] = []
 
         for i, input_file in enumerate(input_files):
             p = PurePosixPath(input_file)
             container_name = matched.get(i)
-
-            # For directories (BIDS dirs etc.), symlink with the matched key name
-            # or original directory name (no extension needed)
-            is_dir = False
-            try:
-                exit_code, stdout, _ = self._ssh.execute(
-                    f'test -d "{input_file}" && echo DIR || echo FILE', timeout=5
-                )
-                is_dir = stdout.strip() == "DIR"
-            except Exception:
-                pass
+            is_dir = input_is_dir.get(i, False)
 
             if is_dir:
                 link_name = container_name or p.name
@@ -784,17 +871,129 @@ class SLURMBackend(ExecutionBackend):
                 link_name = f"{container_name or p.stem}{ext}"
 
             link_path = f"{job_dir}/inputs/{link_name}"
-            try:
-                self._ssh_exec(
-                    f'ln -sf "{input_file}" "{link_path}"', check=False
-                )
-                logger.info("Staged input: %s -> %s (%s)", p.name, link_name, "dir" if is_dir else "file")
-            except Exception as e:
-                logger.warning("Could not symlink input %s: %s", input_file, e)
 
-            # For BIDS directory inputs, ensure dataset_description.json exists
+            if input_is_local.get(i, False):
+                try:
+                    local_path = Path(input_file)
+                    if is_dir:
+                        self._upload_directory(str(local_path), link_path)
+                    else:
+                        self._ssh.put_file(str(local_path), link_path)
+                    logger.info("Uploaded local input: %s -> %s (%s)", p.name, link_name, "dir" if is_dir else "file")
+                    if container_name:
+                        staged_keys.add(container_name)
+                    if is_dir:
+                        dir_inputs_staged.append(link_path)
+                except Exception as e:
+                    logger.warning("Could not upload local input %s: %s", input_file, e)
+            else:
+                try:
+                    self._ssh_exec(
+                        f'ln -sf "{input_file}" "{link_path}"', check=False
+                    )
+                    logger.info("Staged input: %s -> %s (%s)", p.name, link_name, "dir" if is_dir else "file")
+                    if container_name:
+                        staged_keys.add(container_name)
+                    if is_dir:
+                        dir_inputs_staged.append(input_file)
+                except Exception as e:
+                    logger.warning("Could not symlink input %s: %s", input_file, e)
+
             if is_dir and container_name and "bids" in container_name.lower():
-                self._ensure_bids_description(input_file)
+                bids_path = link_path if input_is_local.get(i, False) else input_file
+                self._ensure_bids_description(bids_path)
+
+        # Auto-resolve file-type inputs from staged directories.
+        # If plugin expects e.g. T1w (nifti) but user submitted a directory,
+        # search the directory for the matching file and symlink it directly.
+        if dir_inputs_staged:
+            nifti_keys = [
+                (k, t) for k, t in expected_inputs
+                if t in ("nifti", "nifti_gz") and k not in staged_keys
+            ]
+            if nifti_keys:
+                for dir_path in dir_inputs_staged:
+                    for key, _ in list(nifti_keys):
+                        found = self._find_nifti_in_dir(dir_path, key)
+                        if found:
+                            ext = ".nii.gz" if found.endswith(".nii.gz") else ".nii"
+                            link_path = f"{job_dir}/inputs/{key}{ext}"
+                            try:
+                                self._ssh_exec(
+                                    f'ln -sf "{found}" "{link_path}"', check=False
+                                )
+                                logger.info(
+                                    "Auto-resolved %s from directory: %s",
+                                    key, PurePosixPath(found).name,
+                                )
+                                staged_keys.add(key)
+                                nifti_keys = [(k, t) for k, t in nifti_keys if k != key]
+                            except Exception as e:
+                                logger.warning("Could not symlink auto-resolved %s: %s", key, e)
+
+    # File patterns for BIDS-aware NIfTI detection by modality key.
+    # Each key maps to (glob_patterns, exclusion_substrings).
+    _NIFTI_SEARCH_PATTERNS: dict[str, tuple[list[str], list[str]]] = {
+        "T1w":   (["*T1w*.nii.gz", "*T1w*.nii"], ["label-lesion", "_roi."]),
+        "T2w":   (["*T2w*.nii.gz", "*T2w*.nii"], ["T2starw", "label-lesion", "_roi."]),
+        "FLAIR": (["*FLAIR*.nii.gz", "*flair*.nii.gz", "*FLAIR*.nii", "*flair*.nii"], ["label-lesion", "_roi."]),
+    }
+
+    def _find_nifti_in_dir(self, dir_path: str, key: str) -> Optional[str]:
+        """Search a directory for a NIfTI file matching a modality key.
+
+        Uses a two-pass strategy:
+          1. Flat: look directly in dir_path
+          2. BIDS: look in dir_path/ses-*/anat/
+
+        Returns the absolute path of the first match, or None.
+        """
+        patterns, exclusions = self._NIFTI_SEARCH_PATTERNS.get(
+            key, ([f"*{key}*.nii.gz", f"*{key}*.nii", "*.nii.gz", "*.nii"], ["label-lesion", "_roi."])
+        )
+        excl_grep = "|".join(exclusions) if exclusions else "NOMATCH"
+
+        # Build a find command that searches flat first, then BIDS ses-*/anat/
+        search_dirs = [f'"{dir_path}"']
+        # Also search immediate subdirectories named anat (e.g., dir_path/anat/)
+        search_dirs.append(f'"{dir_path}/anat"')
+        # BIDS session layout: ses-*/anat/
+        search_dirs.append(f'"{dir_path}"/ses-*/anat')
+
+        for search_dir in search_dirs:
+            for pattern in patterns:
+                cmd = (
+                    f'shopt -s nullglob 2>/dev/null; '
+                    f'for f in {search_dir}/{pattern}; do '
+                    f'  basename "$f" | grep -qiE "{excl_grep}" || {{ echo "$f"; break; }}; '
+                    f'done'
+                )
+                try:
+                    exit_code, stdout, _ = self._ssh.execute(cmd, timeout=10)
+                    result = stdout.strip()
+                    if result and exit_code == 0:
+                        first_line = result.split("\n")[0].strip()
+                        if first_line:
+                            logger.debug("_find_nifti_in_dir: %s matched %s in %s", key, first_line, search_dir)
+                            return first_line
+                except Exception:
+                    continue
+        return None
+
+    def _upload_directory(self, local_dir: str, remote_dir: str) -> None:
+        """Recursively upload a local directory to the remote host via SFTP."""
+        local_path = Path(local_dir)
+        self._ssh_exec(f'mkdir -p "{remote_dir}"', check=False)
+        for item in local_path.rglob("*"):
+            relative = item.relative_to(local_path)
+            remote_target = f"{remote_dir}/{relative}"
+            if item.is_dir():
+                self._ssh_exec(f'mkdir -p "{remote_target}"', check=False)
+            elif item.is_file():
+                try:
+                    self._ssh.put_file(str(item), remote_target)
+                except Exception as e:
+                    logger.warning("Failed to upload %s: %s", item, e)
 
     def _ensure_bids_description(self, bids_dir: str) -> None:
         """Create a minimal dataset_description.json if missing from a BIDS dir."""
@@ -906,6 +1105,7 @@ class SLURMBackend(ExecutionBackend):
         job_id: str,
         job_dir: str,
         command_template: str = "",
+        workflow_steps: Optional[List[dict]] = None,
     ) -> str:
         """Generate SLURM batch script.
 
@@ -914,6 +1114,8 @@ class SLURMBackend(ExecutionBackend):
         2. Loads required environment modules
         3. Runs the pipeline inside Singularity/Apptainer
         4. Captures output and logs
+
+        For workflows, each step runs in its own container image.
         """
         res = spec.resources
         safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", spec.pipeline_name[:20])
@@ -982,11 +1184,29 @@ class SLURMBackend(ExecutionBackend):
         lines.append(f"mkdir -p {job_dir}/outputs/native {job_dir}/outputs/bundle {job_dir}/outputs/logs")
         lines.append("")
 
+        # Build per-item input bind mounts to avoid Singularity nested-mount issues.
+        # Symlinks in inputs/ point to host paths invisible inside the container,
+        # so we mount each item individually instead of the parent directory.
+        lines.append("# Build per-item input bind mounts (resolves symlinks)")
+        lines.append('INPUT_BINDS=""')
+        lines.append(f'for item in {job_dir}/inputs/*; do')
+        lines.append('  [ -e "$item" ] || [ -L "$item" ] || continue')
+        lines.append('  name=$(basename "$item")')
+        lines.append('  if [ -L "$item" ]; then')
+        lines.append('    target=$(readlink -f "$item")')
+        lines.append('    INPUT_BINDS="$INPUT_BINDS --bind $target:/data/inputs/$name:ro"')
+        lines.append('    echo "Input (resolved symlink): $target -> /data/inputs/$name"')
+        lines.append('  else')
+        lines.append(f'    INPUT_BINDS="$INPUT_BINDS --bind $item:/data/inputs/$name:ro"')
+        lines.append('    echo "Input (direct): $item -> /data/inputs/$name"')
+        lines.append('  fi')
+        lines.append('done')
+        lines.append("")
+
         # Build container command
         image = spec.container_image
 
         bind_mounts = [
-            f"{job_dir}/inputs:/data/inputs:ro",
             f"{job_dir}/outputs:/data/outputs:rw",
         ]
 
@@ -1037,15 +1257,101 @@ class SLURMBackend(ExecutionBackend):
         binds_str = " ".join(f"--bind {b}" for b in bind_mounts)
         envs_str = " ".join(f"--env {k}={v}" for k, v in container_envs.items())
 
-        if command_template:
-            cmd_script = command_template
-            all_params = self._resolve_all_params(spec)
-            dangerous_chars = set(";|&`$(){}!><\n\r")
+        all_params = self._resolve_all_params(spec)
+        dangerous_chars = set(";|&`$(){}!><\n\r")
+
+        def _substitute_params(template: str) -> str:
+            result = template
             for key, value in all_params.items():
                 if not str(key).startswith("_"):
                     safe_val = "".join(c for c in str(value) if c not in dangerous_chars)
-                    cmd_script = cmd_script.replace(f"{{{key}}}", safe_val)
-                    cmd_script = cmd_script.replace(f"${{{key}}}", safe_val)
+                    result = result.replace(f"{{{key}}}", safe_val)
+                    result = result.replace(f"${{{key}}}", safe_val)
+            return result
+
+        # Map of plugin_id -> container output path (populated during step iteration)
+        _step_output_paths: dict[str, str] = {}
+
+        # Known output paths for each plugin (host-side, relative to job_dir/outputs)
+        _PLUGIN_OUTPUT_DIRS = {
+            "qsiprep":       "native/qsiprep",
+            "qsirecon":      "native/qsirecon",
+            "fmriprep":      "native/fmriprep",
+            "xcpd":          "native/xcpd",
+            "freesurfer_recon":             "native/freesurfer/SUBJECTS_DIR",
+            "freesurfer_autorecon_volonly":  "native/freesurfer/SUBJECTS_DIR",
+            "freesurfer_longitudinal":      "native/freesurfer/SUBJECTS_DIR",
+            "fastsurfer":    "native/fastsurfer",
+        }
+
+        if workflow_steps:
+            # ---- Workflow: run each step in its own container ----
+            total = len(workflow_steps)
+            lines.append("PIPELINE_EXIT=0")
+            lines.append("")
+
+            for step_idx, step in enumerate(workflow_steps):
+                step_num = step_idx + 1
+                step_image = step["image"]
+                step_name = step["name"]
+                step_pid = step["plugin_id"]
+
+                cmd_script = _substitute_params(step["command_template"])
+
+                # Build extra bind mounts for inter-step output chaining.
+                # Scan the command template for /data/inputs/{name} references and
+                # bind the matching previous step's output directory there.
+                step_extra_binds = ""
+                if step_idx > 0:
+                    for prev_step in workflow_steps[:step_idx]:
+                        prev_pid = prev_step["plugin_id"]
+                        host_out = _PLUGIN_OUTPUT_DIRS.get(prev_pid)
+                        if not host_out:
+                            continue
+                        full_host_path = f"{job_dir}/outputs/{host_out}"
+                        # Check all /data/inputs/XXX references in the command
+                        for m in re.finditer(r'/data/inputs/(\w+)', cmd_script):
+                            input_name = m.group(1)
+                            container_input = f"/data/inputs/{input_name}"
+                            # Match if the input name contains the plugin name or derivatives suffix
+                            if (prev_pid in input_name
+                                    or input_name.replace("_derivatives", "") == prev_pid
+                                    or input_name == "subjects_dir"
+                                    or input_name == "freesurfer_subjects_dir"):
+                                step_extra_binds += f" --bind {full_host_path}:{container_input}:ro"
+                                logger.info(
+                                    "Workflow step %d: bind previous output %s -> %s",
+                                    step_num, full_host_path, container_input,
+                                )
+                                break
+
+                # Record this step's output path for downstream steps
+                if step_pid in _PLUGIN_OUTPUT_DIRS:
+                    _step_output_paths[step_pid] = f"{job_dir}/outputs/{_PLUGIN_OUTPUT_DIRS[step_pid]}"
+
+                lines.append(f'# ---- Workflow step {step_num}/{total}: {step_name} ----')
+                lines.append(f'if [ $PIPELINE_EXIT -eq 0 ]; then')
+                lines.append(f'echo "=== WORKFLOW STEP {step_num}/{total}: {step_name} ==="')
+                lines.append(f"cat > {job_dir}/scripts/step_{step_num}_cmd.sh << 'NI_STEP_{step_num}_EOF'")
+                lines.append(cmd_script)
+                lines.append(f"NI_STEP_{step_num}_EOF")
+                lines.append(f"chmod +x {job_dir}/scripts/step_{step_num}_cmd.sh")
+                lines.append("set +e")
+                lines.append(
+                    f"$CONTAINER_RT exec {envs_str} {binds_str} $INPUT_BINDS{step_extra_binds} "
+                    f"--bind {job_dir}/scripts/step_{step_num}_cmd.sh:/run_pipeline.sh:ro "
+                    f"docker://{step_image} "
+                    f"bash /run_pipeline.sh 2>&1 | tee {job_dir}/outputs/logs/step_{step_num}_{step_pid}.log"
+                )
+                lines.append('PIPELINE_EXIT=${PIPESTATUS[0]}')
+                lines.append("set -e")
+                lines.append(f'echo "Step {step_num} ({step_name}) exited with code $PIPELINE_EXIT"')
+                lines.append('fi')
+                lines.append("")
+
+        elif command_template:
+            # ---- Single plugin: one container ----
+            cmd_script = _substitute_params(command_template)
 
             lines.append("# Write pipeline command script")
             lines.append(f"cat > {job_dir}/scripts/pipeline_cmd.sh << 'NEUROINSIGHT_CMD_EOF'")
@@ -1054,21 +1360,55 @@ class SLURMBackend(ExecutionBackend):
             lines.append(f"chmod +x {job_dir}/scripts/pipeline_cmd.sh")
             lines.append("")
             lines.append(f"# Run pipeline in container")
+            lines.append("set +e")
             lines.append(
-                f"$CONTAINER_RT exec {envs_str} {binds_str} "
+                f"$CONTAINER_RT exec {envs_str} {binds_str} $INPUT_BINDS "
                 f"--bind {job_dir}/scripts/pipeline_cmd.sh:/run_pipeline.sh:ro "
                 f"docker://{image} "
                 f"bash /run_pipeline.sh 2>&1 | tee {job_dir}/outputs/logs/container.log"
             )
+            lines.append('PIPELINE_EXIT=${PIPESTATUS[0]}')
+            lines.append("set -e")
         else:
             lines.append(f"# Run container (default command)")
+            lines.append("set +e")
             lines.append(
                 f"$CONTAINER_RT run {envs_str} {binds_str} "
                 f"docker://{image} 2>&1 | tee {job_dir}/outputs/logs/container.log"
             )
+            lines.append('PIPELINE_EXIT=${PIPESTATUS[0]}')
+            lines.append("set -e")
 
         lines.append("")
-        lines.append('echo "NeuroInsight job completed with exit code $?"')
+        lines.append('echo "Pipeline exited with code $PIPELINE_EXIT"')
+        lines.append("")
+
+        # Post-container: generate stats CSVs if converter is available
+        lines.append("# Post-processing: generate stats CSVs")
+        lines.append(f'CONVERTER="{job_dir}/scripts/stats_converter.py"')
+        lines.append(f'OUTPUT_DIR="{job_dir}/outputs"')
+        pipeline_name_escaped = spec.pipeline_name.replace("'", "'\\''")
+        lines.append('if [ -f "$CONVERTER" ] && command -v python3 &>/dev/null; then')
+        lines.append('  echo "Generating stats CSVs..."')
+        lines.append("  python3 << 'NI_STATS_EOF'")
+        lines.append(f'import sys; sys.path.insert(0, "{job_dir}/scripts")')
+        lines.append('from stats_converter import FileProvider, generate_stats_csvs')
+        lines.append('from pathlib import Path')
+        lines.append(f'fp = FileProvider(local_dir="{job_dir}/outputs")')
+        lines.append(f'sheets = generate_stats_csvs("{pipeline_name_escaped}", fp)')
+        lines.append('if sheets:')
+        lines.append(f'    csv_dir = Path("{job_dir}/outputs/bundle/csv")')
+        lines.append('    csv_dir.mkdir(parents=True, exist_ok=True)')
+        lines.append('    for s in sheets:')
+        lines.append('        (csv_dir / s.filename).write_text(s.to_csv_string())')
+        lines.append('    print(f"Generated {len(sheets)} stats CSVs")')
+        lines.append('else:')
+        lines.append('    print("No stats to convert")')
+        lines.append('NI_STATS_EOF')
+        lines.append('fi')
+        lines.append("")
+        lines.append('echo "NeuroInsight job completed with exit code $PIPELINE_EXIT"')
+        lines.append('exit $PIPELINE_EXIT')
         lines.append("")
 
         return "\n".join(lines)

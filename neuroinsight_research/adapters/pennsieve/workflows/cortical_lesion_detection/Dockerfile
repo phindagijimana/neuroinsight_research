@@ -13,6 +13,9 @@ ENV FREESURFER_HOME=/usr/local/freesurfer
 ENV PATH="${FREESURFER_HOME}/bin:${PATH}"
 ENV SUBJECTS_DIR=/data/output/subjects
 
+COPY shared/detect_inputs.sh /shared/detect_inputs.sh
+RUN chmod +x /shared/detect_inputs.sh
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
