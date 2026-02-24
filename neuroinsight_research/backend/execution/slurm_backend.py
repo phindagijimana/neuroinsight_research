@@ -1118,14 +1118,48 @@ class SLURMBackend(ExecutionBackend):
         For workflows, each step runs in its own container image.
         """
         res = spec.resources
+
+        # For workflows, compute resource requirements from step plugins
+        # to avoid under-allocating (e.g., 6h default vs 28h needed).
+        effective_time = res.time_hours
+        effective_mem = res.memory_gb
+        effective_cpus = res.cpus
+        if workflow_steps:
+            try:
+                from backend.core.plugin_registry import get_plugin_workflow_registry
+                registry = get_plugin_workflow_registry()
+                total_time = 0
+                max_mem = res.memory_gb
+                max_cpus = res.cpus
+                for step in workflow_steps:
+                    step_plugin = registry.get_plugin(step["plugin_id"])
+                    if step_plugin and step_plugin.resource_profiles:
+                        default_res = step_plugin.resource_profiles.get("default", {})
+                        if isinstance(default_res, dict):
+                            total_time += default_res.get("time_hours", 0)
+                            max_mem = max(max_mem, default_res.get("mem_gb", 0))
+                            max_cpus = max(max_cpus, default_res.get("cpus", 0))
+                if total_time > effective_time:
+                    logger.info(
+                        "Workflow resource override: time %dh->%dh (sum of steps)",
+                        effective_time, total_time,
+                    )
+                    effective_time = total_time
+                if max_mem > effective_mem:
+                    effective_mem = max_mem
+                if max_cpus > effective_cpus:
+                    effective_cpus = max_cpus
+            except Exception as e:
+                logger.debug("Could not compute workflow resources from steps: %s", e)
+
         safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", spec.pipeline_name[:20])
         lines = [
             "#!/bin/bash",
             f"#SBATCH --job-name=ni-{safe_name}-{job_id[:8]}",
             f"#SBATCH --partition={self.partition}",
-            f"#SBATCH --mem={res.memory_gb}G",
-            f"#SBATCH --cpus-per-task={res.cpus}",
-            f"#SBATCH --time={res.time_hours}:00:00",
+            f"#SBATCH --mem={effective_mem}G",
+            f"#SBATCH --cpus-per-task={effective_cpus}",
+            f"#SBATCH --time={effective_time}:00:00",
             f"#SBATCH --output={job_dir}/logs/slurm-%j.out",
             f"#SBATCH --error={job_dir}/logs/slurm-%j.err",
         ]
@@ -1335,6 +1369,7 @@ class SLURMBackend(ExecutionBackend):
                 # Scan the command template for /data/inputs/{name} references and
                 # bind the matching previous step's output directory there.
                 step_extra_binds = ""
+                step_override_names: list[str] = []
                 if step_idx > 0:
                     for prev_step in workflow_steps[:step_idx]:
                         prev_pid = prev_step["plugin_id"]
@@ -1342,16 +1377,15 @@ class SLURMBackend(ExecutionBackend):
                         if not host_out:
                             continue
                         full_host_path = f"{job_dir}/outputs/{host_out}"
-                        # Check all /data/inputs/XXX references in the command
                         for m in re.finditer(r'/data/inputs/(\w+)', cmd_script):
                             input_name = m.group(1)
                             container_input = f"/data/inputs/{input_name}"
-                            # Match if the input name contains the plugin name or derivatives suffix
                             if (prev_pid in input_name
                                     or input_name.replace("_derivatives", "") == prev_pid
                                     or input_name == "subjects_dir"
                                     or input_name == "freesurfer_subjects_dir"):
                                 step_extra_binds += f" --bind {full_host_path}:{container_input}:ro"
+                                step_override_names.append(input_name)
                                 logger.info(
                                     "Workflow step %d: bind previous output %s -> %s",
                                     step_num, full_host_path, container_input,
@@ -1362,6 +1396,32 @@ class SLURMBackend(ExecutionBackend):
                 if step_pid in _PLUGIN_OUTPUT_DIRS:
                     _step_output_paths[step_pid] = f"{job_dir}/outputs/{_PLUGIN_OUTPUT_DIRS[step_pid]}"
 
+                # If this step overrides input names via inter-step binds,
+                # build a filtered INPUT_BINDS that skips conflicting names.
+                if step_override_names:
+                    skip_var = f"STEP_{step_num}_SKIP"
+                    input_var = f"STEP_{step_num}_INPUT_BINDS"
+                    skip_list = " ".join(step_override_names)
+                    lines.append(f'# Filter INPUT_BINDS for step {step_num} (skip names overridden by inter-step binds)')
+                    lines.append(f'{skip_var}="{skip_list}"')
+                    lines.append(f'{input_var}=""')
+                    lines.append(f'for item in {job_dir}/inputs/*; do')
+                    lines.append(f'  [ -e "$item" ] || [ -L "$item" ] || continue')
+                    lines.append(f'  name=$(basename "$item")')
+                    lines.append(f'  _skip=0; for _s in ${skip_var}; do [ "$name" = "$_s" ] && _skip=1 && break; done')
+                    lines.append(f'  [ $_skip -eq 1 ] && continue')
+                    lines.append(f'  if [ -L "$item" ]; then')
+                    lines.append(f'    target=$(readlink -f "$item")')
+                    lines.append(f'    {input_var}="${input_var} --bind $target:/data/inputs/$name:ro"')
+                    lines.append(f'  else')
+                    lines.append(f'    {input_var}="${input_var} --bind $item:/data/inputs/$name:ro"')
+                    lines.append(f'  fi')
+                    lines.append(f'done')
+                    lines.append("")
+                    input_binds_ref = f"${input_var}"
+                else:
+                    input_binds_ref = "$INPUT_BINDS"
+
                 lines.append(f'# ---- Workflow step {step_num}/{total}: {step_name} ----')
                 lines.append(f'if [ $PIPELINE_EXIT -eq 0 ]; then')
                 lines.append(f'echo "=== WORKFLOW STEP {step_num}/{total}: {step_name} ==="')
@@ -1371,7 +1431,7 @@ class SLURMBackend(ExecutionBackend):
                 lines.append(f"chmod +x {job_dir}/scripts/step_{step_num}_cmd.sh")
                 lines.append("set +e")
                 lines.append(
-                    f"$CONTAINER_RT exec --writable-tmpfs {envs_str} {binds_str} $INPUT_BINDS{step_extra_binds} "
+                    f"$CONTAINER_RT exec --writable-tmpfs {envs_str} {binds_str} {input_binds_ref}{step_extra_binds} "
                     f"--bind {job_dir}/scripts/step_{step_num}_cmd.sh:/run_pipeline.sh:ro "
                     f"docker://{step_image} "
                     f"bash /run_pipeline.sh 2>&1 | tee {job_dir}/outputs/logs/step_{step_num}_{step_pid}.log"

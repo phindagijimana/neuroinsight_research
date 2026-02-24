@@ -25,6 +25,8 @@ NIIVUE_ORIENTATION="${NIIVUE_ORIENTATION:-coronal}"
 
 mkdir -p "$BUNDLE_ROOT"
 
+export PYTHONPATH=/app:${PYTHONPATH:-}
+
 echo "Running HS Detection Postprocess for subject: $SUBJECT_ID"
 
 python -m neuroinsight_hs.postprocess \

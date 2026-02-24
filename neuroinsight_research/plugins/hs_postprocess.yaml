@@ -127,6 +127,7 @@ execution:
         export BUNDLE_ROOT=/data/outputs/bundle
         mkdir -p $BUNDLE_ROOT/metrics $BUNDLE_ROOT/reports $BUNDLE_ROOT/qc/hs $BUNDLE_ROOT/viewer $BUNDLE_ROOT/volumes $BUNDLE_ROOT/labels
 
+        export PYTHONPATH=/app:${PYTHONPATH:-}
         python -m neuroinsight_hs.postprocess \
           --subject-id "{subject_id}" \
           --subjects-dir "$SUBJECTS_DIR" \
