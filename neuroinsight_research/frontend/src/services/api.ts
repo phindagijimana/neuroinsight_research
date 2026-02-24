@@ -420,7 +420,7 @@ export const apiService = {
    * Lightweight endpoint optimised for frequent polling.
    */
   async getJobsProgress(): Promise<{ id: string; status: string; progress: number; current_phase: string | null }[]> {
-    const response = await api.get('/api/jobs/progress');
+    const response = await api.get('/api/jobs/progress', { timeout: 20000 });
     return response.data.jobs;
   },
 
@@ -746,9 +746,11 @@ export const apiService = {
   /** Connect to an external data platform. */
   async platformConnect(
     platform: string,
-    credentials: Record<string, string>
+    credentials: Record<string, any>
   ): Promise<{ connected: boolean; user?: string; workspace?: string; platform: string }> {
-    const resp = await api.post(`/api/platforms/${platform}/connect`, credentials);
+    const resp = await api.post(`/api/platforms/${platform}/connect`, credentials, {
+      timeout: 25000,
+    });
     return resp.data;
   },
 

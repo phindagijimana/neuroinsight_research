@@ -1,4 +1,4 @@
-FROM neuroinsight/hs-postprocess:1.0.0
+FROM phindagijimana321/hs-postprocess:1.0.0
 
 LABEL maintainer="NeuroInsight Research"
 LABEL description="HS Detection Postprocess utility adapter for Pennsieve"

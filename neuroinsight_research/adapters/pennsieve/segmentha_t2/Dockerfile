@@ -1,4 +1,4 @@
-FROM freesurfer/freesurfer:7.4.1
+FROM phindagijimana321/freesurfer-mcr:7.4.1
 
 LABEL maintainer="NeuroInsight Research"
 LABEL description="FreeSurfer SegmentHA_T2 adapter for Pennsieve"

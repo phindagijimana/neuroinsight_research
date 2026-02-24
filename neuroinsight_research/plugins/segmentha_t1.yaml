@@ -23,8 +23,8 @@ references:
 
 container:
   runtime: docker
-  image: "freesurfer/freesurfer:7.4.1"
-  digest: "sha256:10b6468cbd9fcd2db3708f4651d59ad75d4da849a2c5d8bb6dba217f08b8c46b"
+  image: "phindagijimana321/freesurfer-mcr:7.4.1"
+  digest: "sha256:a0e43e718cb0b4489810f5d366cfbbe70aaa355015800db81a848ffea8265be9"
 
 inputs:
   required:

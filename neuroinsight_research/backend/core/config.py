@@ -194,6 +194,12 @@ class Settings(BaseSettings):
         description="Path to MELD Graph license ON the HPC filesystem (not local). "
                     "Falls back to meld_license_path if unset.",
     )
+    hpc_mcr_path: Optional[str] = Field(
+        default=None,
+        description="Path to Matlab Compiler Runtime (MCRv97) ON the HPC filesystem. "
+                    "Required for FreeSurfer hippocampal/amygdala segmentation (segmentHA). "
+                    "Auto-detected from ~/freesurfer_mcr/MCRv97 if not set.",
+    )
 
     # -- Platform Integration --
     pennsieve_api_url: str = Field(

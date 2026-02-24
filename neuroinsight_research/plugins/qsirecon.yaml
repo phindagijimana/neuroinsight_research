@@ -64,9 +64,22 @@ input_format:
 parameters:
   - name: recon_spec
     type: choice
-    default: mrtrix_multishell_msmt
-    choices: ["mrtrix_multishell_msmt", "mrtrix_singleshell_ss3t", "dipy_dki", "dipy_mapmri", "csd"]
-    description: "Reconstruction pipeline specification"
+    default: mrtrix_multishell_msmt_noACT
+    choices:
+      - mrtrix_multishell_msmt_noACT
+      - mrtrix_multishell_msmt_ACT-fast
+      - mrtrix_multishell_msmt_ACT-hsvs
+      - mrtrix_singleshell_ss3t_noACT
+      - mrtrix_singleshell_ss3t_ACT-fast
+      - mrtrix_singleshell_ss3t_ACT-hsvs
+      - dipy_dki
+      - dipy_mapmri
+      - dipy_3dshore
+      - dsi_studio_gqi
+      - dsi_studio_autotrack
+      - amico_noddi
+      - reorient_fslstd
+    description: "Reconstruction pipeline specification (prepackaged QSIRecon spec)"
 
 resources:
   profiles:

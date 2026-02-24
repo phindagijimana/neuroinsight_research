@@ -22,8 +22,8 @@ authors:
 
 container:
   runtime: docker
-  image: "neuroinsight/hs-postprocess:1.0.0"
-  digest: null
+  image: "phindagijimana321/hs-postprocess:1.0.0"
+  digest: "sha256:982ccb4052130b6df57db1770e77ccb50ba4e74b90035d7e60d54800869e196b"
 
 inputs:
   required:

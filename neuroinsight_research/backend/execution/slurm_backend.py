@@ -1251,6 +1251,39 @@ class SLURMBackend(ExecutionBackend):
                         meld_hpc = None
             if meld_hpc:
                 bind_mounts.append(f"{meld_hpc}:/run/secrets/meld_license.txt:ro")
+
+            # Matlab Compiler Runtime -- optional host-side override for
+            # segmentHA_T1/T2.  MCR is baked into the freesurfer-mcr container
+            # image, so this bind-mount is purely an optimisation: if the HPC
+            # already has MCR on a shared filesystem, mounting it avoids
+            # pulling the larger container layer.
+            plugin_id = spec.parameters.get("_plugin_id", "")
+            needs_mcr = plugin_id in ("segmentha_t1", "segmentha_t2")
+            if not needs_mcr and workflow_steps:
+                needs_mcr = any(
+                    s.get("plugin_id") in ("segmentha_t1", "segmentha_t2")
+                    for s in workflow_steps
+                )
+            if needs_mcr:
+                mcr_path = settings.hpc_mcr_path
+                if not mcr_path:
+                    for candidate in [
+                        f"{self.work_dir}/freesurfer_mcr/MCRv97",
+                    ]:
+                        try:
+                            exit_code, out = self._ssh_exec(f"test -d {candidate} && echo yes || echo no")
+                            if exit_code == 0 and "yes" in out:
+                                mcr_path = candidate
+                                break
+                        except Exception:
+                            pass
+                if mcr_path:
+                    bind_mounts.append(f"{mcr_path}:/usr/local/freesurfer/MCRv97:ro")
+                    logger.info("MCR bind mount (host override): %s", mcr_path)
+                else:
+                    logger.info(
+                        "No host-side MCR found; using MCR from container image"
+                    )
         except Exception as e:
             logger.debug(f"Could not add license bind mounts: {e}")
 
@@ -1274,7 +1307,7 @@ class SLURMBackend(ExecutionBackend):
 
         # Known output paths for each plugin (host-side, relative to job_dir/outputs)
         _PLUGIN_OUTPUT_DIRS = {
-            "qsiprep":       "native/qsiprep",
+            "qsiprep":       "native/qsiprep/qsiprep",
             "qsirecon":      "native/qsirecon",
             "fmriprep":      "native/fmriprep",
             "xcpd":          "native/xcpd",
@@ -1338,7 +1371,7 @@ class SLURMBackend(ExecutionBackend):
                 lines.append(f"chmod +x {job_dir}/scripts/step_{step_num}_cmd.sh")
                 lines.append("set +e")
                 lines.append(
-                    f"$CONTAINER_RT exec {envs_str} {binds_str} $INPUT_BINDS{step_extra_binds} "
+                    f"$CONTAINER_RT exec --writable-tmpfs {envs_str} {binds_str} $INPUT_BINDS{step_extra_binds} "
                     f"--bind {job_dir}/scripts/step_{step_num}_cmd.sh:/run_pipeline.sh:ro "
                     f"docker://{step_image} "
                     f"bash /run_pipeline.sh 2>&1 | tee {job_dir}/outputs/logs/step_{step_num}_{step_pid}.log"
@@ -1362,7 +1395,7 @@ class SLURMBackend(ExecutionBackend):
             lines.append(f"# Run pipeline in container")
             lines.append("set +e")
             lines.append(
-                f"$CONTAINER_RT exec {envs_str} {binds_str} $INPUT_BINDS "
+                f"$CONTAINER_RT exec --writable-tmpfs {envs_str} {binds_str} $INPUT_BINDS "
                 f"--bind {job_dir}/scripts/pipeline_cmd.sh:/run_pipeline.sh:ro "
                 f"docker://{image} "
                 f"bash /run_pipeline.sh 2>&1 | tee {job_dir}/outputs/logs/container.log"
@@ -1373,7 +1406,7 @@ class SLURMBackend(ExecutionBackend):
             lines.append(f"# Run container (default command)")
             lines.append("set +e")
             lines.append(
-                f"$CONTAINER_RT run {envs_str} {binds_str} "
+                f"$CONTAINER_RT run --writable-tmpfs {envs_str} {binds_str} "
                 f"docker://{image} 2>&1 | tee {job_dir}/outputs/logs/container.log"
             )
             lines.append('PIPELINE_EXIT=${PIPESTATUS[0]}')
