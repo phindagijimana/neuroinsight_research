@@ -80,6 +80,10 @@ parameters:
       - amico_noddi
       - reorient_fslstd
     description: "Reconstruction pipeline specification (prepackaged QSIRecon spec)"
+  - name: atlases
+    type: string
+    default: "AAL116 Brainnetome246Ext Gordon333Ext 4S156Parcels 4S256Parcels"
+    description: "Space-separated list of atlases for connectivity estimation (AAL116, AICHA384Ext, Brainnetome246Ext, Gordon333Ext, 4S156Parcels, 4S256Parcels, 4S456Parcels)"
 
 resources:
   profiles:
@@ -112,6 +116,7 @@ execution:
           participant \
           --participant-label {subject_id} \
           --recon-spec {recon_spec} \
+          --atlases {atlases} \
           --nthreads {threads} \
           --omp-nthreads {omp_nthreads}
 
