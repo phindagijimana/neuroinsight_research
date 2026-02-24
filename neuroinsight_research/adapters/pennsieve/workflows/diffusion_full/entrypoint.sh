@@ -3,11 +3,10 @@ set -euo pipefail
 
 INPUT_DIR="/data/input"
 OUTPUT_DIR="/data/output"
-WORK_DIR="/data/work"
 
 export FS_LICENSE=/license/license.txt
 
-mkdir -p "$OUTPUT_DIR/qsiprep" "$OUTPUT_DIR/qsirecon" "$WORK_DIR"
+mkdir -p "$OUTPUT_DIR/qsiprep" "$OUTPUT_DIR/qsirecon" /tmp/work/qsiprep /tmp/work/qsirecon
 
 BIDS_DIR=$(find "$INPUT_DIR" -name "dataset_description.json" -exec dirname {} \; | head -1)
 if [ -z "$BIDS_DIR" ]; then
@@ -24,7 +23,7 @@ qsiprep "$BIDS_DIR" "$OUTPUT_DIR/qsiprep" participant \
     --fs-license-file "$FS_LICENSE" \
     --nprocs "$NPROCS" \
     --mem-mb "$MEM_MB" \
-    --work-dir "$WORK_DIR/qsiprep" \
+    --work-dir /tmp/work/qsiprep \
     --output-resolution 1.25 \
     --skip-bids-validation \
     --notrack
@@ -34,7 +33,7 @@ qsirecon "$OUTPUT_DIR/qsiprep" "$OUTPUT_DIR/qsirecon" participant \
     --participant-label "${PARTICIPANT#sub-}" \
     --nprocs "$NPROCS" \
     --mem-mb "$MEM_MB" \
-    --work-dir "$WORK_DIR/qsirecon" \
+    --work-dir /tmp/work/qsirecon \
     --notrack
 
 echo "Diffusion Full Pipeline workflow complete. Output in $OUTPUT_DIR"

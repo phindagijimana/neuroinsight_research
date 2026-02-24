@@ -3,11 +3,10 @@ set -euo pipefail
 
 INPUT_DIR="/data/input"
 OUTPUT_DIR="/data/output"
-WORK_DIR="/data/work"
 
 export FS_LICENSE=/license/license.txt
 
-mkdir -p "$OUTPUT_DIR" "$WORK_DIR"
+mkdir -p "$OUTPUT_DIR" /tmp/work/qsiprep
 
 BIDS_DIR=$(find "$INPUT_DIR" -name "dataset_description.json" -exec dirname {} \; | head -1)
 if [ -z "$BIDS_DIR" ]; then
@@ -26,7 +25,7 @@ qsiprep "$BIDS_DIR" "$OUTPUT_DIR" participant \
     --fs-license-file "$FS_LICENSE" \
     --nprocs "$NPROCS" \
     --mem-mb "$MEM_MB" \
-    --work-dir "$WORK_DIR" \
+    --work-dir /tmp/work/qsiprep \
     --output-resolution 1.25 \
     --skip-bids-validation \
     --notrack

@@ -109,6 +109,7 @@ execution:
 
         mkdir -p /data/outputs/native/qsirecon
         mkdir -p /data/outputs/logs/qsirecon
+        mkdir -p /data/outputs/work/qsirecon
 
         qsirecon \
           /data/inputs/qsiprep_derivatives \
@@ -118,7 +119,8 @@ execution:
           --recon-spec {recon_spec} \
           --atlases {atlases} \
           --nthreads {threads} \
-          --omp-nthreads {omp_nthreads}
+          --omp-nthreads {omp_nthreads} \
+          --work-dir /data/outputs/work/qsirecon
 
         echo "QSIRecon completed successfully"
 

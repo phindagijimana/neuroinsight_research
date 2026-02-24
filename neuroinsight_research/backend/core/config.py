@@ -208,7 +208,7 @@ class Settings(BaseSettings):
     )
     xnat_api_url: Optional[str] = Field(
         default=None,
-        description="XNAT instance URL (e.g. https://cidur.urmc-sh.rochester.edu)",
+        description="XNAT instance URL (e.g. https://xnat.your-institution.edu)",
     )
 
     # -- Logging --

@@ -1413,6 +1413,137 @@ To return to local Docker execution:
 
 ---
 
+## Connecting to XNAT
+
+NeuroInsight can browse, download, and process data directly from any XNAT instance (CIDUR, CNDA, NITRC, Central, or your own).
+
+### Prerequisites
+
+1. **An XNAT account** with read access to at least one project
+2. **Network access** from the NeuroInsight server to the XNAT instance (see "XNAT Behind a Firewall" below)
+
+### Step 1: Connect to XNAT
+
+1. Open NeuroInsight and click **Get Started**
+2. Under **Data Source**, click the **XNAT** tab
+3. Fill in:
+   - **XNAT URL** — the full URL of the XNAT instance (e.g., `https://xnat.example.edu`)
+   - **Username** — your XNAT username
+   - **Password** — your XNAT password
+4. Click **Connect**
+5. A green "Connected" badge confirms the connection
+
+### Step 2: Browse Data
+
+After connecting, click **Browse** in the input section to open the XNAT Data Browser. The XNAT hierarchy is:
+
+```
+Project
+ └── Subject
+      └── Experiment (session)
+           └── Scan
+                └── Resource (NIFTI, DICOM, etc.)
+                     └── Files
+```
+
+1. **Projects** — select the project containing your data
+2. **Subjects** — click a subject to view their sessions
+3. **Experiments** — click a session to view scans
+4. **Scans** — click a scan to view available resources (NIFTI, DICOM, etc.)
+5. **Resources** — click a resource to see individual files
+6. **Files** — select the files you want to process, then click **Select for Processing**
+
+Use the breadcrumb navigation at the top to go back to any level.
+
+### Step 3: Process Data
+
+After selecting files from XNAT, the files are downloaded to the NeuroInsight server and submitted to your chosen compute backend (Local Docker, Remote Server, or HPC/SLURM) for processing.
+
+### XNAT Behind a Firewall (SSH Tunnel)
+
+If NeuroInsight runs on an external server (e.g., AWS EC2) and the XNAT instance is on a private institutional network, the server cannot reach XNAT directly. Use an **SSH local port forward** through an intermediary that can reach both networks.
+
+#### Architecture
+
+```
+NeuroInsight Server (AWS)                    Intermediary (HPC/VPN)                   XNAT Instance
+      localhost:8443  ──── SSH tunnel ────→  hpc-login  ──── network ────→  xnat.university.edu:443
+```
+
+The intermediary can be any machine that:
+- Is reachable from the NeuroInsight server via SSH
+- Can reach the XNAT instance over the network (e.g., on the same campus network or VPN)
+
+An HPC login node you are already connected to is a common choice.
+
+#### Set up the tunnel
+
+On the **NeuroInsight server**, run:
+
+```bash
+ssh -L 8443:<xnat-hostname>:443 <username>@<intermediary-host> -N
+```
+
+| Parameter | Example | Purpose |
+|-----------|---------|---------|
+| `8443` | `8443` | Local port on the NeuroInsight server that will proxy to XNAT |
+| `<xnat-hostname>` | `xnat.university.edu` | The XNAT hostname as reachable from the intermediary |
+| `443` | `443` | XNAT's HTTPS port (use `80` for HTTP, or `8080` if non-standard) |
+| `<intermediary-host>` | `hpc-login.university.edu` | The SSH-accessible intermediary machine |
+| `-N` | | Don't open a shell, just forward ports |
+
+Keep this terminal open while using XNAT.
+
+**Example** (tunneling through an HPC login node):
+
+```bash
+ssh -L 8443:xnat.your-institution.edu:443 youruser@hpc-login.your-institution.edu -N
+```
+
+#### Connect in the UI
+
+When using the tunnel, enter:
+- **XNAT URL**: `https://localhost:8443`
+- **Skip SSL verification**: **checked** (required — see below)
+- **Username / Password**: your XNAT credentials
+
+### SSL Certificate Verification
+
+When connecting through an SSH tunnel, the browser/server connects to `localhost:8443` but the XNAT server's SSL certificate was issued for its real hostname (e.g., `xnat.university.edu`). This hostname mismatch causes SSL verification to fail with an error like:
+
+```
+SSL certificate verification failed for https://localhost:8443
+```
+
+**Solution**: Check the **"Skip SSL verification"** checkbox in the XNAT Login form before clicking Connect. This is safe when using an SSH tunnel because the tunnel itself provides encrypted transport to the intermediary.
+
+When connecting directly to an XNAT instance (no tunnel), leave SSL verification **enabled** unless the XNAT instance uses a self-signed certificate.
+
+### XNAT on the Transfer Page
+
+The XNAT connection is also available on the **Transfer** page for downloading/uploading data without processing. Click the **XNAT** tab in either the source or destination pane, enter credentials, and browse the same Project → Subject → Experiment → Scan hierarchy.
+
+### Troubleshooting XNAT Connection
+
+| Problem | Solution |
+|---------|----------|
+| **"Connection timed out"** | XNAT is unreachable — check network/VPN, set up an SSH tunnel if on a different network |
+| **"SSL certificate verification failed"** | Check **"Skip SSL verification"** if using an SSH tunnel or self-signed certificate |
+| **"Authentication failed (401)"** | Wrong username or password |
+| **"Access denied (403)"** | Account lacks permission for this XNAT instance — contact your XNAT admin |
+| **"XNAT REST API not found (404)"** | Incorrect URL — verify the URL points to the XNAT web root (not a sub-path) |
+| **Empty project list** | Your account may not have read access to any projects — verify in the XNAT web UI |
+| **Tunnel connection refused** | SSH tunnel may have closed — check and restart the `ssh -L` command |
+
+### Important Notes
+
+- **Session timeout**: XNAT sessions expire after inactivity (typically 15-30 minutes). If you get errors after being idle, click **Disconnect** and reconnect.
+- **Large downloads**: When downloading many files or large datasets, ensure sufficient disk space on the NeuroInsight server.
+- **XNAT versions**: NeuroInsight uses the standard XNAT REST API and works with XNAT 1.7+ instances.
+- **No uploads during processing**: File uploads to XNAT require the experiment and resource to already exist. Use the XNAT web interface to create them first.
+
+---
+
 ## Support
 
 - **GitHub Issues**: Report bugs and request features

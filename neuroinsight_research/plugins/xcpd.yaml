@@ -109,6 +109,7 @@ execution:
 
         mkdir -p /data/outputs/native/xcpd
         mkdir -p /data/outputs/logs/xcpd
+        mkdir -p /data/outputs/work/xcpd
 
         xcp_d \
           /data/inputs/fmriprep_derivatives \
@@ -120,7 +121,8 @@ execution:
           --low-pass {low_pass} \
           --atlases {atlases} \
           --nthreads {threads} \
-          --omp-nthreads {omp_nthreads}
+          --omp-nthreads {omp_nthreads} \
+          --work-dir /data/outputs/work/xcpd
 
         echo "XCP-D completed successfully"
 

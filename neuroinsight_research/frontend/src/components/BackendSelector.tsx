@@ -93,6 +93,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
   const [xnatUrl, setXnatUrl] = useState('');
   const [xnatUser, setXnatUser] = useState('');
   const [xnatPass, setXnatPass] = useState('');
+  const [xnatSkipSsl, setXnatSkipSsl] = useState(false);
 
   const isPlatformSelected = dataSource === 'pennsieve' || dataSource === 'xnat';
   const isPlatformConnected = platformConnection?.connected && platformConnection?.platform === dataSource;
@@ -252,7 +253,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
         result = await apiService.platformConnect('pennsieve', { api_key: apiKey, api_secret: apiSecret });
       } else if (dataSource === 'xnat') {
         if (!xnatUrl || !xnatUser || !xnatPass) { setPlatformError('URL, username, and password are required'); setPlatformConnecting(false); return; }
-        result = await apiService.platformConnect('xnat', { url: xnatUrl, username: xnatUser, password: xnatPass });
+        result = await apiService.platformConnect('xnat', { url: xnatUrl, username: xnatUser, password: xnatPass, verify_ssl: !xnatSkipSsl });
       }
       if (result?.connected && onPlatformConnect) {
         onPlatformConnect({ platform: dataSource, connected: true, user: result.user, workspace: result.workspace });
@@ -585,7 +586,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">XNAT URL</label>
                 <input type="text" value={xnatUrl} onChange={(e) => setXnatUrl(e.target.value)}
-                  placeholder="https://cidur.urmc-sh.rochester.edu"
+                  placeholder="https://xnat.example.edu"
                   className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500" />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -602,6 +603,15 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500" />
                 </div>
               </div>
+              <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={xnatSkipSsl}
+                  onChange={(e) => setXnatSkipSsl(e.target.checked)}
+                  className="rounded border-gray-300 text-orange-500 focus:ring-orange-500 h-3.5 w-3.5"
+                />
+                Skip SSL verification (for tunneled or self-signed connections)
+              </label>
             </>
           )}
 

@@ -4189,9 +4189,6 @@ class MRIProcessor:
         if not singularity_img or not singularity_img.exists():
             # Try common locations including HPC paths
             possible_paths = [
-                # Project-specific location
-                Path("/mnt/nfs/home/urmc-sh.rochester.edu/pndagiji/hippo/singularity-images/fastsurfer.sif"),
-
                 # Relative to output directory
                 Path(settings.output_dir).parent / "singularity-images" / "fastsurfer.sif",
                 Path("./singularity-images/fastsurfer.sif"),

@@ -117,8 +117,10 @@ execution:
 
         mkdir -p /data/outputs/native/fmriprep
         mkdir -p /data/outputs/logs/fmriprep
+        mkdir -p /data/outputs/work/fmriprep
 
         FMRIPREP_CMD="fmriprep /data/inputs/bids_dir /data/outputs/native/fmriprep participant"
+        FMRIPREP_CMD="$FMRIPREP_CMD --work-dir /data/outputs/work/fmriprep"
         FMRIPREP_CMD="$FMRIPREP_CMD --participant-label {subject_id}"
         FMRIPREP_CMD="$FMRIPREP_CMD --output-spaces {output_spaces}"
         FMRIPREP_CMD="$FMRIPREP_CMD --nthreads {threads}"

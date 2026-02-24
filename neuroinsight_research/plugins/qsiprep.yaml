@@ -112,8 +112,10 @@ execution:
 
         mkdir -p /data/outputs/native/qsiprep
         mkdir -p /data/outputs/logs/qsiprep
+        mkdir -p /data/outputs/work/qsiprep
 
         QSIPREP_CMD="qsiprep /data/inputs/bids_dir /data/outputs/native/qsiprep participant"
+        QSIPREP_CMD="$QSIPREP_CMD --work-dir /data/outputs/work/qsiprep"
         QSIPREP_CMD="$QSIPREP_CMD --participant-label {subject_id}"
         QSIPREP_CMD="$QSIPREP_CMD --output-resolution {output_resolution}"
         QSIPREP_CMD="$QSIPREP_CMD --nthreads {threads}"
