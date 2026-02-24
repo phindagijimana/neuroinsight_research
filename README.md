@@ -222,6 +222,16 @@ cd neuroinsight_windows
 - **Backup/Restore:** Only available in Docker deployments (native uses manual backup)
 - **Update:** Docker deployments can update with one command; native requires manual update
 
+## Connecting to Compute and Data Sources
+
+NeuroInsight supports multiple data sources and compute backends that can be mixed and matched:
+
+**Data Sources:** Local files, Remote Server (SSH), HPC filesystem (SSH), Pennsieve, XNAT
+
+**Compute Backends:** Local Docker, Remote Server (SSH + Docker), HPC/SLURM (SSH + Singularity)
+
+See the [User Guide](docs/USER_GUIDE.md#compute-and-data-sources) for detailed connection instructions for each source and backend, including SSH tunneling for firewalled environments.
+
 ## Further Documentation
 
 - [User Guide](docs/USER_GUIDE.md) - Complete usage instructions
