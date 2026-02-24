@@ -1260,6 +1260,30 @@ Yes: PDF reports, CSV data, PNG/PDF images.
 No, research software only. Not for clinical diagnosis.
 
 
+## Terminology
+
+If you are new to research computing, here are the key terms used in this guide.
+
+| Term | What it means |
+|------|---------------|
+| **SSH** | Secure Shell -- a way to securely log in to another computer over the network, like a remote desktop but text-based. |
+| **SSH key** | A digital credential file stored on your computer that proves your identity to a remote server, replacing the need to type a password each time. You generate a key pair: a private key (stays on your machine, never shared) and a public key (copied to the server). |
+| **Hostname** | The network name of a computer, similar to a website address. Example: `hpc-login.bu.edu`. |
+| **Port** | A numbered channel on a computer for network communication. SSH uses port 22 by default. Think of the hostname as a building address and the port as a specific room number inside. |
+| **VPN** | Virtual Private Network -- software that makes your computer appear to be on a university or company network even when you are off-site. Required to reach servers that are not exposed to the public internet. |
+| **Firewall** | A security barrier that blocks unauthorized network connections. University HPCs and XNAT servers are often behind firewalls, meaning outside computers cannot reach them directly. |
+| **SSH tunnel** | A technique that forwards network traffic through an SSH connection to bypass firewalls. It creates a secure "pipe" from one machine to another, allowing you to reach a server you cannot access directly. |
+| **Docker** | Software that packages applications into self-contained units called containers. NeuroInsight uses Docker to run neuroimaging tools without requiring you to install them manually. |
+| **HPC** | High-Performance Computing cluster -- a shared set of powerful computers managed by a university or institution. Researchers submit processing jobs to the cluster and the scheduler distributes the work. |
+| **SLURM** | The job scheduler used on most HPC clusters. When you submit a job, SLURM places it in a queue and runs it when resources (CPU, memory, GPU) become available. |
+| **Partition** | A group of compute nodes on an HPC cluster designated for certain types of work (e.g., `general`, `gpu`, `short`). You select a partition when submitting a job. |
+| **Login node** | The computer you SSH into when connecting to an HPC cluster. It is used for submitting jobs and transferring files, not for heavy computation. |
+| **Singularity / Apptainer** | Container software designed for HPC environments. It serves the same purpose as Docker but is allowed on shared clusters where Docker is not (for security reasons). Apptainer is the newer name for Singularity. |
+| **API key** | A credential (like a username and password combined into one token) used to authenticate with a web service programmatically. Pennsieve uses API keys for access. |
+| **SSL certificate** | A digital certificate that verifies a website's identity and enables encrypted (HTTPS) connections. When you connect through an SSH tunnel, the certificate check may fail because the certificate was issued for the real hostname, not `localhost`. |
+
+---
+
 ## Compute and Data Sources
 
 NeuroInsight separates **where your data lives** from **where processing runs**. You can mix and match any data source with any compute backend to suit your environment.
@@ -1301,6 +1325,24 @@ When **Pennsieve** or **XNAT** is selected as a data source, a platform login fo
 ## Connecting to a Remote Server
 
 NeuroInsight can run neuroimaging jobs on any SSH-accessible Linux machine with Docker installed. This is useful for offloading processing to a more powerful server, a cloud VM (AWS, GCP, Azure), or a lab workstation.
+
+### Example Scenario
+
+Dr. Reyes runs NeuroInsight on her laptop (8 GB RAM), but FreeSurfer and fMRIPrep need far more memory. Her lab has a shared Linux workstation (`brainlab-ws01.med.stanford.edu`) with 128 GB RAM, 32 CPU cores, and Docker installed. She wants to keep browsing and uploading files from her laptop while the heavy processing happens on the lab workstation.
+
+**What she enters in the UI:**
+
+| Field | Value |
+|-------|-------|
+| Data Source | **Local** (files are on her laptop) |
+| Compute Source | **Remote Server** |
+| Host | `brainlab-ws01.med.stanford.edu` |
+| Username | `sreyes` |
+| Port | `22` |
+
+After clicking **Connect & Activate**, she uploads a T1 NIfTI file from her laptop. NeuroInsight transfers it to the workstation, runs FreeSurfer inside a Docker container there, and streams the results back.
+
+If she were working from home and the workstation were behind the university firewall, she would first connect her VPN, then enter the same hostname. Alternatively, she could set up a reverse SSH tunnel as described in the HPC section below and use `localhost` / port `2222` instead.
 
 ### Prerequisites
 
@@ -1346,7 +1388,28 @@ If the remote server is on a private network (e.g., behind a university firewall
 
 ## Connecting to Pennsieve
 
-NeuroInsight can browse, download, and process data stored on the [Pennsieve](https://app.pennsieve.io) data management platform.
+NeuroInsight can browse, download, and process data stored on the [Pennsieve](https://app.pennsieve.io) data management platform. Pennsieve is a cloud-based research data management system used by NIH SPARC, RE-JOIN, and other programs to store, organize, and share biomedical datasets.
+
+### Example Scenario
+
+Dr. Okonkwo's epilepsy lab at the University of Pennsylvania stores all their MRI datasets on Pennsieve under the organization "Penn Epilepsy Center". A research assistant, James, needs to run the hippocampal sclerosis detection pipeline on 12 subjects from the dataset "Temporal Lobe Epilepsy Cohort 2025".
+
+James does not have the MRI files on his local machine -- they are only on Pennsieve. He also wants to process them on the lab's HPC cluster.
+
+**Step 1 -- Generate API credentials:** James logs into `app.pennsieve.io`, goes to his profile, and creates an API key named "NeuroInsight". He copies the key (`a3f8e1d2-...`) and the secret.
+
+**Step 2 -- Connect in NeuroInsight:**
+
+| Field | Value |
+|-------|-------|
+| Data Source | **Pennsieve** |
+| Compute Source | **HPC/SLURM** |
+| API Key | `a3f8e1d2-7b4c-49e1-8f6a-2d9c0e5b1a73` |
+| API Secret | (pasted from clipboard) |
+
+**Step 3 -- Browse and select data:** After connecting, he clicks Browse, selects "Temporal Lobe Epilepsy Cohort 2025", navigates into the subject folders, and selects the T1-weighted NIfTI files for his 12 subjects.
+
+**Step 4 -- Process:** NeuroInsight downloads the selected files from Pennsieve and submits them to the HPC cluster for processing via SLURM. James monitors progress in the SLURM Queue Monitor panel.
 
 ### Prerequisites
 
@@ -1415,6 +1478,41 @@ After selecting files from Pennsieve, the files are downloaded to the NeuroInsig
 ## Connecting to HPC (SLURM Cluster)
 
 NeuroInsight can submit neuroimaging jobs to a remote HPC cluster via SSH and SLURM, running containerized tools (Singularity/Apptainer) on cluster nodes instead of locally.
+
+### Example Scenario
+
+Priya is a PhD student in neuroscience at Boston University. She has 50 subjects to process through the full diffusion pipeline (QSIPrep + QSIRecon), which takes about 8 hours per subject. Running all 50 sequentially on her laptop would take over 16 days. The university's Shared Computing Cluster (SCC) has hundreds of nodes and can run multiple subjects in parallel.
+
+NeuroInsight is deployed on an AWS EC2 instance so Priya can access it from anywhere. The SCC is behind BU's campus firewall, so Priya uses a reverse SSH tunnel from her laptop (connected to BU's VPN) to bridge the two.
+
+**Setting up the tunnel (on her laptop, VPN connected):**
+
+```bash
+ssh -i ~/keys/aws-neuroinsight.pem \
+    -L 3000:localhost:3000 \
+    -L 8000:localhost:8000 \
+    -R 2222:scc-login.bu.edu:22 \
+    ubuntu@54.89.123.45
+```
+
+This single command does three things: forwards the NeuroInsight UI (port 3000) and API (port 8000) to her browser, and creates a reverse tunnel so the AWS server can reach the SCC through her VPN.
+
+**What she enters in the NeuroInsight UI:**
+
+| Field | Value |
+|-------|-------|
+| Data Source | **HPC** (her BIDS data is on `/projectnb/epilepsy/priya/`) |
+| Compute Source | **HPC/SLURM** |
+| Host | `localhost` (because of the reverse tunnel) |
+| Username | `priya` |
+| Port | `2222` (the tunnel port) |
+| Work Directory | `/scratch/priya/neuroinsight` |
+| Partition | `general` (auto-populated after connecting) |
+| Modules | `singularity/3.10` |
+
+After connecting, she browses her BIDS directory on the SCC through the file browser, selects all 50 subjects, chooses "Diffusion Full Pipeline", and clicks Submit. SLURM queues the jobs and processes multiple subjects in parallel across cluster nodes. She monitors everything from the SLURM Queue Monitor panel in her browser.
+
+If Priya were on campus (connected to BU's network directly), she would skip the tunnel and enter the real hostname (`scc-login.bu.edu`, port `22`) instead of `localhost:2222`.
 
 ### Prerequisites
 
@@ -1567,7 +1665,38 @@ To return to local Docker execution:
 
 ## Connecting to XNAT
 
-NeuroInsight can browse, download, and process data directly from any XNAT instance (CIDUR, CNDA, NITRC, Central, or your own).
+NeuroInsight can browse, download, and process data directly from any XNAT instance (CIDUR, CNDA, NITRC, Central, or your own). XNAT is an open-source imaging informatics platform used by hospitals and research centers to archive and share neuroimaging data.
+
+### Example Scenario
+
+Dr. Nakamura is a neuroradiologist at the University of Rochester Medical Center. The imaging center stores all research MRI data on an internal XNAT server at `https://xnat.urmc.rochester.edu`. She wants to run the cortical lesion detection pipeline on five subjects from the "Focal Epilepsy MRI Study" project.
+
+NeuroInsight is running on an AWS EC2 instance, and the XNAT server is on the hospital's internal network (not accessible from the internet). Dr. Nakamura is already connected to the university HPC via NeuroInsight. She uses the HPC login node as a bridge to reach XNAT.
+
+**Setting up the tunnel (on the NeuroInsight server):**
+
+```bash
+ssh -L 8443:xnat.urmc.rochester.edu:443 dnakamura@smdodlogin01.urmc.rochester.edu -N
+```
+
+This forwards port 8443 on the NeuroInsight server through the HPC login node to the XNAT server. The HPC login node can reach XNAT because both are on the hospital network.
+
+**What she enters in the NeuroInsight UI:**
+
+| Field | Value |
+|-------|-------|
+| Data Source | **XNAT** |
+| Compute Source | **HPC/SLURM** (already connected) |
+| XNAT URL | `https://localhost:8443` |
+| Skip SSL verification | **checked** (required because the certificate is for `xnat.urmc.rochester.edu`, not `localhost`) |
+| Username | `dnakamura` |
+| Password | (her XNAT password) |
+
+**Browsing data:** After connecting, she clicks Browse and sees the project list. She selects "Focal Epilepsy MRI Study", clicks into the first subject, opens their MR Session, selects Scan 1 (T1 MPRAGE), opens the NIFTI resource, and selects the `.nii.gz` file. She repeats for all five subjects.
+
+**Processing:** She selects "Cortical Lesion Detection" as the pipeline and clicks Submit. NeuroInsight downloads the five NIfTI files from XNAT (via the tunnel), then submits them to the HPC for processing via SLURM.
+
+If the XNAT server were publicly accessible (e.g., `https://central.xnat.org`), no tunnel would be needed. She would enter the real URL directly and leave SSL verification enabled.
 
 ### Prerequisites
 
