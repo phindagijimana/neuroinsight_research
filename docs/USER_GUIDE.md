@@ -1422,4 +1422,4 @@ To return to local Docker execution:
 
 ---
 
-© 2025 University of Rochester. All rights reserved.
+© 2025 NeuroInsight Research. All rights reserved.

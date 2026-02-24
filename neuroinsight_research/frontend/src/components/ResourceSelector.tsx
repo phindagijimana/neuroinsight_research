@@ -74,12 +74,23 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
   }, []);
 
   /* -- Derived limits ------------------------------------------------------ */
-  const limits = useMemo(() => ({
-    maxCpus:   systemRes?.limits.max_cpus      ?? 32,
-    maxMemGb:  systemRes?.limits.max_memory_gb ?? 128,
-    gpuAvail:  systemRes?.limits.gpu_available ?? false,
-    gpuCount:  systemRes?.limits.gpu_count     ?? 0,
-  }), [systemRes]);
+  const isRemoteCompute = backendType === 'hpc' || backendType === 'remote';
+  const limits = useMemo(() => {
+    if (isRemoteCompute) {
+      return {
+        maxCpus:  backendType === 'hpc' ? 128 : 64,
+        maxMemGb: backendType === 'hpc' ? 512 : 256,
+        gpuAvail: true,
+        gpuCount: backendType === 'hpc' ? 8 : 4,
+      };
+    }
+    return {
+      maxCpus:   systemRes?.limits.max_cpus      ?? 32,
+      maxMemGb:  systemRes?.limits.max_memory_gb ?? 128,
+      gpuAvail:  systemRes?.limits.gpu_available ?? false,
+      gpuCount:  systemRes?.limits.gpu_count     ?? 0,
+    };
+  }, [systemRes, isRemoteCompute, backendType]);
 
   /* -- Profiles ------------------------------------------------------------ */
   const profiles = plugin?.resource_profiles ?? {};
@@ -185,7 +196,12 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
       </div>
 
       {/* System capacity bar */}
-      {systemRes && (
+      {isRemoteCompute ? (
+        <div className="flex gap-3 text-[10px] text-gray-400 border-b border-gray-100 pb-2">
+          <span>{backendType === 'hpc' ? 'HPC cluster' : 'Remote server'} &mdash; resources allocated per job</span>
+          <span className="text-emerald-500">GPU available</span>
+        </div>
+      ) : systemRes ? (
         <div className="flex gap-3 text-[10px] text-gray-400 border-b border-gray-100 pb-2">
           <span>Host: {systemRes.cpu.total_logical} CPUs</span>
           <span>{systemRes.memory.total_gb} GB RAM</span>
@@ -197,7 +213,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
             <span>No GPU</span>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* -- Profile selector (only if multiple profiles) ---------------- */}
       {profileNames.length > 1 && (
@@ -250,8 +266,10 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
             value={resources.memory_gb}
             min={1} max={limits.maxMemGb} step={1}
             onChange={(v) => update('memory_gb', v)}
-            warn={overMem}
-            hint={`Host max: ${limits.maxMemGb} GB`}
+            warn={overMem && !isRemoteCompute}
+            hint={isRemoteCompute
+              ? `Per-job allocation (${backendType === 'hpc' ? 'SLURM --mem' : 'Docker --memory'})`
+              : `Host max: ${limits.maxMemGb} GB`}
           />
 
           {/* CPUs */}
@@ -261,8 +279,10 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
             value={resources.cpus}
             min={1} max={limits.maxCpus} step={1}
             onChange={(v) => update('cpus', v)}
-            warn={overCpu}
-            hint={`Host max: ${limits.maxCpus}`}
+            warn={overCpu && !isRemoteCompute}
+            hint={isRemoteCompute
+              ? `Per-job allocation (${backendType === 'hpc' ? 'SLURM --cpus-per-task' : 'Docker --cpus'})`
+              : `Host max: ${limits.maxCpus}`}
           />
 
           {/* Time */}
@@ -294,10 +314,17 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
               />
             </div>
           </div>
-          {gpuNeededButMissing && (
+          {gpuNeededButMissing && !isRemoteCompute && (
             <p className="text-[10px] text-amber-600 flex items-center gap-1 -mt-1 ml-1">
               <AlertTriangle className="h-3 w-3" />
               GPU requested but no GPU detected on this host.
+            </p>
+          )}
+          {isRemoteCompute && resources.gpu && (
+            <p className="text-[10px] text-emerald-600 -mt-1 ml-1">
+              {backendType === 'hpc'
+                ? 'Job will be scheduled on a GPU-equipped node (e.g. gpu partition).'
+                : 'Job will request GPU access on the remote server.'}
             </p>
           )}
           {para?.gpu_optional && limits.gpuAvail && !resources.gpu && (
@@ -399,8 +426,8 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
         </div>
       )}
 
-      {/* Warnings */}
-      {useCustom && (overCpu || overMem) && (
+      {/* Warnings -- only for local compute where exceeding host limits matters */}
+      {useCustom && !isRemoteCompute && (overCpu || overMem) && (
         <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
           <p className="text-[11px] text-amber-800">

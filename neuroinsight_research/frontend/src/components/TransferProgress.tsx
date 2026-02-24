@@ -15,7 +15,7 @@ import type { TransferStatus } from '../types';
 interface TransferProgressProps {
   transferId: string;
   direction: 'download' | 'upload' | 'move';
-  onComplete: () => void;
+  onComplete: (info: { localPaths: string[]; targetPath: string }) => void;
   onCancel?: () => void;
 }
 
@@ -40,7 +40,11 @@ export const TransferProgress: React.FC<TransferProgressProps> = ({
   useEffect(() => {
     if (status?.status === 'completed') {
       if (intervalRef.current) clearInterval(intervalRef.current);
-      const timer = setTimeout(onComplete, 1500);
+      const info = {
+        localPaths: (status as any).local_paths || [],
+        targetPath: (status as any).target_path || '',
+      };
+      const timer = setTimeout(() => onComplete(info), 1500);
       return () => clearTimeout(timer);
     }
     if (status?.status === 'failed' || status?.status === 'cancelled') {

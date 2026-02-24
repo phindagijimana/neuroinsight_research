@@ -78,6 +78,9 @@ def reap_stale_jobs(
             logger.warning("Could not list containers: %s", e)
 
         for job in stuck_jobs:
+            if job.backend_type == "slurm":
+                continue
+
             container_id = job.backend_job_id
             reason = None
             exit_code = None

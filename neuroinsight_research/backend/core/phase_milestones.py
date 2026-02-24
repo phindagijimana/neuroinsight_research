@@ -224,14 +224,14 @@ QSIPREP: List[PhaseMilestone] = [
     ("Finished.*dwi_resampling", 80, "DWI resampling complete"),
 
     # Derivatives & reports (~10%)
-    ("ds_report", 82, "Writing reports"),
-    ("ds_dwi", 85, "Writing DWI derivatives"),
-    ("confounds", 88, "Computing confounds"),
-    ("carpetplot", 90, "Generating carpet plot"),
+    ("ds_report_wf", 82, "Writing reports"),
+    ("ds_dwi_t1", 85, "Writing DWI derivatives"),
+    ("confounds_wf", 88, "Computing confounds"),
+    ("carpet_seg", 90, "Generating carpet plot"),
 
     # Completion
     ("Subject results", 93, "Writing subject results"),
-    ("Generating boilerplate", 95, "Generating citation boilerplate"),
+    ("resource monitor", 95, "Finalizing"),
     ("QSIPrep completed successfully", 100, "Completed"),
 ]
 
@@ -267,10 +267,10 @@ QSIRECON: List[PhaseMilestone] = [
     ("ad_map", 78, "Computing AD map"),
 
     # Output & reports (~10%)
-    ("ds_report", 82, "Writing reports"),
-    ("ds_recon", 85, "Writing reconstruction outputs"),
-    ("atlas", 88, "Atlas-based analysis"),
-    ("Generating boilerplate", 92, "Generating citation boilerplate"),
+    ("ds_report_wf", 82, "Writing reports"),
+    ("ds_recon_wf", 85, "Writing reconstruction outputs"),
+    ("atlas_wf", 88, "Atlas-based analysis"),
+    ("workflow completed", 92, "Workflow completed"),
 
     # Completion
     ("QSIRecon completed successfully", 100, "Completed"),
@@ -325,7 +325,7 @@ XCPD: List[PhaseMilestone] = [
     ("carpet", 90, "Generating carpet plot"),
 
     # Completion
-    ("Generating boilerplate", 94, "Generating citation boilerplate"),
+    ("write_derivative_description", 94, "Finalizing outputs"),
     ("XCP-D completed successfully", 100, "Completed"),
 ]
 
@@ -526,6 +526,46 @@ MILESTONES: Dict[str, List[PhaseMilestone]] = {
 
 # Shared system phases (prepended to all plugins)
 SYSTEM_PHASES: List[PhaseMilestone] = []
+
+# ══════════════════════════════════════════════════════════════════════
+#  Workflow Step Weights
+#
+#  Maps workflow_id -> list of fractional weights for each step.
+#  Weights reflect approximate wall-clock time ratios so the overall
+#  progress bar advances smoothly across steps.
+#
+#  Sum of weights per workflow should equal 1.0.
+# ══════════════════════════════════════════════════════════════════════
+WORKFLOW_STEP_WEIGHTS: Dict[str, List[float]] = {
+    # fMRI Full: fmriprep (~4h) + xcpd (~1h)
+    "fmri_full": [0.80, 0.20],
+
+    # Diffusion Full: qsiprep (~4h) + qsirecon (~1.5h)
+    "diffusion_full": [0.75, 0.25],
+
+    # FreeSurfer Longitudinal Full: freesurfer_longitudinal (~20h) + stats (~10min)
+    "wf_freesurfer_longitudinal_full": [0.97, 0.03],
+
+    # Cortical Lesion Detection: freesurfer_recon (~6h) + meld_graph (~1h)
+    "cortical_lesion_detection": [0.85, 0.15],
+
+    # HS Detection: freesurfer_autorecon_volonly (~30min) + hs_postprocess (~5min)
+    "wf_hs_detection_v1": [0.85, 0.15],
+
+    # Hippocampal Subfields T1: freesurfer_recon (~6h) + segmentha_t1 (~30min)
+    "hippo_subfields_t1": [0.92, 0.08],
+
+    # Hippocampal Subfields T1+T2: freesurfer_recon (~6h) + segmentha_t2 (~40min)
+    "hippo_subfields_t2": [0.90, 0.10],
+}
+
+
+def get_workflow_step_weights(workflow_id: str, num_steps: int) -> List[float]:
+    """Get step weights for a workflow, falling back to equal weights."""
+    weights = WORKFLOW_STEP_WEIGHTS.get(workflow_id, [])
+    if len(weights) == num_steps:
+        return weights
+    return [1.0 / num_steps] * num_steps
 
 
 def get_milestones(plugin_id: str) -> List[PhaseMilestone]:

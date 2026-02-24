@@ -124,7 +124,7 @@ execution:
           --t1 /data/inputs/T1w.nii.gz \
           --sid {subject_id} \
           --sd $SUBJECTS_DIR \
-          --fs_license /opt/freesurfer/license.txt \
+          --fs_license ${FS_LICENSE:-/opt/freesurfer/license.txt} \
           --device $DEVICE \
           --batch {batch_size} \
           --allow_root \

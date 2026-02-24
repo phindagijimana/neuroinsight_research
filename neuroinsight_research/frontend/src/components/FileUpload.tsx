@@ -5,14 +5,12 @@
  *
  * A) Filesystem flow (Local / Remote / HPC):
  *    BackendSelector -> DirectorySelector -> PipelineSelector -> Submit
- *    (data source = processing target, no transfer needed)
+ *    Data source and compute are independent -- data source controls
+ *    filesystem browsing, compute controls where jobs run.
  *
  * B) Platform flow (Pennsieve / XNAT):
  *    BackendSelector (connect) -> PlatformBrowser -> BackendSelector (processing target)
  *    -> TransferProgress -> PipelineSelector -> Submit
- *
- * The unified BackendSelector shows all 5 tabs in one row:
- *   [Local] [Remote Server] [HPC] [Pennsieve] [XNAT]
  */
 
 import React, { useState } from 'react';
@@ -54,6 +52,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
   // Transfer state
   const [transferId, setTransferId] = useState<string | null>(null);
   const [transferredPath, setTransferredPath] = useState<string | null>(null);
+  const [transferredFilePaths, setTransferredFilePaths] = useState<string[]>([]);
   const [platformDatasetId, setPlatformDatasetId] = useState<string | null>(null);
 
   // Pipeline / execution
@@ -61,8 +60,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
   const [selectedExecution, setSelectedExecution] = useState<SelectedExecution | null>(null);
   const [customResources, setCustomResources] = useState<ResourceConfig | null>(null);
 
-  // Input mode (directory vs single file)
-  const [mode, setMode] = useState<UploadMode>('directory');
+  // Input mode (single subject vs batch)
+  const [mode, setMode] = useState<UploadMode>('single');
   const [uploadedFilePath, setUploadedFilePath] = useState<string | null>(null);
 
   // UI state
@@ -108,13 +107,18 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
     }
   };
 
-  const handleTransferComplete = () => {
-    // Transfer done -- pipeline step auto-shows
+  const handleTransferComplete = (info: { localPaths: string[]; targetPath: string }) => {
+    if (info.localPaths.length > 0) {
+      setTransferredFilePaths(info.localPaths);
+    }
+    if (info.targetPath) {
+      setTransferredPath(info.targetPath);
+    }
   };
 
   // ---- Job submission handlers ----
 
-  const handleBatchSubmit = async (inputDir: string, outputDir: string, files: string[]) => {
+  const handleBatchSubmit = async (inputDir: string, _outputDir: string, files: string[]) => {
     if (!selectedPipeline) { setError('Please select a plugin or workflow first'); return; }
     setSubmitting(true);
     setError(null);
@@ -131,7 +135,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
           jobIds.push(result.job_id);
         } else {
           const result = await apiService.submitBatchJob({
-            pipeline_name: selectedPipeline.name, input_dir: inputDir, output_dir: outputDir,
+            pipeline_name: selectedPipeline.name, input_dir: inputDir, output_dir: '',
             parameters: {}, file_pattern: '*.nii.gz', custom_resources: customResources || undefined,
           });
           jobIds.push(...result.job_ids);
@@ -146,25 +150,33 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
     }
   };
 
-  const handleDirectorySubmit = async (inputDir: string, outputDir: string) => {
-    if (!selectedPipeline) { setError('Please select a plugin or workflow first'); return; }
-    if (!selectedExecution?.id) {
-      setError('Please click on a pipeline or workflow to select it before submitting');
+  const handleBidsBatchSubmit = async (bidsDir: string, subjectIds: string[]) => {
+    if (!selectedExecution) { setError('Please select a plugin or workflow first'); return; }
+    if (selectedExecution.type !== 'workflow') {
+      setError('BIDS batch mode is only available for workflows. Select a workflow pipeline.');
       return;
     }
     setSubmitting(true);
     setError(null);
 
     try {
-      if (selectedExecution.type === 'plugin') {
-        const result = await apiService.submitPluginJob(selectedExecution.id, [inputDir], {}, customResources || undefined);
-        onJobsSubmitted([result.job_id]);
-      } else {
-        const result = await apiService.submitWorkflowJob(selectedExecution.id, [inputDir], {}, customResources || undefined);
-        onJobsSubmitted([result.job_id]);
+      const result = await apiService.submitWorkflowBatch(
+        selectedExecution.id,
+        bidsDir,
+        subjectIds,
+        {},
+        customResources || undefined,
+      );
+      const jobIds = result.jobs.map(j => j.job_id);
+
+      if (result.errors.length > 0) {
+        const errMsg = result.errors.map(e => `${e.subject_id}: ${e.error}`).join('; ');
+        setError(`Submitted ${result.submitted}/${result.total_subjects} jobs. Failures: ${errMsg}`);
       }
+
+      if (jobIds.length > 0) onJobsSubmitted(jobIds);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to submit directory job');
+      setError(err.response?.data?.detail || 'Failed to submit BIDS batch');
     } finally {
       setSubmitting(false);
     }
@@ -172,7 +184,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
 
   const handleSingleFileSubmit = async () => {
     if (!selectedPipeline) { setError('Please select a plugin or workflow first'); return; }
-    if (!uploadedFilePath) { setError('Please upload a file first'); return; }
+    if (!uploadedFilePath) { setError('Please select a file or folder first'); return; }
     setSubmitting(true);
     setError(null);
 
@@ -199,7 +211,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
     setSubmitting(true);
     setError(null);
     try {
-      const inputFiles = platformFiles.map((_, i) => `${transferredPath}/file_${i}`);
+      // Use actual file paths from transfer, or fall back to directory
+      const inputFiles = transferredFilePaths.length > 0
+        ? transferredFilePaths
+        : [transferredPath];
       const srcPlatform = isPlatformSource ? dataSource : undefined;
       const srcDatasetId = isPlatformSource ? (platformDatasetId || undefined) : undefined;
       if (selectedExecution?.type === 'plugin' && selectedExecution.id) {
@@ -221,6 +236,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
     setPlatformDatasetId(null);
     setTransferId(null);
     setTransferredPath(null);
+    setTransferredFilePaths([]);
   };
 
   // Shared BackendSelector props
@@ -382,21 +398,21 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Input Mode</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => setMode('directory')}
-                    className={`p-3 rounded-md border transition-all ${mode === 'directory' ? 'border-navy-600 bg-navy-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                    <div className="flex items-center mb-1">
-                      <FolderOpen className={`h-4 w-4 mr-1.5 ${mode === 'directory' ? 'text-navy-600' : 'text-gray-400'}`} />
-                      <span className="text-sm font-medium text-gray-900">Batch</span>
-                    </div>
-                    <p className="text-xs text-gray-600 text-left">Multiple files</p>
-                  </button>
                   <button onClick={() => setMode('single')}
                     className={`p-3 rounded-md border transition-all ${mode === 'single' ? 'border-navy-600 bg-navy-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
                     <div className="flex items-center mb-1">
                       <Upload className={`h-4 w-4 mr-1.5 ${mode === 'single' ? 'text-navy-600' : 'text-gray-400'}`} />
                       <span className="text-sm font-medium text-gray-900">Single</span>
                     </div>
-                    <p className="text-xs text-gray-600 text-left">One file</p>
+                    <p className="text-xs text-gray-600 text-left">One subject folder or file</p>
+                  </button>
+                  <button onClick={() => setMode('directory')}
+                    className={`p-3 rounded-md border transition-all ${mode === 'directory' ? 'border-navy-600 bg-navy-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                    <div className="flex items-center mb-1">
+                      <FolderOpen className={`h-4 w-4 mr-1.5 ${mode === 'directory' ? 'text-navy-600' : 'text-gray-400'}`} />
+                      <span className="text-sm font-medium text-gray-900">Batch</span>
+                    </div>
+                    <p className="text-xs text-gray-600 text-left">Folder with multiple subjects</p>
                   </button>
                 </div>
               </div>
@@ -407,15 +423,16 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
               <div className="flex-1" style={submitting ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
                 {mode === 'directory' ? (
                   <DirectorySelector
-                    mode={selectedBackend === 'local' ? 'local' : selectedBackend === 'remote_hpc' ? 'hpc' : 'remote'}
+                    mode={dataSource === 'hpc' ? 'hpc' : dataSource === 'remote' ? 'remote' : 'local'}
                     onSubmit={handleBatchSubmit}
-                    onSubmitDirectory={handleDirectorySubmit}
+                    onBidsSubmit={handleBidsBatchSubmit}
                   />
                 ) : (
                   <>
                     <SingleFileUpload
-                      browseMode={selectedBackend === 'local' ? 'local' : selectedBackend === 'remote_hpc' ? 'hpc' : 'remote'}
+                      browseMode={dataSource === 'hpc' ? 'hpc' : dataSource === 'remote' ? 'remote' : 'local'}
                       onFileUploaded={(path) => { setUploadedFilePath(path); setError(null); }}
+                      executionContext={selectedExecution ? { type: selectedExecution.type, id: selectedExecution.id } : null}
                     />
                     {uploadedFilePath && (
                       <div className="mt-3">

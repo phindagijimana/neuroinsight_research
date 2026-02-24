@@ -226,6 +226,33 @@ export const apiService = {
     return response.data;
   },
 
+  /**
+   * Submit a workflow in batch mode for multiple BIDS subjects.
+   * Auto-discovers sub-* directories or uses provided subject_ids.
+   */
+  async submitWorkflowBatch(
+    workflowId: string,
+    bidsDir: string,
+    subjectIds?: string[],
+    parameters: Record<string, any> = {},
+    customResources?: Record<string, any>,
+  ): Promise<{
+    workflow: string;
+    bids_dir: string;
+    total_subjects: number;
+    submitted: number;
+    jobs: { job_id: string; subject_id: string }[];
+    errors: { subject_id: string; error: string }[];
+  }> {
+    const response = await api.post(`/api/workflows/${workflowId}/submit-batch`, {
+      bids_dir: bidsDir,
+      subject_ids: subjectIds,
+      parameters,
+      custom_resources: customResources,
+    });
+    return response.data;
+  },
+
   // ================================================================================
   // LICENSE STATUS
   // ================================================================================
@@ -314,6 +341,25 @@ export const apiService = {
    */
   async submitBatchJob(request: BatchSubmitRequest): Promise<BatchSubmitResponse> {
     const response = await api.post('/api/jobs/submit-batch', request);
+    return response.data;
+  },
+
+  /**
+   * List completed jobs whose outputs can be reused as inputs for new jobs.
+   * Filter by input_type (e.g. "subjects_dir") or plugin_id that will consume the output.
+   */
+  async getReusableOutputs(params: { input_type?: string; plugin_id?: string; workflow_id?: string } = {}): Promise<{
+    outputs: {
+      job_id: string;
+      job_pipeline: string;
+      completed_at: string | null;
+      subject_id: string;
+      provides: string;
+      plugin_id: string;
+      output_path: string;
+    }[];
+  }> {
+    const response = await api.get('/api/jobs/reusable-outputs', { params });
     return response.data;
   },
 
@@ -665,6 +711,32 @@ export const apiService = {
   /** Export results as tar.gz -- returns download URL. */
   exportJobResultsUrl(jobId: string): string {
     return `${API_BASE_URL}/api/results/${jobId}/export`;
+  },
+
+  /** Get structured stats CSVs (plugin-aware) for a completed job. */
+  async getStatsCSVs(jobId: string): Promise<{
+    job_id: string;
+    pipeline_name: string;
+    csv_count: number;
+    csvs: Array<{
+      name: string;
+      filename: string;
+      description: string;
+      category: string;
+      headers: string[];
+      rows: any[][];
+      total_rows: number;
+      truncated: boolean;
+    }>;
+  }> {
+    const resp = await api.get(`/api/results/${jobId}/stats/csv`);
+    return resp.data;
+  },
+
+  /** Download a specific stats CSV file. */
+  downloadStatsCSV(jobId: string, csvFilename: string): void {
+    const url = `${API_BASE_URL}/api/results/${jobId}/stats/csv/${encodeURIComponent(csvFilename)}`;
+    window.open(url, '_blank');
   },
 
   // ================================================================================

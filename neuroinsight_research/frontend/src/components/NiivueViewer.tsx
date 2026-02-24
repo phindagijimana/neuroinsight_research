@@ -9,19 +9,28 @@ import { Niivue } from '@niivue/niivue';
 interface NiivueViewerProps {
   imageUrl?: string;
   segmentationUrl?: string;
+  pipelineName?: string;
   onLoad?: () => void;
 }
+
+const isHippocampalPipeline = (name?: string): boolean => {
+  if (!name) return false;
+  const lower = name.toLowerCase();
+  return lower.includes('hs detection') || lower.includes('hippocam') || lower.includes('segmentha');
+};
 
 const NiivueViewer: React.FC<NiivueViewerProps> = ({
   imageUrl,
   segmentationUrl,
+  pipelineName,
   onLoad
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const nvRef = useRef<Niivue | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [sliceType, setSliceType] = useState<number>(4); // 4 = multi-planar view
-  const [opacity, setOpacity] = useState(0.5);
+  const isHippo = isHippocampalPipeline(pipelineName);
+  const [sliceType, setSliceType] = useState<number>(isHippo ? 1 : 4); // coronal for hippo, multi-planar otherwise
+  const [opacity, setOpacity] = useState(isHippo ? 0.65 : 0.5);
   const [colormap, setColormap] = useState('gray');
   const [showCrosshair, setShowCrosshair] = useState(true);
 
@@ -218,7 +227,7 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2 mt-4">
+        <div className="flex gap-2 mt-4 flex-wrap">
           <button
             onClick={handleResetView}
             className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
@@ -231,6 +240,28 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
           >
             Save Screenshot
           </button>
+          {isHippo && segmentationUrl && (
+            <>
+              <button
+                onClick={() => {
+                  setSliceType(3);
+                  setOpacity(0.7);
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+              >
+                Hippocampal 3D
+              </button>
+              <button
+                onClick={() => {
+                  setSliceType(1);
+                  setOpacity(0.65);
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+              >
+                Coronal View
+              </button>
+            </>
+          )}
         </div>
       </div>
 

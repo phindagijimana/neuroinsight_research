@@ -979,4 +979,4 @@ docker ps -a | Select-String neuroinsight  # Container list
 
 ---
 
-© 2025 University of Rochester. All rights reserved.
+© 2025 NeuroInsight Research. All rights reserved.

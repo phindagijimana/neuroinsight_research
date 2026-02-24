@@ -1,19 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 
+source /shared/detect_inputs.sh
+
 INPUT_DIR="/data/input"
 OUTPUT_DIR="/data/output"
 
-# Pennsieve provides data in /data/input and expects results in /data/output.
-# FreeSurfer license must be mounted at /license/license.txt.
-
 export FS_LICENSE=/license/license.txt
 
-# Find NIfTI T1w input
-T1W=$(find "$INPUT_DIR" -name "*.nii.gz" -o -name "*.nii" | head -1)
+T1W=$(find_t1w "$INPUT_DIR")
 
 if [ -z "$T1W" ]; then
-    echo "ERROR: No NIfTI file found in $INPUT_DIR" >&2
+    echo "ERROR: No T1w NIfTI file found in $INPUT_DIR" >&2
+    echo "Searched: flat, anat/, ses-*/anat/" >&2
+    find "$INPUT_DIR" -name "*.nii.gz" -o -name "*.nii" | head -10 >&2
     exit 1
 fi
 

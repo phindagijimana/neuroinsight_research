@@ -15,9 +15,11 @@ developer_contract: >
 
 inputs:
   required:
-    - key: T1w
-      type: nifti
-      description: "T1-weighted MRI scan"
+    - key: input_dir
+      type: directory
+      description: >
+        Directory containing T1w and optionally FLAIR NIfTI files.
+        Also accepts a single T1w file (backward compatible).
   optional:
     - key: subject_id
       type: string
@@ -29,22 +31,29 @@ inputs:
       default: 0.5
 
 input_format:
-  format_name: "Single NIfTI"
-  description: "A single T1-weighted MRI scan in NIfTI format."
+  format_name: "Directory with T1w + optional FLAIR"
+  description: >
+    A directory containing a T1-weighted MRI scan and optionally a FLAIR scan.
+    FLAIR improves lesion detection accuracy but is not required.
+    Also supports submitting a single T1w file directly.
   example_structure: |
-    any_folder/
+    input_folder/
       sub-01_T1w.nii.gz
+      sub-01_FLAIR.nii.gz       (optional, improves detection)
+  notes:
+    - "T1w file is required (detected by 'T1w' or 'T1' in filename)"
+    - "FLAIR file is optional (detected by 'FLAIR' or 'flair' in filename)"
+    - "If submitting a single file, use Single input mode"
 
 validation:
   preflight_checks:
-    - "file_exists(T1w)"
-    - "is_nifti(T1w)"
+    - "directory_exists(input_dir) or file_exists(input_dir)"
 
 steps:
   - id: recon_all
     uses: freesurfer_recon
     with:
-      T1w: "{inputs.T1w}"
+      input_dir: "{inputs.input_dir}"
       subject_id: "{inputs.subject_id}"
       fs_license: "{inputs.fs_license}"
 
@@ -53,6 +62,7 @@ steps:
     with:
       freesurfer_subjects_dir: "{step.recon_all.outputs.subjects_dir}"
       subject_id: "{inputs.subject_id}"
+      input_dir: "{inputs.input_dir}"
       threshold: "{inputs.threshold}"
 
 outputs:

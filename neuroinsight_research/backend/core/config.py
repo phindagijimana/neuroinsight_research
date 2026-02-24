@@ -173,7 +173,7 @@ class Settings(BaseSettings):
     # -- HPC/SLURM Settings --
     hpc_host: Optional[str] = Field(default=None, description="HPC cluster hostname")
     hpc_user: Optional[str] = Field(default=None, description="HPC username")
-    hpc_work_dir: str = Field(default="/scratch", description="HPC working directory")
+    hpc_work_dir: str = Field(default="~", description="HPC working directory (~ expands to $HOME)")
     hpc_partition: str = Field(default="general", description="Default SLURM partition")
     hpc_account: Optional[str] = Field(default=None, description="SLURM account/allocation name")
     hpc_qos: Optional[str] = Field(default=None, description="SLURM QoS level")

@@ -288,6 +288,12 @@ export interface DirectoryInfo {
   /** Filtered NIfTI files (.nii, .nii.gz) */
   nifti_files: string[];
 
+  /** Subdirectories */
+  directories?: { name: string; path: string }[];
+
+  /** Parent directory path */
+  parent?: string;
+
   /** Total size in bytes */
   total_size?: number;
 }

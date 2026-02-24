@@ -12,6 +12,9 @@ COPY --from=freesurfer /usr/local/freesurfer /usr/local/freesurfer
 ENV FREESURFER_HOME=/usr/local/freesurfer
 ENV PATH="${FREESURFER_HOME}/bin:${PATH}"
 
+COPY shared/detect_inputs.sh /shared/detect_inputs.sh
+RUN chmod +x /shared/detect_inputs.sh
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

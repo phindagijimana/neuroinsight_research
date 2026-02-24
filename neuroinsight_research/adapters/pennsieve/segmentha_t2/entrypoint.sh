@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+source /shared/detect_inputs.sh
+
 INPUT_DIR="/data/input"
 OUTPUT_DIR="/data/output"
 
@@ -8,17 +10,16 @@ export FS_LICENSE=/license/license.txt
 export SUBJECTS_DIR="$INPUT_DIR"
 
 SUBJECT_ID="${SUBJECT_ID:-sub-01}"
-T2_FILE="${T2_FILE:-}"
 
-if [ -z "$T2_FILE" ]; then
-    T2_FILE=$(find "$INPUT_DIR" -name "*T2*" -o -name "*t2*" | head -1)
-fi
+T2W=$(find_t2w "$INPUT_DIR")
 
 echo "Running FreeSurfer segmentHA_T2.sh on: $SUBJECTS_DIR/$SUBJECT_ID"
 
-if [ -n "$T2_FILE" ]; then
-    segmentHA_T2.sh "$SUBJECT_ID" "$T2_FILE" T2 1
+if [ -n "$T2W" ]; then
+    echo "Using T2w: $T2W"
+    segmentHA_T2.sh "$SUBJECT_ID" "$T2W" T2 1
 else
+    echo "No T2w found, running without T2"
     segmentHA_T2.sh "$SUBJECT_ID"
 fi
 

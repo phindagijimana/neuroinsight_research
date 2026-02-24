@@ -1,15 +1,15 @@
 /**
  * BackendSelector Component
  *
- * Unified data source & execution backend selector.
- * Shows all 5 options in one row:
- *   [Local] [Remote Server] [HPC] [Pennsieve] [XNAT]
+ * Independent data source & compute backend selector.
  *
- * - Local/Remote/HPC: data source = processing target (same machine)
- * - Pennsieve/XNAT:   data source only; processing target chosen separately
+ * Data Source row:  [Local] [Remote Server] [HPC] [Pennsieve] [XNAT]
+ * Compute row:     [Local Docker] [Remote Server] [HPC/SLURM]
  *
- * For Remote/HPC, provides SSH connection configuration.
- * For Pennsieve/XNAT, provides API credential forms.
+ * Data source and compute are independent -- you can browse data on a
+ * remote server while running jobs on an HPC cluster, for instance.
+ * SSH connection is shared: when either data or compute points to a
+ * remote host, the SSH form is shown and the connection serves both.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -98,14 +98,17 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
   const isPlatformConnected = platformConnection?.connected && platformConnection?.platform === dataSource;
 
   const activeDataSource = dataSource;
+  const dataSourceNeedsSSH = dataSource === 'remote' || dataSource === 'hpc';
+  const computeNeedsSSH = selectedBackend === 'remote' || selectedBackend === 'remote_hpc';
+  const needsSSH = !isPlatformSelected && (dataSourceNeedsSSH || computeNeedsSSH);
 
   useEffect(() => { checkCurrentBackend(); }, []);
 
   useEffect(() => {
-    if (onSSHConfigChange && (selectedBackend === 'remote' || selectedBackend === 'remote_hpc')) {
+    if (onSSHConfigChange && (dataSourceNeedsSSH || computeNeedsSSH)) {
       onSSHConfigChange({ host, username, port });
     }
-  }, [host, username, port, selectedBackend]);
+  }, [host, username, port, selectedBackend, dataSource]);
 
   const checkCurrentBackend = async () => {
     try {
@@ -148,8 +151,9 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
       if (data.connected) {
         setConnectionStatus('connected');
         if (selectedBackend === 'remote_hpc') fetchPartitions();
-        // Auto-activate the remote backend after successful SSH connection
-        switchToRemote(true);
+        if (computeNeedsSSH) {
+          switchToRemote(true);
+        }
       } else {
         setConnectionStatus('error');
         setErrorMessage(data.message || 'Connection failed');
@@ -331,15 +335,21 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
 
       {/* Description line */}
       <p className="text-xs text-gray-500 mb-3">
-        {isPlatformSelected && activeDataSource === 'pennsieve' && 'Browse and download data from Pennsieve, then process on chosen backend.'}
-        {isPlatformSelected && activeDataSource === 'xnat' && 'Browse and download data from XNAT, then process on chosen backend.'}
-        {!isPlatformSelected && selectedBackend === 'local' && 'Data and processing on this machine using Docker.'}
-        {!isPlatformSelected && selectedBackend === 'remote' && 'Data and processing on a remote SSH server (AWS EC2, Google Cloud, Azure, etc.)'}
-        {!isPlatformSelected && selectedBackend === 'remote_hpc' && 'Data and processing on an HPC cluster via SLURM.'}
+        {isPlatformSelected && activeDataSource === 'pennsieve' && 'Browse and download data from Pennsieve, then process on chosen compute backend.'}
+        {isPlatformSelected && activeDataSource === 'xnat' && 'Browse and download data from XNAT, then process on chosen compute backend.'}
+        {!isPlatformSelected && dataSource === 'local' && selectedBackend === 'local' && 'Data and processing on this machine using Docker.'}
+        {!isPlatformSelected && dataSource === 'local' && selectedBackend === 'remote' && 'Browse data locally, process on a remote Docker server via SSH.'}
+        {!isPlatformSelected && dataSource === 'local' && selectedBackend === 'remote_hpc' && 'Browse data locally, process on HPC via SLURM.'}
+        {!isPlatformSelected && dataSource === 'remote' && selectedBackend === 'local' && 'Browse data on remote server via SSH, process locally with Docker.'}
+        {!isPlatformSelected && dataSource === 'remote' && selectedBackend === 'remote' && 'Data and processing on a remote SSH server.'}
+        {!isPlatformSelected && dataSource === 'remote' && selectedBackend === 'remote_hpc' && 'Browse data on remote server, process on HPC via SLURM.'}
+        {!isPlatformSelected && dataSource === 'hpc' && selectedBackend === 'local' && 'Browse data on HPC filesystem via SSH, process locally with Docker.'}
+        {!isPlatformSelected && dataSource === 'hpc' && selectedBackend === 'remote' && 'Browse data on HPC filesystem, process on remote Docker server.'}
+        {!isPlatformSelected && dataSource === 'hpc' && selectedBackend === 'remote_hpc' && 'Data and processing on HPC cluster via SLURM.'}
       </p>
 
-      {/* SSH Configuration (Remote / HPC) */}
-      {!isPlatformSelected && (selectedBackend === 'remote' || selectedBackend === 'remote_hpc') && (
+      {/* SSH Configuration -- shown when either data source or compute needs SSH */}
+      {needsSSH && (
         <div className="border-t border-gray-200 pt-3 mt-1 flex-1 overflow-y-auto">
           {connectionStatus === 'connected' && (
             <div className="flex items-center justify-between mb-3 px-2 py-1.5 bg-green-50 border border-green-200 rounded text-xs">
@@ -483,15 +493,17 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
                   </>
                 )}
 
-                <button
-                  onClick={switchToRemote} disabled={isSwitching}
-                  className="w-full px-3 py-2 text-sm bg-navy-600 text-white rounded-md hover:bg-navy-700 disabled:bg-gray-300 font-medium transition flex items-center justify-center gap-2"
-                >
-                  {isSwitching ? (<><Loader2 className="h-4 w-4 animate-spin" />Activating...</>) : (
-                    <>{selectedBackend === 'remote_hpc' ? <Server className="h-4 w-4" /> : <Cloud className="h-4 w-4" />}
-                      {selectedBackend === 'remote_hpc' ? 'Activate SLURM Backend' : 'Activate Remote Docker'}</>
-                  )}
-                </button>
+                {computeNeedsSSH && (
+                  <button
+                    onClick={() => switchToRemote()} disabled={isSwitching}
+                    className="w-full px-3 py-2 text-sm bg-navy-600 text-white rounded-md hover:bg-navy-700 disabled:bg-gray-300 font-medium transition flex items-center justify-center gap-2"
+                  >
+                    {isSwitching ? (<><Loader2 className="h-4 w-4 animate-spin" />Activating...</>) : (
+                      <>{selectedBackend === 'remote_hpc' ? <Server className="h-4 w-4" /> : <Cloud className="h-4 w-4" />}
+                        {selectedBackend === 'remote_hpc' ? 'Activate SLURM Backend' : 'Activate Remote Docker'}</>
+                    )}
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -504,8 +516,34 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
         </div>
       )}
 
+      {/* Cross-system info: data and compute on different systems */}
+      {!isPlatformSelected && dataSource !== 'local' && selectedBackend === 'local' && dataSourceNeedsSSH && (
+        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded">
+          <p className="text-xs text-amber-700">
+            <strong>Note:</strong> Data is on a remote host but compute is local.
+            Input paths must be accessible from this machine (e.g. NFS mount) or files will be downloaded before processing.
+          </p>
+        </div>
+      )}
+      {!isPlatformSelected && dataSource === 'local' && computeNeedsSSH && (
+        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded">
+          <p className="text-xs text-amber-700">
+            <strong>Note:</strong> Data is local but compute is remote.
+            Input files will be uploaded to the remote host before processing.
+          </p>
+        </div>
+      )}
+      {!isPlatformSelected && dataSourceNeedsSSH && computeNeedsSSH && dataSource !== (selectedBackend === 'remote_hpc' ? 'hpc' : 'remote') && (
+        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded">
+          <p className="text-xs text-amber-700">
+            <strong>Note:</strong> Data source and compute are on different remote systems.
+            The SSH connection is shared &mdash; input paths must be accessible from the compute server (e.g. shared NFS filesystem).
+          </p>
+        </div>
+      )}
+
       {/* Local backend info */}
-      {!isPlatformSelected && selectedBackend === 'local' && (
+      {!isPlatformSelected && selectedBackend === 'local' && !dataSourceNeedsSSH && (
         <div className="border-t border-gray-200 pt-3 mt-1">
           <div className="flex items-center gap-1.5 text-xs text-gray-600">
             <Monitor className="h-3.5 w-3.5" />
