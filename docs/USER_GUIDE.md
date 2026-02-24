@@ -1260,6 +1260,158 @@ Yes: PDF reports, CSV data, PNG/PDF images.
 No, research software only. Not for clinical diagnosis.
 
 
+## Compute and Data Sources
+
+NeuroInsight separates **where your data lives** from **where processing runs**. You can mix and match any data source with any compute backend to suit your environment.
+
+### Data Sources
+
+| Source | Description | Authentication |
+|--------|-------------|----------------|
+| **Local** | Files on the machine running NeuroInsight | None (filesystem access) |
+| **Remote Server** | Files on any SSH-accessible Linux machine | SSH key (same credentials as compute) |
+| **HPC** | Files on an HPC cluster filesystem | SSH key (same credentials as compute) |
+| **Pennsieve** | Browse and download from the Pennsieve platform | API key + secret |
+| **XNAT** | Browse and download from any XNAT instance | XNAT username + password |
+
+### Compute Backends
+
+| Backend | Description | Requirements |
+|---------|-------------|--------------|
+| **Local Docker** | Process on the NeuroInsight server using Docker containers | Docker installed |
+| **Remote Server** | Process on a remote Linux machine via SSH + Docker | SSH access, Docker on remote |
+| **HPC/SLURM** | Submit jobs to an HPC cluster via SLURM | SSH access, SLURM, Singularity/Apptainer |
+
+### How They Work Together
+
+You select both a **data source** (top row) and a **compute backend** (bottom row) on the main processing page. A description line below explains the current combination. Examples:
+
+- **Local + Local Docker**: Everything runs on this machine -- simplest setup
+- **Local + HPC/SLURM**: Browse files locally, submit processing to an HPC cluster
+- **HPC + HPC/SLURM**: Browse and process data entirely on the HPC cluster
+- **Pennsieve + HPC/SLURM**: Download data from Pennsieve, process on HPC
+- **XNAT + Local Docker**: Download data from XNAT, process locally with Docker
+
+When **Remote Server** or **HPC** is selected as a data source or compute backend, an SSH configuration panel appears for entering the host, username, and port. A single SSH connection is shared when both data and compute point to the same remote machine.
+
+When **Pennsieve** or **XNAT** is selected as a data source, a platform login form replaces the SSH panel. After connecting, you can browse and select files through the platform's data hierarchy, then process them on any compute backend.
+
+---
+
+## Connecting to a Remote Server
+
+NeuroInsight can run neuroimaging jobs on any SSH-accessible Linux machine with Docker installed. This is useful for offloading processing to a more powerful server, a cloud VM (AWS, GCP, Azure), or a lab workstation.
+
+### Prerequisites
+
+1. **A Linux server** with Docker installed and running
+2. **SSH access** from the NeuroInsight server to the remote machine (key-based authentication)
+3. **Docker permissions** for your SSH user on the remote machine (user must be in the `docker` group)
+
+### Step 1: Set Up SSH Key Authentication
+
+Follow the same SSH key setup as for HPC connections (see "Connecting to HPC" below, Step 1). The NeuroInsight server needs passwordless SSH access to the remote machine.
+
+### Step 2: Connect in the NeuroInsight UI
+
+1. Open NeuroInsight in your browser
+2. Under **Data Source**, select **Local** (or **Remote Server** if your data is on the remote machine)
+3. Under **Compute Source**, select **Remote Server**
+4. Fill in the SSH connection fields:
+   - **Host** -- hostname or IP of the remote machine (or `localhost` if using a reverse tunnel)
+   - **Username** -- your SSH username on the remote machine
+   - **Port** -- `22` (default) or `2222` if using a reverse tunnel
+5. Click **Connect & Activate**
+6. A green "Connected" badge confirms the connection
+
+### Step 3: Verify Docker Access
+
+After connecting, NeuroInsight verifies that Docker is available on the remote machine. If Docker is not found or the user lacks permissions, an error message will explain the issue.
+
+### Network Access (Remote Server Behind a Firewall)
+
+If the remote server is on a private network (e.g., behind a university firewall), use a reverse SSH tunnel, following the same pattern described in "Connecting to HPC" Step 2 below. Replace the HPC login node with the remote server's hostname.
+
+### How Remote Server Differs from HPC
+
+| Feature | Remote Server | HPC/SLURM |
+|---------|---------------|-----------|
+| Container runtime | Docker | Singularity/Apptainer |
+| Job scheduling | Immediate (docker run) | Queued (sbatch) |
+| Multi-node | No (single machine) | Yes (SLURM partitions) |
+| Shared filesystem | No | Yes (NFS/Lustre) |
+| Best for | Single-server setups, cloud VMs | Multi-user clusters with job queuing |
+
+---
+
+## Connecting to Pennsieve
+
+NeuroInsight can browse, download, and process data stored on the [Pennsieve](https://app.pennsieve.io) data management platform.
+
+### Prerequisites
+
+1. **A Pennsieve account** with access to at least one dataset
+2. **An API key and secret** generated from your Pennsieve account
+
+### Step 1: Generate API Credentials
+
+1. Log in to Pennsieve at [https://app.pennsieve.io](https://app.pennsieve.io)
+2. Click your profile icon (top-right) and select **View My Profile**
+3. Scroll down to the **API Keys** section
+4. Click **Create API Key**
+5. Enter a name (e.g., "NeuroInsight") and click **Create**
+6. **Copy both the API Key and the API Secret** -- the secret is only shown once
+
+If you lose the secret, delete the key and create a new one.
+
+### Step 2: Connect in the NeuroInsight UI
+
+1. Open NeuroInsight and click **Get Started**
+2. Under **Data Source**, click the **Pennsieve** tab (blue database icon)
+3. Enter your credentials:
+   - **API Key** -- the key from Step 1 (format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`)
+   - **API Secret** -- the secret from Step 1
+4. Click **Connect**
+5. A green "Connected" badge confirms the connection, showing your email and workspace
+
+### Step 3: Browse Data
+
+After connecting, click **Browse** in the input section to open the Pennsieve Data Browser. The Pennsieve hierarchy is:
+
+```
+Workspace (Organization)
+ └── Dataset
+      └── Package (folder or file collection)
+           └── Files
+```
+
+1. **Datasets** -- listed automatically after connecting; select the dataset containing your data
+2. **Packages** -- navigate through folder structure within the dataset
+3. **Files** -- select the files you want to process, then click **Select for Processing**
+
+### Step 4: Process Data
+
+After selecting files from Pennsieve, the files are downloaded to the NeuroInsight server and submitted to your chosen compute backend (Local Docker, Remote Server, or HPC/SLURM) for processing.
+
+### Troubleshooting Pennsieve Connection
+
+| Problem | Solution |
+|---------|----------|
+| **"API Key and Secret are required"** | Both fields must be filled in |
+| **"Authentication failed"** | API key or secret is incorrect -- generate a new pair from Pennsieve |
+| **"Connection timed out"** | Network issue reaching Pennsieve API (`api.pennsieve.io`) -- check firewall/proxy |
+| **Empty dataset list** | Your account may not have access to any datasets -- verify in the Pennsieve web UI |
+| **"Token expired"** | Session expired after long idle time -- click Disconnect and reconnect |
+
+### Important Notes
+
+- **API key security**: API keys provide full access to your Pennsieve account. Do not share them or commit them to version control.
+- **Data download**: Files are downloaded to the NeuroInsight server before processing. Ensure sufficient disk space for your datasets.
+- **Large files**: Download speed depends on network bandwidth between the NeuroInsight server and Pennsieve's cloud storage.
+- **Pennsieve organizations**: If you belong to multiple organizations, NeuroInsight connects to your primary (default) organization.
+
+---
+
 ## Connecting to HPC (SLURM Cluster)
 
 NeuroInsight can submit neuroimaging jobs to a remote HPC cluster via SSH and SLURM, running containerized tools (Singularity/Apptainer) on cluster nodes instead of locally.
