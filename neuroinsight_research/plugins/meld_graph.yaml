@@ -145,8 +145,9 @@ execution:
         fi
 
         # Build MELD command
-        # Official pipeline: scripts/new_patient_pipeline/new_pt_pipeline.py
-        MELD_CMD="python scripts/new_patient_pipeline/new_pt_pipeline.py"
+        # Official pipeline: /app/scripts/new_patient_pipeline/new_pt_pipeline.py
+        # Use absolute path because Apptainer does not honor Docker WORKDIR.
+        MELD_CMD="python /app/scripts/new_patient_pipeline/new_pt_pipeline.py"
         MELD_CMD="$MELD_CMD -id {subject_id}"
 
         # Skip FreeSurfer segmentation if already done (default in workflow)

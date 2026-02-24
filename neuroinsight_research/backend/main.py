@@ -628,9 +628,23 @@ def submit_workflow_job(workflow_id: str, request: WorkflowJobSubmitRequest, db:
     # Check required licenses for all plugins in the workflow
     _check_licenses(step_plugin_ids)
 
-    # Use first step's plugin for container image and resources
+    # Compute resources from all steps: sum time_hours, take max of mem/cpus
     first_plugin = pw_registry.get_plugin(workflow.steps[0].uses)
-    res = first_plugin.resources if isinstance(first_plugin.resources, dict) else {}
+    total_time = 0
+    max_mem = 8
+    max_cpus = 4
+    any_gpu = False
+    for step in workflow.steps:
+        sp = pw_registry.get_plugin(step.uses)
+        if sp and sp.resource_profiles:
+            rp = sp.resource_profiles.get("default", {})
+            total_time += rp.get("time_hours", 0)
+            max_mem = max(max_mem, rp.get("mem_gb", 0))
+            max_cpus = max(max_cpus, rp.get("cpus", 0))
+            any_gpu = any_gpu or rp.get("gpus", 0) > 0
+    if total_time == 0:
+        total_time = 6
+    res = {"memory_gb": max_mem, "cpus": max_cpus, "time_hours": total_time, "gpu": any_gpu}
     if request.custom_resources:
         res = {**res, **request.custom_resources}
 

@@ -49,6 +49,7 @@ mri_segstats \
     --i "$SUBJECTS_DIR/$SUBJECT_ID/mri/brain.mgz"
 
 echo "=== Step 2/2: HS Detection Postprocess ==="
+export PYTHONPATH=/app:${PYTHONPATH:-}
 python -m neuroinsight_hs.postprocess \
     --subject-id "$SUBJECT_ID" \
     --subjects-dir "$SUBJECTS_DIR" \
