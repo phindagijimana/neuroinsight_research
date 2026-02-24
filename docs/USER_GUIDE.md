@@ -145,19 +145,7 @@ NeuroInsight separates **where your data lives** from **where processing runs**.
 | **Remote Server** | Process on a remote Linux machine via SSH + Docker | SSH access, Docker on remote |
 | **HPC/SLURM** | Submit jobs to an HPC cluster via SLURM | SSH access, SLURM, Singularity/Apptainer |
 
-### How They Work Together
-
-You select both a **data source** (top row) and a **compute backend** (bottom row) on the main processing page. A description line below explains the current combination. Examples:
-
-- **Local + Local Docker**: Everything runs on this machine -- simplest setup
-- **Local + HPC/SLURM**: Browse files locally, submit processing to an HPC cluster
-- **HPC + HPC/SLURM**: Browse and process data entirely on the HPC cluster
-- **Pennsieve + HPC/SLURM**: Download data from Pennsieve, process on HPC
-- **XNAT + Local Docker**: Download data from XNAT, process locally with Docker
-
-When **Remote Server** or **HPC** is selected as a data source or compute backend, an SSH configuration panel appears for entering the host, username, and port. A single SSH connection is shared when both data and compute point to the same remote machine.
-
-When **Pennsieve** or **XNAT** is selected as a data source, a platform login form replaces the SSH panel. After connecting, you can browse and select files through the platform's data hierarchy, then process them on any compute backend.
+You select a **data source** and a **compute backend** on the main processing page. Any combination works. For example: Local + Local Docker (simplest), Pennsieve + HPC/SLURM (download from cloud, process on cluster), or XNAT + Local Docker (download from hospital archive, process locally).
 
 ---
 
@@ -191,45 +179,7 @@ If she were working from home and the workstation were behind the university fir
 
 ### Step 1: Set Up SSH Key Authentication
 
-The NeuroInsight server needs passwordless SSH access to the remote machine. Generate a key on the server and copy it to the remote machine.
-
-On the **NeuroInsight server**:
-
-```bash
-ssh-keygen -t ed25519 -C "neuroinsight" -f ~/.ssh/id_ed25519 -N ""
-```
-
-This creates two files:
-
-```
-~/.ssh/id_ed25519       (private key -- stays on this server, never share)
-~/.ssh/id_ed25519.pub   (public key -- copy to the remote machine)
-```
-
-Display the public key:
-
-```bash
-cat ~/.ssh/id_ed25519.pub
-```
-
-Example output:
-
-```
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGk7r0gF4QXBZ1dN8vRpJm2LkO3xEzPfCwU9t2Q4sRmN neuroinsight
-```
-
-Copy that line and add it to the remote machine:
-
-```bash
-ssh sreyes@brainlab-ws01.med.stanford.edu \
-    "mkdir -p ~/.ssh && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGk7r0gF4QXBZ1dN8vRpJm2LkO3xEzPfCwU9t2Q4sRmN neuroinsight' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
-```
-
-Verify it works (should print the hostname without asking for a password):
-
-```bash
-ssh -o BatchMode=yes sreyes@brainlab-ws01.med.stanford.edu hostname
-```
+Follow the SSH key setup in the HPC section below (Step 1a-1c). The process is identical -- generate a key on the NeuroInsight server and copy the public key to the remote machine's `~/.ssh/authorized_keys`.
 
 ### Step 2: Connect in the NeuroInsight UI
 
@@ -243,50 +193,13 @@ ssh -o BatchMode=yes sreyes@brainlab-ws01.med.stanford.edu hostname
 5. Click **Connect & Activate**
 6. A green "Connected" badge confirms the connection
 
-### Step 3: Verify Docker Access
-
-After connecting, NeuroInsight verifies that Docker is available on the remote machine. If Docker is not found or the user lacks permissions, an error message will explain the issue.
-
-### Network Access (Remote Server Behind a Firewall)
-
-If the remote server is on a private network (e.g., behind a university firewall), use a reverse SSH tunnel, following the same pattern described in "Connecting to HPC" Step 2 below. Replace the HPC login node with the remote server's hostname.
-
-### How Remote Server Differs from HPC
-
-| Feature | Remote Server | HPC/SLURM |
-|---------|---------------|-----------|
-| Container runtime | Docker | Singularity/Apptainer |
-| Job scheduling | Immediate (docker run) | Queued (sbatch) |
-| Multi-node | No (single machine) | Yes (SLURM partitions) |
-| Shared filesystem | No | Yes (NFS/Lustre) |
-| Best for | Single-server setups, cloud VMs | Multi-user clusters with job queuing |
+If the remote server is behind a firewall, use a reverse SSH tunnel (same pattern as HPC Step 2 below).
 
 ---
 
 ## Connecting to Pennsieve
 
 NeuroInsight can browse, download, and process data stored on the [Pennsieve](https://app.pennsieve.io) data management platform. Pennsieve is a cloud-based research data management system used by NIH SPARC, RE-JOIN, and other programs to store, organize, and share biomedical datasets.
-
-### Example Scenario
-
-Dr. Okonkwo's epilepsy lab at the University of Pennsylvania stores all their MRI datasets on Pennsieve under the organization "Penn Epilepsy Center". A research assistant, James, needs to run the hippocampal sclerosis detection pipeline on 12 subjects from the dataset "Temporal Lobe Epilepsy Cohort 2025".
-
-James does not have the MRI files on his local machine -- they are only on Pennsieve. He also wants to process them on the lab's HPC cluster.
-
-**Step 1 -- Generate API credentials:** James logs into `app.pennsieve.io`, goes to his profile, and creates an API key named "NeuroInsight". He copies the key (`a3f8e1d2-...`) and the secret.
-
-**Step 2 -- Connect in NeuroInsight:**
-
-| Field | Value |
-|-------|-------|
-| Data Source | **Pennsieve** |
-| Compute Source | **HPC/SLURM** |
-| API Key | `a3f8e1d2-7b4c-49e1-8f6a-2d9c0e5b1a73` |
-| API Secret | (pasted from clipboard) |
-
-**Step 3 -- Browse and select data:** After connecting, he clicks Browse, selects "Temporal Lobe Epilepsy Cohort 2025", navigates into the subject folders, and selects the T1-weighted NIfTI files for his 12 subjects.
-
-**Step 4 -- Process:** NeuroInsight downloads the selected files from Pennsieve and submits them to the HPC cluster for processing via SLURM. James monitors progress in the SLURM Queue Monitor panel.
 
 ### Prerequisites
 
@@ -350,13 +263,6 @@ After selecting files from Pennsieve, the files are downloaded to the NeuroInsig
 | **Empty dataset list** | Your account may not have access to any datasets -- verify in the Pennsieve web UI |
 | **"Token expired"** | Session expired after long idle time -- click Disconnect and reconnect |
 
-### Important Notes
-
-- **API key security**: API keys provide full access to your Pennsieve account. Do not share them or commit them to version control.
-- **Data download**: Files are downloaded to the NeuroInsight server before processing. Ensure sufficient disk space for your datasets.
-- **Large files**: Download speed depends on network bandwidth between the NeuroInsight server and Pennsieve's cloud storage.
-- **Pennsieve organizations**: If you belong to multiple organizations, NeuroInsight connects to your primary (default) organization.
-
 ---
 
 ## Connecting to HPC (SLURM Cluster)
@@ -367,19 +273,7 @@ NeuroInsight can submit neuroimaging jobs to a remote HPC cluster via SSH and SL
 
 Priya is a PhD student in neuroscience at Boston University. She has 50 subjects to process through the full diffusion pipeline (QSIPrep + QSIRecon), which takes about 8 hours per subject. Running all 50 sequentially on her laptop would take over 16 days. The university's Shared Computing Cluster (SCC) has hundreds of nodes and can run multiple subjects in parallel.
 
-NeuroInsight is deployed on an AWS EC2 instance so Priya can access it from anywhere. The SCC is behind BU's campus firewall, so Priya uses a reverse SSH tunnel from her laptop (connected to BU's VPN) to bridge the two.
-
-**Setting up the tunnel (on her laptop, VPN connected):**
-
-```bash
-ssh -i ~/keys/aws-neuroinsight.pem \
-    -L 3000:localhost:3000 \
-    -L 8000:localhost:8000 \
-    -R 2222:scc-login.bu.edu:22 \
-    ubuntu@54.89.123.45
-```
-
-This single command does three things: forwards the NeuroInsight UI (port 3000) and API (port 8000) to her browser, and creates a reverse tunnel so the AWS server can reach the SCC through her VPN.
+NeuroInsight is deployed on an AWS EC2 instance so Priya can access it from anywhere. The SCC is behind BU's campus firewall, so she sets up a reverse SSH tunnel from her laptop (see Step 2 below for the exact command).
 
 **What she enters in the NeuroInsight UI:**
 
@@ -544,12 +438,6 @@ Once connected, the **SLURM Queue Monitor** panel appears automatically, showing
 
 You can also browse remote files on the HPC using the **File Browser** panel in HPC mode.
 
-### Switching Back to Local
-
-To return to local Docker execution:
-- Click the **Local** tab in the backend selector, or
-- Click **Disconnect** in the HPC panel
-
 ### Troubleshooting HPC Connection
 
 | Problem | Solution |
@@ -559,12 +447,6 @@ To return to local Docker execution:
 | **"Connection refused"** | Wrong port, or the hostname is a web portal (OOD) not an SSH server -- use the actual login node |
 | **"No SLURM partitions found"** | SLURM not available on this node -- verify `sinfo` works when you SSH in manually |
 | **Reverse tunnel not working** | Ensure your VPN is active and the SSH session with `-R` flag is still open |
-
-### Important Notes
-
-- **Open OnDemand (OOD)**: OOD servers are web portals and typically do not accept SSH connections. Use the underlying HPC login node hostname instead. You can find it by opening a terminal session within the OOD web interface.
-- **SSH Agent Forwarding**: Not required -- NeuroInsight uses key-based auth directly from the server.
-- **Multiple Users**: Each user needs their own SSH key added to their HPC account.
 
 ---
 
@@ -654,67 +536,19 @@ After selecting files from XNAT, the files are downloaded to the NeuroInsight se
 
 If NeuroInsight runs on an external server (e.g., AWS EC2) and the XNAT instance is on a private institutional network, the server cannot reach XNAT directly. Use an **SSH local port forward** through an intermediary that can reach both networks.
 
-#### Architecture
-
-```
-NeuroInsight Server (AWS)                    Intermediary (HPC/VPN)                   XNAT Instance
-      localhost:8443  ---- SSH tunnel ---->  hpc-login  ---- network ---->  xnat.university.edu:443
-```
-
-The intermediary can be any machine that:
-- Is reachable from the NeuroInsight server via SSH
-- Can reach the XNAT instance over the network (e.g., on the same campus network or VPN)
-
-An HPC login node you are already connected to is a common choice.
+The intermediary can be any SSH-accessible machine that can reach the XNAT server -- typically an HPC login node on the same campus network.
 
 #### Set up the tunnel
 
 On the **NeuroInsight server**, run:
 
 ```bash
-ssh -L 8443:<xnat-hostname>:443 <username>@<intermediary-host> -N
-```
-
-| Parameter | Example | Purpose |
-|-----------|---------|---------|
-| `8443` | `8443` | Local port on the NeuroInsight server that will proxy to XNAT |
-| `<xnat-hostname>` | `xnat.university.edu` | The XNAT hostname as reachable from the intermediary |
-| `443` | `443` | XNAT's HTTPS port (use `80` for HTTP, or `8080` if non-standard) |
-| `<intermediary-host>` | `hpc-login.university.edu` | The SSH-accessible intermediary machine |
-| `-N` | | Don't open a shell, just forward ports |
-
-Keep this terminal open while using XNAT.
-
-**Example** (tunneling through an HPC login node to reach a hospital XNAT):
-
-```bash
 ssh -L 8443:xnat.urmc.rochester.edu:443 dnakamura@smdodlogin01.urmc.rochester.edu -N
 ```
 
-In this example, `dnakamura` is the HPC username, `smdodlogin01.urmc.rochester.edu` is the HPC login node (which can reach XNAT), and `xnat.urmc.rochester.edu` is the XNAT server on the hospital network. Replace all three with your own values.
+This forwards local port `8443` through the HPC login node to the XNAT server. Replace the hostnames and username with your own. Keep this terminal open while using XNAT. Then use the "Via SSH tunnel" column in the Step 1 table above to fill in the UI fields.
 
-#### Connect in the UI
-
-When using the tunnel, enter:
-- **XNAT URL**: `https://localhost:8443`
-- **Skip SSL verification**: **checked** (required -- see below)
-- **Username / Password**: your XNAT credentials
-
-### SSL Certificate Verification
-
-When connecting through an SSH tunnel, the browser/server connects to `localhost:8443` but the XNAT server's SSL certificate was issued for its real hostname (e.g., `xnat.university.edu`). This hostname mismatch causes SSL verification to fail with an error like:
-
-```
-SSL certificate verification failed for https://localhost:8443
-```
-
-**Solution**: Check the **"Skip SSL verification"** checkbox in the XNAT Login form before clicking Connect. This is safe when using an SSH tunnel because the tunnel itself provides encrypted transport to the intermediary.
-
-When connecting directly to an XNAT instance (no tunnel), leave SSL verification **enabled** unless the XNAT instance uses a self-signed certificate.
-
-### XNAT on the Transfer Page
-
-The XNAT connection is also available on the **Transfer** page for downloading/uploading data without processing. Click the **XNAT** tab in either the source or destination pane, enter credentials, and browse the same Project > Subject > Experiment > Scan hierarchy.
+Check **"Skip SSL verification"** when connecting via a tunnel -- the XNAT certificate was issued for the real hostname, not `localhost`, so verification will fail. This is safe because the tunnel itself provides encrypted transport.
 
 ### Troubleshooting XNAT Connection
 
@@ -730,10 +564,8 @@ The XNAT connection is also available on the **Transfer** page for downloading/u
 
 ### Important Notes
 
-- **Session timeout**: XNAT sessions expire after inactivity (typically 15-30 minutes). If you get errors after being idle, click **Disconnect** and reconnect.
-- **Large downloads**: When downloading many files or large datasets, ensure sufficient disk space on the NeuroInsight server.
-- **XNAT versions**: NeuroInsight uses the standard XNAT REST API and works with XNAT 1.7+ instances.
-- **No uploads during processing**: File uploads to XNAT require the experiment and resource to already exist. Use the XNAT web interface to create them first.
+- XNAT sessions expire after 15-30 minutes of inactivity. If you get errors after being idle, disconnect and reconnect.
+- NeuroInsight uses the standard XNAT REST API and works with XNAT 1.7+ instances.
 
 ---
 
