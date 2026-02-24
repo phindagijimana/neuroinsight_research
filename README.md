@@ -87,6 +87,10 @@ NeuroInsight supports five data sources and three compute backends that can be c
 - [User Guide](https://github.com/phindagijimana/neuroinsight_research/blob/master/docs/USER_GUIDE.md) -- Complete setup, connection, and usage instructions with real-world examples
 - [Troubleshooting](https://github.com/phindagijimana/neuroinsight_research/blob/master/docs/TROUBLESHOOTING.md) -- Common issues and solutions
 
+## Contact
+
+For questions, comments, or contributions, reach out to **phindagijimana@gmail.com**.
+
 ## License
 
 MIT License. Individual neuroimaging tools (FreeSurfer, fMRIPrep, etc.) have their own licenses.
