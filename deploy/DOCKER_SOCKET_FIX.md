@@ -3,8 +3,8 @@
 ## Problem
 
 NeuroInsight needs to spawn FreeSurfer containers for MRI processing. This requires:
-1. Docker socket mounted: `/var/run/docker.sock:/var/run/docker.sock` ✓
-2. Container user has permission to access the socket ✗ (varies by system)
+1. Docker socket mounted: `/var/run/docker.sock:/var/run/docker.sock` [x]
+2. Container user has permission to access the socket [ ] (varies by system)
 
 The Docker socket's group ID (GID) varies between systems:
 - **Linux:** GID varies (often 999, 998, or distribution-specific)
@@ -27,10 +27,10 @@ The container now **automatically detects and configures** Docker socket permiss
 ```
 
 **2. Universal Compatibility**
-- ✅ **Linux (any distribution)** - Auto-detects GID
-- ✅ **WSL2** - Auto-detects Docker Desktop's GID
-- ✅ **Docker Desktop** - Works out of the box
-- ✅ **Existing containers** - No manual configuration needed
+- **Linux (any distribution)** - Auto-detects GID
+- **WSL2** - Auto-detects Docker Desktop's GID
+- **Docker Desktop** - Works out of the box
+- **Existing containers** - No manual configuration needed
 
 **3. Zero User Configuration**
 - No need to manually specify `--group-add`
@@ -115,7 +115,7 @@ Check that Docker access works:
 docker logs neuroinsight 2>&1 | grep -A 10 "Docker socket"
 
 # Should show:
-# ✓ Docker access verified - FreeSurfer spawning enabled
+# Docker access verified - FreeSurfer spawning enabled
 
 # Method 2: Test Docker access from inside container
 docker exec neuroinsight docker ps
@@ -149,11 +149,11 @@ But this should never be necessary with the new image.
 ## Testing
 
 Tested and verified on:
-- ✅ Ubuntu 20.04, 22.04, 24.04 (native)
-- ✅ Debian 11, 12
-- ✅ WSL2 (Ubuntu on Windows 10/11)
-- ✅ Docker Desktop for Windows
-- ✅ Docker Desktop for Mac (via Lima VM)
+- Ubuntu 20.04, 22.04, 24.04 (native)
+- Debian 11, 12
+- WSL2 (Ubuntu on Windows 10/11)
+- Docker Desktop for Windows
+- Docker Desktop for Mac (via Lima VM)
 
 ## Related Files
 

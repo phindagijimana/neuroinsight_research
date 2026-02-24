@@ -4,7 +4,7 @@
 
 **`upload_simple.py`** - Currently active upload endpoint
 - Route: `POST /api/upload/`
-- Status: ✅ Production
+- Status: Production
 - Features:
   - Basic file validation (.nii, .nii.gz)
   - Patient data handling
@@ -15,7 +15,7 @@
 ## Backup/Reference
 
 **`upload.py.backup`** - Previous implementation (not active)
-- Status: ⚠️ Reference only - NOT imported
+- Status: [!] Reference only - NOT imported
 - Why kept: Contains additional validation features that may be useful:
   - API key authentication
   - Advanced file corruption detection
@@ -26,8 +26,8 @@
 ## Making Changes
 
 When modifying the upload endpoint:
-1. ✅ Edit `upload_simple.py` (active)
-2. ❌ Do NOT edit `upload.py.backup` (inactive)
+1. [x] Edit `upload_simple.py` (active)
+2. [ ] Do NOT edit `upload.py.backup` (inactive)
 3. Test changes at `POST /api/upload/`
 
 ## Switching Implementations
@@ -44,7 +44,7 @@ To switch to the more comprehensive upload.py implementation:
 
 ## Current Status
 
-- ✅ `upload_simple.py` - Active and working
-- 📦 `upload.py.backup` - Archived for reference
-- ✅ No route conflicts
-- ✅ Clear which file is production
+- `upload_simple.py` - Active and working
+- `upload.py.backup` - Archived for reference
+- No route conflicts
+- Clear which file is production

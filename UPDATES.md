@@ -70,7 +70,7 @@ Split into three subsections:
 ### 8. **Updated Roadmap with Detailed Milestones**
 
 New Section 14 shows:
-- Checkboxes for completed items (✅)
+- Checkboxes for completed items ([x])
 - Specific deliverables for each phase
 - Clear progression from local → HPC → desktop → OOD
 - Current status: Phase 1 in progress
@@ -116,24 +116,24 @@ New Section 15 includes:
 ## Why These Changes Matter
 
 ### For Developers:
-- ✅ Clear what to build first (local platform)
-- ✅ Understand the abstraction layer
-- ✅ Know they can develop without HPC access
+- Clear what to build first (local platform)
+- Understand the abstraction layer
+- Know they can develop without HPC access
 
 ### For Investors:
-- ✅ Realistic timeline (12 months to full platform)
-- ✅ No institutional partnerships blocking MVP
-- ✅ Clear go-to-market strategy
+- Realistic timeline (12 months to full platform)
+- No institutional partnerships blocking MVP
+- Clear go-to-market strategy
 
 ### For Users:
-- ✅ Works locally for small-scale use
-- ✅ Can connect to their own HPC (no IT approval needed)
-- ✅ Data never leaves their control
+- Works locally for small-scale use
+- Can connect to their own HPC (no IT approval needed)
+- Data never leaves their control
 
 ### For HPC Administrators:
-- ✅ Understand security model (user credentials only)
-- ✅ See optional OOD integration path
-- ✅ Recognize it's just an SSH client (from their perspective)
+- Understand security model (user credentials only)
+- See optional OOD integration path
+- Recognize it's just an SSH client (from their perspective)
 
 ---
 
@@ -184,14 +184,14 @@ New Section 15 includes:
 ## Feedback Incorporated
 
 Based on conversation with team:
-1. ✅ Clarified two versions: Local/Desktop + HPC-Native
-2. ✅ Confirmed development strategy: local first
-3. ✅ Explained abstraction layer concept
-4. ✅ Emphasized data stays on HPC
-5. ✅ Removed partnership requirement for desktop HPC access
-6. ✅ Listed core features across all modes
-7. ✅ Updated roadmap to match phased approach
-8. ✅ Made document more concise overall
+1. [x] Clarified two versions: Local/Desktop + HPC-Native
+2. [x] Confirmed development strategy: local first
+3. [x] Explained abstraction layer concept
+4. [x] Emphasized data stays on HPC
+5. [x] Removed partnership requirement for desktop HPC access
+6. [x] Listed core features across all modes
+7. [x] Updated roadmap to match phased approach
+8. [x] Made document more concise overall
 
 ---
 

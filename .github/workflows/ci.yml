@@ -598,7 +598,7 @@ jobs:
 
       - name: Download test MRI data
         run: |
-          echo "🧲 Downloading test MRI dataset..."
+          echo "Downloading test MRI dataset..."
 
           # Create test data directory
           mkdir -p test_data
@@ -690,7 +690,7 @@ jobs:
 
       - name: Test MRI processing pipeline
         run: |
-          echo "🔬 Testing complete MRI processing pipeline..."
+          echo "Testing complete MRI processing pipeline..."
 
           python -c "
           import sys

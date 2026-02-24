@@ -28,31 +28,31 @@ if [ -S /var/run/docker.sock ]; then
         if [ "$DOCKER_SOCKET_GID" != "$CURRENT_DOCKER_GID" ]; then
             echo "  Updating docker group GID to match socket..."
             groupmod -g "$DOCKER_SOCKET_GID" docker
-            echo "  ✓ Docker group updated to GID $DOCKER_SOCKET_GID"
+            echo "  [OK] Docker group updated to GID $DOCKER_SOCKET_GID"
         else
-            echo "  ✓ Docker group GID already matches socket"
+            echo "  [OK] Docker group GID already matches socket"
         fi
     else
         # Docker group doesn't exist, create it with correct GID
         echo "  Creating docker group with GID $DOCKER_SOCKET_GID..."
         groupadd -g "$DOCKER_SOCKET_GID" docker
-        echo "  ✓ Docker group created"
+        echo "  [OK] Docker group created"
     fi
     
     # Ensure neuroinsight user is in docker group
     if ! id -nG neuroinsight | grep -qw docker; then
         echo "  Adding neuroinsight user to docker group..."
         usermod -aG docker neuroinsight
-        echo "  ✓ User added to docker group"
+        echo "  [OK] User added to docker group"
     else
-        echo "  ✓ User already in docker group"
+        echo "  [OK] User already in docker group"
     fi
     
     # Verify Docker access
     if su - neuroinsight -c "docker ps > /dev/null 2>&1"; then
-        echo "  ✓ Docker access verified - FreeSurfer spawning enabled"
+        echo "  [OK] Docker access verified - FreeSurfer spawning enabled"
     else
-        echo "  ⚠ Warning: Docker access test failed"
+        echo "  [WARN] Warning: Docker access test failed"
         echo "  FreeSurfer container spawning may not work"
         echo "  This is usually fine if Docker daemon is starting up"
     fi
@@ -61,7 +61,7 @@ if [ -S /var/run/docker.sock ]; then
     echo ""
 else
     echo ""
-    echo "⚠ Warning: Docker socket not found at /var/run/docker.sock"
+    echo "[WARN] Warning: Docker socket not found at /var/run/docker.sock"
     echo "FreeSurfer container spawning will not be available"
     echo "Application will run in demo mode with mock processing"
     echo ""

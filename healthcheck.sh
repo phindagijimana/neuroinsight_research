@@ -10,10 +10,10 @@ check_service() {
     check_command=$2
     
     if eval "$check_command" > /dev/null 2>&1; then
-        echo "✓ $service_name is healthy"
+        echo "[OK] $service_name is healthy"
         return 0
     else
-        echo "✗ $service_name is not responding"
+        echo "[FAIL] $service_name is not responding"
         return 1
     fi
 }

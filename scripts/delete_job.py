@@ -77,7 +77,7 @@ def main():
         deleted = JobService.delete_job(db, job_id)
         
         if deleted:
-            print(f"✓ Job {job_id} deleted successfully")
+            print(f"[OK] Job {job_id} deleted successfully")
             print(f"  - Database record removed")
             print(f"  - Uploaded file removed")
             print(f"  - Output directory removed")
