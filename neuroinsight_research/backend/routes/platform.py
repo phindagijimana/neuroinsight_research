@@ -73,6 +73,7 @@ class ConnectRequest(BaseModel):
     url: Optional[str] = None
     username: Optional[str] = None
     password: Optional[str] = None
+    verify_ssl: Optional[bool] = True
 
 
 # ------------------------------------------------------------- endpoints
@@ -90,11 +91,25 @@ def platform_connect(platform: str, request: ConnectRequest):
     elif platform == "xnat":
         if not request.url or not request.username or not request.password:
             raise HTTPException(400, "url, username, and password are required for XNAT")
-        creds = {"url": request.url, "username": request.username, "password": request.password}
+        creds = {
+            "url": request.url,
+            "username": request.username,
+            "password": request.password,
+            "verify_ssl": str(request.verify_ssl).lower(),
+        }
 
     try:
         result = connector.connect(creds)
         return result
+    except ConnectionError as e:
+        logger.warning("Platform connect - network error: %s", e)
+        raise HTTPException(502, str(e))
+    except PermissionError as e:
+        logger.warning("Platform connect - auth error: %s", e)
+        raise HTTPException(401, str(e))
+    except ValueError as e:
+        logger.warning("Platform connect - validation: %s", e)
+        raise HTTPException(400, str(e))
     except Exception as e:
         logger.error("Platform connect failed: %s", e)
         raise HTTPException(502, f"Connection failed: {e}")

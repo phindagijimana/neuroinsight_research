@@ -1081,12 +1081,26 @@ def get_jobs_progress(db: Session = Depends(get_db)):
 
     Frontend polls this at ~2-3s intervals to animate progress bars.
     For SLURM jobs, queries live status from the HPC scheduler via SSH.
+    Uses a single batched squeue call instead of one per job.
     """
     active_jobs = (
         db.query(Job)
         .filter(Job.deleted == False, Job.status.in_(["pending", "running"]))
         .all()
     )
+
+    # Batch-query SLURM statuses in a single SSH call
+    slurm_jobs = {
+        j.backend_job_id: j
+        for j in active_jobs
+        if j.backend_type == "slurm" and j.backend_job_id
+    }
+    slurm_statuses: dict[str, str] = {}
+    if slurm_jobs:
+        slurm_statuses = _poll_slurm_status_batch(list(slurm_jobs.keys()))
+
+    import time as _t
+    _progress_deadline = _t.time() + 12  # max 12s on log polling
 
     results = []
     for j in active_jobs:
@@ -1095,7 +1109,7 @@ def get_jobs_progress(db: Session = Depends(get_db)):
         phase = j.current_phase
 
         if j.backend_type == "slurm" and j.backend_job_id:
-            new_status = _poll_slurm_status(j.backend_job_id)
+            new_status = slurm_statuses.get(j.backend_job_id)
             if new_status and new_status != status:
                 status = new_status
                 j.status = status
@@ -1118,8 +1132,7 @@ def get_jobs_progress(db: Session = Depends(get_db)):
                 except Exception:
                     db.rollback()
 
-            # Parse log-based progress for running SLURM jobs
-            if status == "running":
+            if status == "running" and _t.time() < _progress_deadline:
                 prog_result = _poll_slurm_progress(j)
                 if prog_result:
                     new_progress, new_phase = prog_result
@@ -1143,12 +1156,23 @@ def get_jobs_progress(db: Session = Depends(get_db)):
     return {"jobs": results}
 
 
-def _poll_slurm_status(slurm_job_id: str) -> str | None:
-    """Query SLURM for a job's current status via SSH.
+_SLURM_STATUS_MAP = {
+    "PENDING": "pending", "RUNNING": "running",
+    "COMPLETING": "running", "COMPLETED": "completed",
+    "FAILED": "failed", "CANCELLED": "cancelled",
+    "TIMEOUT": "failed", "NODE_FAIL": "failed",
+    "OUT_OF_MEMORY": "failed", "PREEMPTED": "failed",
+}
 
-    Works independently of the backend singleton -- as long as SSH is connected.
-    Returns None when SSH is unavailable (preserves current DB status).
+
+def _poll_slurm_status_batch(slurm_job_ids: list[str]) -> dict[str, str]:
+    """Query SLURM statuses for multiple jobs in a single SSH call.
+
+    Returns {slurm_job_id: mapped_status} for jobs with a known state.
     """
+    if not slurm_job_ids:
+        return {}
+
     try:
         from backend.core.ssh_manager import get_ssh_manager
         ssh = get_ssh_manager()
@@ -1160,43 +1184,35 @@ def _poll_slurm_status(slurm_job_id: str) -> str | None:
                 except Exception:
                     pass
             if not ssh.is_connected:
-                return None
+                return {}
 
+        id_list = ",".join(slurm_job_ids)
         exit_code, stdout, _ = ssh.execute(
-            f"squeue -j {slurm_job_id} --noheader -o '%T' 2>/dev/null || true",
-            timeout=10,
+            f"squeue -j {id_list} --noheader -o '%i %T' 2>/dev/null; "
+            f"sacct -j {id_list} --noheader --format=JobID,State -P 2>/dev/null",
+            timeout=15,
         )
-        state = stdout.strip().upper()
-        if state:
-            status_map = {
-                "PENDING": "pending", "RUNNING": "running",
-                "COMPLETING": "running", "COMPLETED": "completed",
-                "FAILED": "failed", "CANCELLED": "cancelled",
-                "TIMEOUT": "failed", "NODE_FAIL": "failed",
-                "OUT_OF_MEMORY": "failed", "PREEMPTED": "failed",
-            }
-            return status_map.get(state)
 
-        exit_code, stdout, _ = ssh.execute(
-            f"sacct -j {slurm_job_id} --noheader --format=State -P 2>/dev/null | head -1",
-            timeout=10,
-        )
-        state = stdout.strip().split("+")[0].upper()
-        if " " in state:
-            state = state.split()[0]
-        if state:
-            status_map = {
-                "PENDING": "pending", "RUNNING": "running",
-                "COMPLETING": "running", "COMPLETED": "completed",
-                "FAILED": "failed", "CANCELLED": "cancelled",
-                "TIMEOUT": "failed", "NODE_FAIL": "failed",
-                "OUT_OF_MEMORY": "failed", "PREEMPTED": "failed",
-            }
-            return status_map.get(state)
+        results: dict[str, str] = {}
+        for line in stdout.strip().splitlines():
+            parts = line.split()
+            if len(parts) >= 2:
+                jid = parts[0].split("|")[0].split(".")[0].strip()
+                state = parts[-1].split("+")[0].strip().upper()
+                if jid in slurm_job_ids or jid in {s.split("_")[0] for s in slurm_job_ids}:
+                    mapped = _SLURM_STATUS_MAP.get(state)
+                    if mapped and jid not in results:
+                        results[jid] = mapped
+        return results
     except Exception as e:
-        logger.debug("SLURM status poll failed for %s: %s", slurm_job_id, e)
+        logger.debug("Batched SLURM status poll failed: %s", e)
+        return {}
 
-    return None
+
+def _poll_slurm_status(slurm_job_id: str) -> str | None:
+    """Query SLURM for a single job's status (fallback, prefer batch)."""
+    result = _poll_slurm_status_batch([slurm_job_id])
+    return result.get(slurm_job_id)
 
 
 # ---------------------------------------------------------------------------
@@ -1206,7 +1222,7 @@ import time as _time
 import re as _re
 
 _slurm_progress_cache: dict[str, tuple[float, int, str]] = {}
-_SLURM_PROGRESS_POLL_INTERVAL = 20  # seconds between log reads per job
+_SLURM_PROGRESS_POLL_INTERVAL = 30  # seconds between log reads per job
 
 
 def _poll_slurm_progress(job: "Job") -> tuple[int, str] | None:

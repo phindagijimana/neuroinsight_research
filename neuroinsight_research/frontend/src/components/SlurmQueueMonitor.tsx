@@ -6,7 +6,7 @@
  * Auto-refreshes every 10 seconds.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Server, RefreshCw, AlertCircle } from 'lucide-react';
 import { apiService } from '../services/api';
 
@@ -24,7 +24,7 @@ interface QueueJob {
 interface SlurmQueueMonitorProps {
   /** Only show when HPC backend is active */
   visible?: boolean;
-  /** Auto-refresh interval in ms (default: 10000) */
+  /** Auto-refresh interval in ms (default: 30000) */
   refreshInterval?: number;
 }
 
@@ -39,14 +39,17 @@ const stateColors: Record<string, string> = {
 
 const SlurmQueueMonitor: React.FC<SlurmQueueMonitorProps> = ({
   visible = true,
-  refreshInterval = 10000,
+  refreshInterval = 30000,
 }) => {
   const [queue, setQueue] = useState<QueueJob[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const inFlightRef = useRef(false);
 
   const fetchQueue = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
       setLoading(true);
       setError(null);
@@ -55,13 +58,13 @@ const SlurmQueueMonitor: React.FC<SlurmQueueMonitorProps> = ({
       setLastRefresh(new Date());
     } catch (err: any) {
       if (err.response?.status === 400) {
-        // Not using SLURM backend -- ignore
         setQueue([]);
       } else {
         setError('Failed to fetch queue');
       }
     } finally {
       setLoading(false);
+      inFlightRef.current = false;
     }
   }, []);
 

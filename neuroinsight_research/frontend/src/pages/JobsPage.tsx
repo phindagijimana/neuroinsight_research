@@ -72,11 +72,14 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
     setStats(counts);
   }, [jobs]);
 
-  // -- Progress polling for active jobs (lightweight, 2.5s interval) ------
+  // -- Progress polling for active jobs ------
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fullRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressInFlightRef = useRef(false);
 
   const pollProgress = useCallback(async () => {
+    if (progressInFlightRef.current) return;
+    progressInFlightRef.current = true;
     try {
       const progressData = await apiService.getJobsProgress();
       if (progressData.length === 0) return;
@@ -96,7 +99,9 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
         })
       );
     } catch {
-      // Silent — progress polling is best-effort
+      // Silent -- progress polling is best-effort
+    } finally {
+      progressInFlightRef.current = false;
     }
   }, []);
 
@@ -111,17 +116,17 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
       (j) => j.status === 'pending' || j.status === 'running'
     );
 
-    // Fast progress poll (2.5s)
+    // Progress poll every 15s (SSH-based, can be slow)
     if (hasActiveJobs && !progressTimerRef.current) {
-      progressTimerRef.current = setInterval(pollProgress, 2500);
+      progressTimerRef.current = setInterval(pollProgress, 15000);
     } else if (!hasActiveJobs && progressTimerRef.current) {
       clearInterval(progressTimerRef.current);
       progressTimerRef.current = null;
     }
 
-    // Slower full refresh (8s) to catch status transitions (running->completed)
+    // Slower full refresh (30s) to catch status transitions
     if (hasActiveJobs && !fullRefreshTimerRef.current) {
-      fullRefreshTimerRef.current = setInterval(() => fetchJobs(true), 8000);
+      fullRefreshTimerRef.current = setInterval(() => fetchJobs(true), 30000);
     } else if (!hasActiveJobs && fullRefreshTimerRef.current) {
       clearInterval(fullRefreshTimerRef.current);
       fullRefreshTimerRef.current = null;

@@ -29,7 +29,7 @@ inputs:
       default: 1.5
     - key: recon_spec
       type: choice
-      default: "mrtrix_multishell_msmt"
+      default: "mrtrix_multishell_msmt_noACT"
 
 input_format:
   format_name: "BIDS (with DWI)"

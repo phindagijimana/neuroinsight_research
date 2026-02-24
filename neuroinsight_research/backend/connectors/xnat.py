@@ -5,7 +5,7 @@ Communicates with the XNAT REST API using httpx (no SDK dependency).
 Auth: JSESSION cookie or HTTP Basic Auth.
 Hierarchy: Projects -> Subjects -> Experiments -> Scans -> Resources -> Files.
 
-Works with any XNAT instance (including CIDUR).
+Works with any XNAT instance (including CIDUR, CNDA, NITRC, Central, etc.).
 """
 
 import logging
@@ -24,6 +24,9 @@ from backend.connectors.base import (
 
 logger = logging.getLogger(__name__)
 
+_CONNECT_TIMEOUT = 15.0  # seconds to wait for TCP handshake
+_READ_TIMEOUT = 60.0     # seconds to wait for response body
+
 
 class XNATConnector(BasePlatformConnector):
     """Connector for XNAT-based data management platforms."""
@@ -34,7 +37,20 @@ class XNATConnector(BasePlatformConnector):
         self._api_url = (api_url or "").rstrip("/")
         self._session_cookie: Optional[str] = None
         self._username: Optional[str] = None
-        self._client = httpx.Client(timeout=60.0, verify=True)
+        self._verify_ssl = True
+        self._client = self._make_client()
+
+    def _make_client(self) -> httpx.Client:
+        return httpx.Client(
+            timeout=httpx.Timeout(
+                connect=_CONNECT_TIMEOUT,
+                read=_READ_TIMEOUT,
+                write=_READ_TIMEOUT,
+                pool=_CONNECT_TIMEOUT,
+            ),
+            verify=self._verify_ssl,
+            follow_redirects=True,
+        )
 
     # ------------------------------------------------------------------ auth
 
@@ -47,14 +63,79 @@ class XNATConnector(BasePlatformConnector):
         username = credentials.get("username", "")
         password = credentials.get("password", "")
         if not username or not password:
-            raise ValueError("username and password are required")
+            raise ValueError("Username and password are required")
 
-        resp = self._client.post(
-            f"{self._api_url}/data/JSESSION",
-            auth=(username, password),
-        )
-        resp.raise_for_status()
-        self._session_cookie = resp.text.strip()
+        verify_ssl = credentials.get("verify_ssl", "true").lower() != "false"
+        if verify_ssl != self._verify_ssl:
+            self._verify_ssl = verify_ssl
+            self._client.close()
+            self._client = self._make_client()
+
+        try:
+            resp = self._client.post(
+                f"{self._api_url}/data/JSESSION",
+                auth=(username, password),
+            )
+        except httpx.ConnectTimeout:
+            raise ConnectionError(
+                f"Connection timed out after {_CONNECT_TIMEOUT}s. "
+                f"Cannot reach {self._api_url}. "
+                f"Make sure the URL is correct and the server is accessible "
+                f"from this machine (check VPN/firewall)."
+            )
+        except httpx.ConnectError as e:
+            reason = str(e)
+            if "SSL" in reason or "certificate" in reason.lower():
+                raise ConnectionError(
+                    f"SSL certificate verification failed for {self._api_url}. "
+                    f"If your XNAT uses a self-signed certificate, "
+                    f"enable the 'Skip SSL verification' option and try again."
+                )
+            raise ConnectionError(
+                f"Cannot connect to {self._api_url}: {reason}. "
+                f"Check that the URL is correct and the server is running."
+            )
+        except httpx.ReadTimeout:
+            raise ConnectionError(
+                f"Server at {self._api_url} accepted the connection but "
+                f"did not respond in time. The server may be overloaded."
+            )
+        except (httpx.RemoteProtocolError, httpx.HTTPError) as e:
+            raise ConnectionError(
+                f"Communication error with {self._api_url}: {e}. "
+                f"Verify the URL points to a valid XNAT instance "
+                f"(should end with the XNAT context path, e.g. https://xnat.example.edu)."
+            )
+
+        if resp.status_code == 401:
+            raise PermissionError(
+                "Authentication failed. Check your username and password."
+            )
+        if resp.status_code == 403:
+            raise PermissionError(
+                "Access denied. Your account may not have permission to "
+                "access this XNAT instance."
+            )
+        if resp.status_code == 404:
+            raise ConnectionError(
+                f"XNAT REST API not found at {self._api_url}/data/JSESSION. "
+                f"Verify the URL points to a valid XNAT instance."
+            )
+        if resp.status_code >= 400:
+            raise ConnectionError(
+                f"Server returned HTTP {resp.status_code}. "
+                f"Verify {self._api_url} is a valid XNAT instance."
+            )
+
+        session_id = resp.text.strip()
+        if not session_id or len(session_id) > 200 or "<" in session_id:
+            raise ConnectionError(
+                f"Unexpected response from {self._api_url}/data/JSESSION. "
+                f"The URL may not point to a valid XNAT REST API. "
+                f"Expected a JSESSIONID string."
+            )
+
+        self._session_cookie = session_id
         self._username = username
 
         return {

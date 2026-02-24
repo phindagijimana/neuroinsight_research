@@ -1,6 +1,6 @@
 FROM freesurfer/freesurfer:7.4.1 AS freesurfer
 
-FROM neuroinsight/hs-postprocess:1.0.0
+FROM phindagijimana321/hs-postprocess:1.0.0
 
 LABEL maintainer="NeuroInsight Research"
 LABEL description="Hippocampal Sclerosis Detection workflow for Pennsieve (FreeSurfer VolOnly + HS Postprocess)"

@@ -1,4 +1,4 @@
-FROM freesurfer/freesurfer:7.4.1
+FROM phindagijimana321/freesurfer-mcr:7.4.1
 
 LABEL maintainer="NeuroInsight Research"
 LABEL description="Hippocampal Subfields T1 workflow adapter for Pennsieve (recon-all + segmentHA_T1)"

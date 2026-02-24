@@ -42,6 +42,7 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectio
   const [xnatUrl, setXnatUrl] = useState('');
   const [xnatUser, setXnatUser] = useState('');
   const [xnatPass, setXnatPass] = useState('');
+  const [xnatSkipSsl, setXnatSkipSsl] = useState(false);
 
   const needsConnection = platform !== 'local';
 
@@ -119,7 +120,10 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectio
         }
       } else if (platform === 'xnat') {
         if (!xnatUrl || !xnatUser || !xnatPass) { setError('URL, username, and password are required'); setConnecting(false); return; }
-        const result = await apiService.platformConnect('xnat', { url: xnatUrl, username: xnatUser, password: xnatPass });
+        const result = await apiService.platformConnect('xnat', {
+          url: xnatUrl, username: xnatUser, password: xnatPass,
+          verify_ssl: !xnatSkipSsl,
+        });
         if (result?.connected) {
           setConnected(true);
           setConnectedInfo(result.user || 'XNAT');
@@ -262,14 +266,14 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectio
               <div>
                 <label className="block text-[11px] font-medium text-gray-600 mb-0.5">XNAT URL</label>
                 <input type="text" value={xnatUrl} onChange={e => setXnatUrl(e.target.value)}
-                  placeholder="https://cidur.urmc-sh.rochester.edu"
+                  placeholder="https://xnat.example.edu"
                   className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-transparent" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Username</label>
                   <input type="text" value={xnatUser} onChange={e => setXnatUser(e.target.value)}
-                    placeholder="username"
+                    placeholder="your_username"
                     className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-transparent" />
                 </div>
                 <div>
@@ -279,14 +283,22 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectio
                     className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-transparent" />
                 </div>
               </div>
+              <label className="flex items-center gap-1.5 text-[11px] text-gray-600 cursor-pointer select-none">
+                <input type="checkbox" checked={xnatSkipSsl} onChange={e => setXnatSkipSsl(e.target.checked)}
+                  className="rounded border-gray-300 text-orange-500 focus:ring-orange-500 h-3 w-3" />
+                Skip SSL verification (for self-signed certificates)
+              </label>
+              <p className="text-[10px] text-gray-400">
+                Enter your XNAT instance URL and credentials. The server must be reachable from this machine.
+              </p>
             </>
           )}
 
           {/* Error */}
           {error && (
-            <div className="flex items-center gap-1.5 text-[11px] text-red-600 bg-red-50 px-2 py-1.5 rounded">
-              <AlertCircle className="h-3 w-3 flex-shrink-0" />
-              <span className="truncate">{error}</span>
+            <div className="flex items-start gap-1.5 text-[11px] text-red-600 bg-red-50 px-2 py-2 rounded">
+              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+              <span className="break-words whitespace-pre-wrap">{error}</span>
             </div>
           )}
 

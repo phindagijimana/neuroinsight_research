@@ -74,13 +74,13 @@ PLUGIN_ADAPTERS = {
         "dir": os.path.join(ADAPTERS_DIR, "segmentha_t1"),
         "image": "neuroinsight/segmentha-t1-pennsieve",
         "tag": "7.4.1",
-        "base": "freesurfer/freesurfer:7.4.1",
+        "base": "phindagijimana321/freesurfer-mcr:7.4.1",
     },
     "segmentha_t2": {
         "dir": os.path.join(ADAPTERS_DIR, "segmentha_t2"),
         "image": "neuroinsight/segmentha-t2-pennsieve",
         "tag": "7.4.1",
-        "base": "freesurfer/freesurfer:7.4.1",
+        "base": "phindagijimana321/freesurfer-mcr:7.4.1",
     },
     "freesurfer_longitudinal": {
         "dir": os.path.join(ADAPTERS_DIR, "freesurfer_longitudinal"),
@@ -102,9 +102,9 @@ PLUGIN_ADAPTERS = {
     },
     "hs_postprocess": {
         "dir": os.path.join(ADAPTERS_DIR, "hs_postprocess"),
-        "image": "neuroinsight/hs-postprocess-pennsieve",
+        "image": "phindagijimana321/hs-postprocess-pennsieve",
         "tag": "1.0.0",
-        "base": "neuroinsight/hs-postprocess:1.0.0",
+        "base": "phindagijimana321/hs-postprocess:1.0.0",
     },
 }
 
@@ -113,13 +113,13 @@ WORKFLOW_ADAPTERS = {
         "dir": os.path.join(ADAPTERS_DIR, "workflows", "hippo_subfields_t1"),
         "image": "neuroinsight/wf-hippo-subfields-t1-pennsieve",
         "tag": "7.4.1",
-        "base": "freesurfer/freesurfer:7.4.1",
+        "base": "phindagijimana321/freesurfer-mcr:7.4.1",
     },
     "wf_hippo_subfields_t2": {
         "dir": os.path.join(ADAPTERS_DIR, "workflows", "hippo_subfields_t2"),
         "image": "neuroinsight/wf-hippo-subfields-t2-pennsieve",
         "tag": "7.4.1",
-        "base": "freesurfer/freesurfer:7.4.1",
+        "base": "phindagijimana321/freesurfer-mcr:7.4.1",
     },
     "wf_freesurfer_longitudinal_full": {
         "dir": os.path.join(ADAPTERS_DIR, "workflows", "freesurfer_longitudinal_full"),
