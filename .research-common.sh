@@ -839,8 +839,9 @@ preflight_checks() {
         if _infra_up_quiet; then
             success "Infrastructure services started"
         else
-            warn "Infrastructure not available -- DB/Redis/MinIO may fail"
-            info "Run:  ./research infra up"
+            error "Infrastructure services failed to start (PostgreSQL, Redis, MinIO)"
+            info "Make sure Docker is running, then retry: ./research start"
+            exit 1
         fi
     fi
 
@@ -993,9 +994,14 @@ _infra_running() {
 }
 
 _infra_up_quiet() {
+    if ! docker info &>/dev/null; then
+        warn "Docker is not running"
+        info "Start Docker Desktop (Windows/Mac) or run: sudo systemctl start docker"
+        return 1
+    fi
     _compose up -d 2>&1 | tail -5
-    # Give containers a moment to pass healthchecks
     sleep 3
+    _infra_running
 }
 
 # ==============================================================================
