@@ -20,13 +20,11 @@ The first run automatically installs dependencies, generates secure passwords, s
 
 1. Open **http://localhost:3000** and go to the **Jobs** tab
 2. **Select a data source** -- browse local files, remote server, HPC filesystem, Pennsieve, or XNAT
-3. **Pick a pipeline** -- choose from the dropdown (FreeSurfer, fMRIPrep, QSIPrep, etc.)
+3. **Pick a plugin or workflow** -- a **plugin** runs a single tool (e.g., FreeSurfer, fMRIPrep); a **workflow** chains multiple plugins into one job (e.g., fMRIPrep then XCP-D, or QSIPrep then QSIRecon)
 4. **Choose where to process** -- Local (Docker), Remote Server (SSH), or HPC (SLURM)
 5. **Configure resources** -- CPU, RAM, GPU, and time limit
 6. **Submit** -- the job runs in a container; monitor progress on the **Dashboard**
 7. **View results** -- open outputs in the built-in **NIfTI Viewer** with segmentation overlays
-
-Multi-step workflows (e.g., fMRIPrep then XCP-D, or QSIPrep then QSIRecon) can be submitted as a single job that chains the steps automatically.
 
 ## Pipeline Licenses
 
@@ -57,10 +55,14 @@ The app auto-detects the license in `./license.txt`, `./data/license.txt`, `$FRE
 | MELD `meld_license.txt` | MELD Graph (v2.2.4+) |
 | No license needed | QSIPrep, QSIRecon, XCP-D, dcm2niix |
 
-## Supported Pipelines
+## Plugins and Workflows
 
-| Pipeline | Description |
-|----------|-------------|
+**Plugins** are single-tool processing steps. **Workflows** chain multiple plugins into one job with automatic data passing between steps. Both are defined as YAML files -- no code changes needed to add new ones.
+
+### Plugins
+
+| Plugin | Description |
+|--------|-------------|
 | FreeSurfer recon-all | Cortical reconstruction and volumetric segmentation |
 | FastSurfer | GPU-accelerated cortical segmentation |
 | fMRIPrep | Functional MRI preprocessing |
@@ -71,7 +73,35 @@ The app auto-detects the license in `./license.txt`, `./data/license.txt`, `$FRE
 | Hippocampal Sclerosis Detection | Automated HS detection with postprocessing |
 | FreeSurfer Longitudinal | Multi-timepoint longitudinal analysis |
 
-Pipelines are defined as YAML plugin files. Adding a new pipeline requires no code changes -- just drop a new YAML file in `plugins/`.
+### Workflows
+
+| Workflow | Steps |
+|----------|-------|
+| fMRI Full Pipeline | fMRIPrep then XCP-D |
+| Diffusion Full Pipeline | QSIPrep then QSIRecon |
+| FreeSurfer Longitudinal Full | FreeSurfer Longitudinal then Stats |
+| HS Detection | SegmentHA then HS Postprocessing |
+| Cortical Lesion Detection | FreeSurfer then MELD Graph |
+
+## Connecting to Pennsieve and XNAT
+
+NeuroInsight can browse and pull data directly from **Pennsieve** and **XNAT** repositories.
+
+**Pennsieve:**
+
+1. Get an API key from your Pennsieve account (User menu > API Tokens)
+2. In the app, go to **Jobs** > **Data Source** > **Pennsieve**
+3. Enter your API key and secret, click **Connect**
+4. Browse datasets and select files to process
+
+**XNAT:**
+
+1. In the app, go to **Jobs** > **Data Source** > **XNAT**
+2. Enter your XNAT server URL (e.g., `https://central.xnat.org`), username, and password
+3. Click **Connect**
+4. Browse projects, subjects, and sessions to select input data
+
+Data from either platform is pulled to the compute backend before processing. You can combine any data source with any compute backend (e.g., pull from Pennsieve, process on HPC).
 
 ## Running on Remote Servers / HPC
 
@@ -91,12 +121,11 @@ For detailed SSH key setup instructions, see the [User Guide](https://github.com
 
 - **Multiple data sources** -- Local files, Remote Server (SSH), HPC filesystem, Pennsieve, or XNAT
 - **Multiple compute backends** -- Local Docker, Remote Server (SSH + Docker), or HPC/SLURM (SSH + Singularity)
-- **Mix and match** -- Browse data on XNAT, process on HPC; download from Pennsieve, process locally
+- **Mix and match** -- Browse data on XNAT, process on HPC; pull from Pennsieve, process locally
 - **Real-time monitoring** -- SLURM queue monitor, job progress tracking, and log streaming
-- **Plugin architecture** -- Each pipeline is a single YAML file; no code changes to add new ones
-- **Multi-step workflows** -- Chain pipelines with automatic inter-step data passing
-- **Built-in NIfTI viewer** -- Segmentation overlays powered by Niivue
-- **Portable** -- No hardcoded paths or user-specific configuration in source code
+- **Plugins** -- Each tool is a single YAML file; drop a new one in `plugins/` to add a pipeline
+- **Workflows** -- Chain multiple plugins into one job with automatic data passing between steps
+- **Built-in NIfTI viewer** -- View results with segmentation overlays powered by Niivue
 
 ## Documentation
 
