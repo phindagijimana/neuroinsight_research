@@ -1056,6 +1056,17 @@ _update_env_var() {
     fi
 }
 
+_infra_update_env() {
+    local pg_user="${POSTGRES_USER:-neuroinsight}"
+    local pg_pass="${POSTGRES_PASSWORD:-neuroinsight_secure_password}"
+    local pg_db="${POSTGRES_DB:-neuroinsight}"
+    _update_env_var "POSTGRES_PORT" "$POSTGRES_PORT"
+    _update_env_var "DATABASE_URL" "postgresql://${pg_user}:${pg_pass}@localhost:${POSTGRES_PORT}/${pg_db}"
+    _update_env_var "REDIS_PORT" "$REDIS_PORT"
+    _update_env_var "MINIO_PORT" "$MINIO_PORT"
+    set -a; source "$SCRIPT_DIR/.env" 2>/dev/null || true; set +a
+}
+
 _infra_up_quiet() {
     if ! docker info &>/dev/null; then
         warn "Docker is not running"
@@ -1068,29 +1079,69 @@ _infra_up_quiet() {
         docker rm -f "$name" 2>/dev/null || true
     done
 
-    # Resolve infrastructure ports (find free ones if defaults are busy)
-    export POSTGRES_PORT;      POSTGRES_PORT=$(_find_free_port "${POSTGRES_PORT:-5432}" 5460 "PostgreSQL")     || { error "No free port for PostgreSQL (5432-5460)"; return 1; }
-    export REDIS_PORT;         REDIS_PORT=$(_find_free_port "${REDIS_PORT:-6379}" 6400 "Redis")                || { error "No free port for Redis (6379-6400)"; return 1; }
-    export MINIO_PORT;         MINIO_PORT=$(_find_free_port "${MINIO_PORT:-9000}" 9050 "MinIO")                || { error "No free port for MinIO (9000-9050)"; return 1; }
-    export MINIO_CONSOLE_PORT; MINIO_CONSOLE_PORT=$(_find_free_port "${MINIO_CONSOLE_PORT:-9001}" 9050 "MinIO console") || { error "No free port for MinIO console (9001-9050)"; return 1; }
+    # Start with default or configured ports
+    export POSTGRES_PORT="${POSTGRES_PORT:-5432}"
+    export REDIS_PORT="${REDIS_PORT:-6379}"
+    export MINIO_PORT="${MINIO_PORT:-9000}"
+    export MINIO_CONSOLE_PORT="${MINIO_CONSOLE_PORT:-9001}"
 
-    # Update .env so the backend connects to the right ports
-    local pg_user="${POSTGRES_USER:-neuroinsight}"
-    local pg_pass="${POSTGRES_PASSWORD:-neuroinsight_secure_password}"
-    local pg_db="${POSTGRES_DB:-neuroinsight}"
-    _update_env_var "POSTGRES_PORT" "$POSTGRES_PORT"
-    _update_env_var "DATABASE_URL" "postgresql://${pg_user}:${pg_pass}@localhost:${POSTGRES_PORT}/${pg_db}"
-    _update_env_var "REDIS_PORT" "$REDIS_PORT"
-    _update_env_var "MINIO_PORT" "$MINIO_PORT"
+    # Try to start, retry with incremented ports on conflict (up to 10 attempts)
+    local attempt
+    for attempt in $(seq 1 10); do
+        _infra_update_env
+        success "Ports: PostgreSQL:${POSTGRES_PORT}  Redis:${REDIS_PORT}  MinIO:${MINIO_PORT}"
 
-    # Re-source .env so current shell picks up changes
-    set -a; source "$SCRIPT_DIR/.env" 2>/dev/null || true; set +a
+        local compose_output
+        compose_output=$(_compose up -d 2>&1)
+        echo "$compose_output" | tail -5
 
-    success "Ports: PostgreSQL:${POSTGRES_PORT}  Redis:${REDIS_PORT}  MinIO:${MINIO_PORT}"
+        # Check for port conflict in the output
+        local conflict_port
+        conflict_port=$(echo "$compose_output" | grep -oP 'port TCP 127\.0\.0\.1:\K[0-9]+' | head -1)
 
-    _compose up -d 2>&1 | tail -5
-    sleep 5
-    _infra_running
+        if [ -z "$conflict_port" ]; then
+            # No port conflict -- wait and verify
+            sleep 5
+            if _infra_running; then
+                return 0
+            fi
+            # Containers not all running but no port error -- still a failure
+            return 1
+        fi
+
+        # Port conflict detected -- figure out which service and bump it
+        warn "Port $conflict_port is unavailable (in use by another process on the host)"
+
+        # Stop whatever partially started
+        for name in neuroinsight-db neuroinsight-redis neuroinsight-minio; do
+            docker rm -f "$name" 2>/dev/null || true
+        done
+
+        # Increment the conflicting port
+        if [ "$conflict_port" -eq "$POSTGRES_PORT" ]; then
+            POSTGRES_PORT=$((POSTGRES_PORT + 1))
+            [ "$POSTGRES_PORT" -le 5460 ] || { error "No free port for PostgreSQL (tried up to 5460)"; return 1; }
+            info "Trying PostgreSQL on port $POSTGRES_PORT"
+        elif [ "$conflict_port" -eq "$REDIS_PORT" ]; then
+            REDIS_PORT=$((REDIS_PORT + 1))
+            [ "$REDIS_PORT" -le 6400 ] || { error "No free port for Redis (tried up to 6400)"; return 1; }
+            info "Trying Redis on port $REDIS_PORT"
+        elif [ "$conflict_port" -eq "$MINIO_PORT" ]; then
+            MINIO_PORT=$((MINIO_PORT + 1))
+            [ "$MINIO_PORT" -le 9050 ] || { error "No free port for MinIO (tried up to 9050)"; return 1; }
+            info "Trying MinIO on port $MINIO_PORT"
+        elif [ "$conflict_port" -eq "$MINIO_CONSOLE_PORT" ]; then
+            MINIO_CONSOLE_PORT=$((MINIO_CONSOLE_PORT + 1))
+            [ "$MINIO_CONSOLE_PORT" -le 9050 ] || { error "No free port for MinIO console (tried up to 9050)"; return 1; }
+            info "Trying MinIO console on port $MINIO_CONSOLE_PORT"
+        else
+            error "Unknown port conflict on $conflict_port"
+            return 1
+        fi
+    done
+
+    error "Failed to start infrastructure after 10 attempts"
+    return 1
 }
 
 # ==============================================================================
