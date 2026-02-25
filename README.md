@@ -2,6 +2,61 @@
 
 An open-source platform for running neuroimaging pipelines from a web interface. Select your data, pick a pipeline, choose where to process, and click Submit -- no terminal commands or container expertise required.
 
+## Quick Start
+
+```bash
+git clone https://github.com/phindagijimana/neuroinsight_research.git
+cd neuroinsight_research
+./research start
+```
+
+Open **http://localhost:3001** -- that's it.
+
+The first run automatically installs dependencies, generates secure passwords, starts PostgreSQL/Redis/MinIO via Docker, builds the frontend, and launches everything. No manual configuration required.
+
+**Prerequisites:** Python 3.9+, Node.js 18+, Docker with Compose v2
+
+## How to Use
+
+1. Open **http://localhost:3001** and go to the **Jobs** tab
+2. **Select a data source** -- browse local files, remote server, HPC filesystem, Pennsieve, or XNAT
+3. **Pick a pipeline** -- choose from the dropdown (FreeSurfer, fMRIPrep, QSIPrep, etc.)
+4. **Choose where to process** -- Local (Docker), Remote Server (SSH), or HPC (SLURM)
+5. **Configure resources** -- CPU, RAM, GPU, and time limit
+6. **Submit** -- the job runs in a container; monitor progress on the **Dashboard**
+7. **View results** -- open outputs in the built-in **NIfTI Viewer** with segmentation overlays
+
+Multi-step workflows (e.g., fMRIPrep then XCP-D, or QSIPrep then QSIRecon) can be submitted as a single job that chains the steps automatically.
+
+## Pipeline Licenses
+
+Some pipelines require a free license file **before** you can submit your first job. If your pipeline doesn't need one, skip this section.
+
+### FreeSurfer License (required by FreeSurfer, FastSurfer, fMRIPrep, MELD Graph)
+
+1. Register at **https://surfer.nmr.mgh.harvard.edu/registration.html**
+2. A `license.txt` file will be emailed to you
+3. Place it in the project root:
+
+```bash
+cp ~/Downloads/license.txt ./license.txt
+```
+
+The app auto-detects the license in `./license.txt`, `./data/license.txt`, `$FREESURFER_HOME/license.txt`, or `~/.freesurfer/license.txt`. You can also set `FS_LICENSE_PATH` in `.env`.
+
+### MELD Graph License (required by MELD Graph v2.2.4+)
+
+1. Fill the form: **https://docs.google.com/forms/d/e/1FAIpQLSdocMWtxbmh9T7Sv8NT4f0Kpev-tmRI-kngDhUeBF9VcZXcfg/viewform**
+2. Place the received `meld_license.txt` in the project root
+
+### Which pipelines need licenses?
+
+| License | Required By |
+|---|---|
+| FreeSurfer `license.txt` | FreeSurfer, FastSurfer, fMRIPrep, MELD Graph |
+| MELD `meld_license.txt` | MELD Graph (v2.2.4+) |
+| No license needed | QSIPrep, QSIRecon, XCP-D, dcm2niix |
+
 ## Supported Pipelines
 
 | Pipeline | Description |
@@ -16,230 +71,79 @@ An open-source platform for running neuroimaging pipelines from a web interface.
 | Hippocampal Sclerosis Detection | Automated HS detection with postprocessing |
 | FreeSurfer Longitudinal | Multi-timepoint longitudinal analysis |
 
-Pipelines are defined as YAML plugin files. Adding a new pipeline requires no code changes.
+Pipelines are defined as YAML plugin files. Adding a new pipeline requires no code changes -- just drop a new YAML file in `plugins/`.
+
+## Running on Remote Servers / HPC
+
+The app runs jobs locally by default. To process on a remote machine or HPC cluster:
+
+1. Make sure you can `ssh user@server` without a password (using SSH keys)
+2. In the app, go to **Jobs** and select **Remote Server** or **HPC (SLURM)**
+3. Enter your hostname and username, click **Connect**
+4. For HPC, configure the partition, account, and work directory in **Advanced Settings**
+5. Browse files on the remote system, pick a pipeline, and submit
+
+The app uses your local SSH agent for authentication -- your private key never leaves your machine. On HPC, jobs are submitted via `sbatch` and run in Apptainer/Singularity containers (auto-detected).
+
+For detailed SSH key setup instructions, see the [User Guide](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/USER_GUIDE.md).
 
 ## Key Features
 
 - **Multiple data sources** -- Local files, Remote Server (SSH), HPC filesystem, Pennsieve, or XNAT
 - **Multiple compute backends** -- Local Docker, Remote Server (SSH + Docker), or HPC/SLURM (SSH + Singularity)
-- **Mix and match** -- Browse data on XNAT, process on HPC; download from Pennsieve, process locally; or any combination
+- **Mix and match** -- Browse data on XNAT, process on HPC; download from Pennsieve, process locally
 - **Real-time monitoring** -- SLURM queue monitor, job progress tracking, and log streaming
-- **Plugin architecture** -- Each pipeline is a single YAML file defining container image, parameters, and resource requirements
-- **Multi-step workflows** -- Chain pipelines (e.g., QSIPrep then QSIRecon) with automatic inter-step data passing
+- **Plugin architecture** -- Each pipeline is a single YAML file; no code changes to add new ones
+- **Multi-step workflows** -- Chain pipelines with automatic inter-step data passing
 - **Built-in NIfTI viewer** -- Segmentation overlays powered by Niivue
 - **Portable** -- No hardcoded paths or user-specific configuration in source code
 
-## Tech Stack
-
-**Frontend:** React 18, TypeScript, Vite, Tailwind CSS, Niivue
-**Backend:** Python 3.10+, FastAPI, Celery, SQLAlchemy
-**Infrastructure:** PostgreSQL, Redis, MinIO, Docker
-
-## Quick Start
-
-```bash
-git clone https://github.com/phindagijimana/neuroinsight_research.git
-cd neuroinsight_research
-./research start
-```
-
-Open **http://localhost:3001** -- that's it.
-
-The first run automatically:
-- Generates `.env` with secure random passwords
-- Installs Python and Node.js dependencies
-- Starts infrastructure (PostgreSQL, Redis, MinIO via Docker)
-- Runs database migrations
-- Builds the frontend
-- Launches the backend (which serves the frontend)
-
-No manual configuration required.
-
-**Prerequisites:** Python 3.9+, Node.js 18+, Docker with Compose v2
+## Other Deployment Options
 
 ### Development mode
 
 ```bash
-./research-dev start   # Hot-reload backend, HMR frontend (separate ports 3001 + 3000)
+./research-dev start   # Hot-reload backend + HMR frontend
 ```
 
-### Docker Compose deployment
-
-For a fully containerized production deployment:
+### Docker Compose (fully containerized)
 
 ```bash
 cp .env.example .env   # Edit passwords before starting
 docker compose up -d   # Full stack on http://localhost:3001
 ```
 
-## CLI
+### CLI Reference
 
 ```
-install          Install dependencies, start infra, init DB
-start / stop     Start or stop application services
-status           Service and infrastructure health
-infra up/down    Manage PostgreSQL, Redis, MinIO
-db init/reset    Database schema management
-logs [service]   Tail logs (backend|celery|frontend|all)
-pull [image]     Pre-pull pipeline Docker images
-health           Query /health API endpoint
+./research install       Install dependencies, start infra, init DB
+./research start/stop    Start or stop application services
+./research status        Service and infrastructure health
+./research logs [svc]    Tail logs (backend|celery|frontend|all)
+./research infra up/down Manage PostgreSQL, Redis, MinIO
+./research db init/reset Database schema management
+./research pull [image]  Pre-pull pipeline Docker images
+./research health        Query /health API endpoint
 ```
+
+## Documentation
+
+- [User Guide](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/USER_GUIDE.md) -- Complete setup, connections, SSH key guide, and usage instructions
+- [Troubleshooting](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/TROUBLESHOOTING.md) -- Common issues and solutions
 
 ## Repository Structure
 
 ```
 backend/              FastAPI application, connectors, execution backends
-frontend/             React/TypeScript UI (Vite)
+frontend/             React/TypeScript UI (Vite + Tailwind)
 plugins/              Pipeline definitions (YAML)
 workflows/            Multi-step pipeline chains (YAML)
-adapters/pennsieve/   Pennsieve processor adapters and Dockerfiles
+adapters/             Pennsieve and XNAT processor adapters
 docs/                 User guide, troubleshooting, HPC guide
 docker-compose.yml    Production deployment
 requirements.txt      Python dependencies
 research              CLI launcher script
 ```
-
-## Connecting to Remote Servers / HPC
-
-The app runs jobs locally by default. To run on a remote machine (cloud VM or HPC cluster), you connect via SSH. No passwords are stored -- authentication uses your SSH keys.
-
-### SSH Key Setup (one-time)
-
-If you already have an SSH key and can `ssh user@server` without a password, skip to [Connecting from the App](#connecting-from-the-app).
-
-**1. Generate an SSH key pair** (on your local machine):
-
-```bash
-ssh-keygen -t ed25519 -C "your_email@example.com"
-```
-
-- `-t ed25519` selects the key type (modern and secure)
-- `-C` (capital C) adds a comment to identify the key
-- Press Enter to accept the default file location (`~/.ssh/id_ed25519`)
-- Enter a passphrase when prompted (or leave empty)
-
-This creates two files:
-- `~/.ssh/id_ed25519` -- private key (never share this)
-- `~/.ssh/id_ed25519.pub` -- public key (install this on remote servers)
-
-**2. Install your public key on the remote server:**
-
-```bash
-ssh-copy-id user@server
-```
-
-This copies your public key to the server's `~/.ssh/authorized_keys`. You'll be prompted for your password one last time. After this, password-free login is set up.
-
-**3. Load your key into the SSH agent:**
-
-```bash
-eval "$(ssh-agent -s)"     # Start the agent (if not running)
-ssh-add ~/.ssh/id_ed25519  # Add your key (enter passphrase if set)
-```
-
-On macOS, the Keychain handles this automatically after first use. On Linux with GNOME/KDE, the desktop keyring does the same.
-
-**4. Verify:**
-
-```bash
-ssh user@server
-# Should connect without asking for a password
-```
-
-### Connecting from the App
-
-On the **Jobs** page, choose your execution backend:
-
-**Remote Server** (AWS EC2, Google Cloud, Azure, any Linux with Docker):
-
-1. Click **Remote Server**
-2. Enter Host (e.g., `54.123.45.67`) and Username (e.g., `ubuntu`)
-3. Click **Connect** -- authenticates via your SSH agent
-4. Browse remote files, select a plugin, and submit -- jobs run via `docker run` on the remote machine
-
-**HPC with SLURM** (university/research clusters):
-
-1. Click **HPC (SLURM)**
-2. Enter Host (e.g., `hpc.university.edu`) and Username (e.g., `jsmith`)
-3. Click **Connect**
-4. Expand **Advanced Settings** to configure:
-   - Work Directory (e.g., `/scratch/jsmith/neuroinsight`)
-   - Partition (dropdown populated from the cluster)
-   - Account (your SLURM allocation, e.g., `neuroscience_lab`)
-5. Browse files on the HPC, select a plugin, and submit -- jobs are submitted via `sbatch` and run in Apptainer/Singularity containers (auto-detected)
-
-### How Authentication Works
-
-The app uses `paramiko` (Python SSH library) which talks to your local `ssh-agent`. Your private key never leaves your machine and is never stored by the app. If you can `ssh` into a server from your terminal, you can connect from NeuroInsight -- it uses the exact same keys.
-
-## Pipeline Licenses
-
-Some pipelines require free license files before they can run. Obtain these **before** submitting your first job.
-
-### FreeSurfer License (required by FreeSurfer, FastSurfer, fMRIPrep, MELD Graph)
-
-FreeSurfer requires a `license.txt` file for all operations. FastSurfer, fMRIPrep, and MELD Graph also use FreeSurfer internally and need this same license.
-
-1. Go to **https://surfer.nmr.mgh.harvard.edu/registration.html**
-2. Fill in the form (name, institution, email, OS)
-3. A `license.txt` file will be emailed to you
-4. Place it in your NeuroInsight project root:
-
-```bash
-cp ~/Downloads/license.txt ./license.txt
-```
-
-NeuroInsight auto-detects the license in these locations (checked in order):
-- `./license.txt` (project root)
-- `./data/license.txt`
-- `$FREESURFER_HOME/license.txt`
-- `~/.freesurfer/license.txt`
-
-Or set it explicitly in `.env`:
-
-```bash
-FS_LICENSE_PATH=/path/to/your/license.txt
-```
-
-### MELD Graph License (required by MELD Graph v2.2.4+)
-
-MELD Graph requires its own separate license in addition to the FreeSurfer license.
-
-1. Fill the registration form: **https://docs.google.com/forms/d/e/1FAIpQLSdocMWtxbmh9T7Sv8NT4f0Kpev-tmRI-kngDhUeBF9VcZXcfg/viewform**
-2. You will receive a `meld_license.txt` file by email
-3. Place it alongside your FreeSurfer license:
-
-```bash
-cp ~/Downloads/meld_license.txt ./meld_license.txt
-```
-
-Registration also adds you to the MELD mailing list for bug fixes and new releases. For questions, contact the MELD team at `meld.study@gmail.com`.
-
-More details: [MELD Graph GitHub](https://github.com/MELDProject/meld_graph) | [MELD Graph Documentation](https://meld-graph.readthedocs.io/en/latest/)
-
-### License Summary
-
-| License | Required By | Registration URL |
-|---|---|---|
-| FreeSurfer `license.txt` | FreeSurfer, FastSurfer, fMRIPrep, MELD Graph | https://surfer.nmr.mgh.harvard.edu/registration.html |
-| MELD `meld_license.txt` | MELD Graph (v2.2.4+) | [MELD Registration Form](https://docs.google.com/forms/d/e/1FAIpQLSdocMWtxbmh9T7Sv8NT4f0Kpev-tmRI-kngDhUeBF9VcZXcfg/viewform) |
-| QSIPrep / XCP-D | No license needed | -- |
-| dcm2niix (HeuDiConv) | No license needed | -- |
-
-## Container Runtimes
-
-| Backend | Container Runtime | Notes |
-|---|---|---|
-| Local | Docker | Jobs run via Docker SDK (`docker run`) |
-| Remote Server | Docker | Jobs run via `docker run` over SSH |
-| HPC (SLURM) | Apptainer / Singularity | Auto-detected; pulls from `docker://` URIs |
-
-All pipeline containers (FreeSurfer, FastSurfer, fMRIPrep, etc.) are available as Docker images on Docker Hub. On HPC, the SLURM backend automatically converts these to Singularity Image Format (SIF) using `apptainer pull docker://image:tag` or `singularity pull docker://image:tag`.
-
-## Documentation
-
-- [User Guide](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/USER_GUIDE.md) -- Complete setup, connection, and usage instructions with real-world examples
-- [Troubleshooting](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/TROUBLESHOOTING.md) -- Common issues and solutions
 
 ## Citing This Software
 
@@ -255,7 +159,7 @@ If you use NeuroInsight Research in your work, please cite:
 }
 ```
 
-Please also cite the individual tools you use (FreeSurfer, FastSurfer, fMRIPrep, QSIPrep, XCP-D, MELD Graph, etc.) as required by their respective licenses.
+Please also cite the individual tools you use (FreeSurfer, fMRIPrep, QSIPrep, etc.) as required by their respective licenses.
 
 ## Contact
 
