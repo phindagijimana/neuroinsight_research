@@ -62,7 +62,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Access the UI at `http://localhost:3001` (or the port configured in `.env`).
+Access the UI at `http://localhost:3000` (or the port configured in `.env`).
 
 ### Development Setup
 

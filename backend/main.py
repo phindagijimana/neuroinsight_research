@@ -1601,7 +1601,7 @@ def deidentify_dicom(request: DeidentifyRequest):
 # ---------------------------------------------------------------------------
 # When frontend/dist exists, serve the React SPA from the backend port.
 # This eliminates the need for a separate frontend server or proxy in
-# production — users just open http://localhost:3001.
+# production — users just open http://localhost:3000.
 
 _frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
 

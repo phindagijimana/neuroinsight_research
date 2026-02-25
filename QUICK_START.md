@@ -10,7 +10,7 @@
 ./research start
 ```
 
-Open **http://localhost:3001**. Everything is automatic on first run.
+Open **http://localhost:3000**. Everything is automatic on first run.
 
 ## Usage
 
