@@ -54,7 +54,7 @@ wsl --install -d Ubuntu
 
 ```bash
 git clone https://github.com/phindagijimana/neuroinsight_research.git
-cd neuroinsight_research/neuroinsight_research
+cd neuroinsight_research
 
 cp .env.example .env
 # Edit .env to set passwords (POSTGRES_PASSWORD, SECRET_KEY, etc.)
@@ -68,7 +68,7 @@ Access the UI at `http://localhost:3001` (or the port configured in `.env`).
 
 ```bash
 git clone https://github.com/phindagijimana/neuroinsight_research.git
-cd neuroinsight_research/neuroinsight_research
+cd neuroinsight_research
 
 # Backend
 python -m venv venv
@@ -77,7 +77,7 @@ pip install -r requirements.txt
 cd backend && uvicorn main:app --port 3001
 
 # Frontend (separate terminal)
-cd neuroinsight_research/neuroinsight_research/frontend
+cd frontend
 npm install
 npm run dev
 ```

@@ -32,7 +32,7 @@ Pipelines are defined as YAML plugin files. Adding a new pipeline requires no co
 
 ```bash
 git clone https://github.com/phindagijimana/neuroinsight_research.git
-cd neuroinsight_research/neuroinsight_research
+cd neuroinsight_research
 ./research start
 ```
 
@@ -52,27 +52,25 @@ docker compose up -d     # Fully containerized deployment (edit .env first)
 ## Repository Structure
 
 ```
-neuroinsight_research/
-  backend/            FastAPI application, connectors, execution backends
-  frontend/           React/TypeScript UI (Vite)
-  plugins/            Pipeline definitions (YAML)
-  adapters/pennsieve/ Pennsieve processor adapters and Dockerfiles
-  .env.example        Configuration template
-  requirements.txt    Python dependencies
-  docker-compose.yml  Production deployment
-docs/
-  USER_GUIDE.md       Setup, connections, usage, and troubleshooting
-  TROUBLESHOOTING.md  Common issues and solutions
+backend/              FastAPI application, connectors, execution backends
+frontend/             React/TypeScript UI (Vite)
+plugins/              Pipeline definitions (YAML)
+workflows/            Multi-step pipeline chains (YAML)
+adapters/pennsieve/   Pennsieve processor adapters and Dockerfiles
+docs/                 User guide, troubleshooting, HPC guide
+docker-compose.yml    Production deployment
+requirements.txt      Python dependencies
+research              CLI launcher script
 ```
 
 ## Connecting to Compute and Data Sources
 
-NeuroInsight supports five data sources and three compute backends that can be combined freely. The [User Guide](https://github.com/phindagijimana/neuroinsight_research/blob/master/docs/USER_GUIDE.md#compute-and-data-sources) includes step-by-step connection instructions, SSH tunneling for firewalled environments, and real-world examples for each scenario.
+NeuroInsight supports five data sources and three compute backends that can be combined freely. The [User Guide](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/USER_GUIDE.md#compute-and-data-sources) includes step-by-step connection instructions, SSH tunneling for firewalled environments, and real-world examples for each scenario.
 
 ## Documentation
 
-- [User Guide](https://github.com/phindagijimana/neuroinsight_research/blob/master/docs/USER_GUIDE.md) -- Complete setup, connection, and usage instructions with real-world examples
-- [Troubleshooting](https://github.com/phindagijimana/neuroinsight_research/blob/master/docs/TROUBLESHOOTING.md) -- Common issues and solutions
+- [User Guide](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/USER_GUIDE.md) -- Complete setup, connection, and usage instructions with real-world examples
+- [Troubleshooting](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/TROUBLESHOOTING.md) -- Common issues and solutions
 
 ## Contact
 
