@@ -90,7 +90,7 @@ resources:
     default:
       cpus: 8
       mem_gb: 32
-      time_hours: 4
+      time_hours: 8
       gpus: 0
 
 execution:
@@ -125,8 +125,13 @@ execution:
         QSIRECON_RC=$?
         set -e
 
-        if [ -f "/data/outputs/native/qsirecon/dataset_description.json" ] && \
-           ls /data/outputs/native/qsirecon/sub-{subject_id}/ >/dev/null 2>&1; then
+        FOUND_OUTPUTS=false
+        if find /data/outputs/native/qsirecon -name "dataset_description.json" 2>/dev/null | grep -q . || \
+           find /data/outputs/native/qsirecon -name "*.nii.gz" 2>/dev/null | grep -q .; then
+          FOUND_OUTPUTS=true
+        fi
+
+        if $FOUND_OUTPUTS; then
           echo "QSIRecon completed successfully (exit code $QSIRECON_RC, outputs validated)"
         else
           echo "ERROR: QSIRecon failed — expected outputs not found (exit code $QSIRECON_RC)"

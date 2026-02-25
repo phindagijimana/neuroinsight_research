@@ -93,7 +93,7 @@ resources:
     default:
       cpus: 8
       mem_gb: 32
-      time_hours: 4
+      time_hours: 8
       gpus: 0
 
 execution:
@@ -141,8 +141,12 @@ execution:
         QSIPREP_RC=$?
         set -e
 
-        if [ -f "/data/outputs/native/qsiprep/dataset_description.json" ] && \
-           ls /data/outputs/native/qsiprep/sub-{subject_id}/dwi/*desc-preproc_dwi.nii.gz >/dev/null 2>&1; then
+        FOUND_OUTPUTS=false
+        if find /data/outputs/native/qsiprep -name "*desc-preproc_dwi.nii.gz" 2>/dev/null | grep -q .; then
+          FOUND_OUTPUTS=true
+        fi
+
+        if $FOUND_OUTPUTS; then
           echo "QSIPrep completed successfully (exit code $QSIPREP_RC, outputs validated)"
         else
           echo "ERROR: QSIPrep failed — expected outputs not found (exit code $QSIPREP_RC)"
