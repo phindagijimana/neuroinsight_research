@@ -10,7 +10,7 @@ cd neuroinsight_research
 ./research start
 ```
 
-Open **http://localhost:3001** -- that's it.
+Open **http://localhost:3000** -- that's it.
 
 The first run automatically installs dependencies, generates secure passwords, starts PostgreSQL/Redis/MinIO via Docker, builds the frontend, and launches everything. No manual configuration required.
 
@@ -18,7 +18,7 @@ The first run automatically installs dependencies, generates secure passwords, s
 
 ## How to Use
 
-1. Open **http://localhost:3001** and go to the **Jobs** tab
+1. Open **http://localhost:3000** and go to the **Jobs** tab
 2. **Select a data source** -- browse local files, remote server, HPC filesystem, Pennsieve, or XNAT
 3. **Pick a pipeline** -- choose from the dropdown (FreeSurfer, fMRIPrep, QSIPrep, etc.)
 4. **Choose where to process** -- Local (Docker), Remote Server (SSH), or HPC (SLURM)
@@ -98,52 +98,10 @@ For detailed SSH key setup instructions, see the [User Guide](https://github.com
 - **Built-in NIfTI viewer** -- Segmentation overlays powered by Niivue
 - **Portable** -- No hardcoded paths or user-specific configuration in source code
 
-## Other Deployment Options
-
-### Development mode
-
-```bash
-./research-dev start   # Hot-reload backend + HMR frontend
-```
-
-### Docker Compose (fully containerized)
-
-```bash
-cp .env.example .env   # Edit passwords before starting
-docker compose up -d   # Full stack on http://localhost:3001
-```
-
-### CLI Reference
-
-```
-./research install       Install dependencies, start infra, init DB
-./research start/stop    Start or stop application services
-./research status        Service and infrastructure health
-./research logs [svc]    Tail logs (backend|celery|frontend|all)
-./research infra up/down Manage PostgreSQL, Redis, MinIO
-./research db init/reset Database schema management
-./research pull [image]  Pre-pull pipeline Docker images
-./research health        Query /health API endpoint
-```
-
 ## Documentation
 
 - [User Guide](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/USER_GUIDE.md) -- Complete setup, connections, SSH key guide, and usage instructions
 - [Troubleshooting](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/TROUBLESHOOTING.md) -- Common issues and solutions
-
-## Repository Structure
-
-```
-backend/              FastAPI application, connectors, execution backends
-frontend/             React/TypeScript UI (Vite + Tailwind)
-plugins/              Pipeline definitions (YAML)
-workflows/            Multi-step pipeline chains (YAML)
-adapters/             Pennsieve and XNAT processor adapters
-docs/                 User guide, troubleshooting, HPC guide
-docker-compose.yml    Production deployment
-requirements.txt      Python dependencies
-research              CLI launcher script
-```
 
 ## Citing This Software
 

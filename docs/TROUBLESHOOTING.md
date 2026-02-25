@@ -54,7 +54,7 @@ Common issues and solutions for NeuroInsight Research.
 
 | Problem | Solution |
 |---------|----------|
-| UI does not load | Verify the backend is running (`curl http://localhost:3001/health`) and check that the frontend port is correct |
+| UI does not load | Verify the backend is running (`curl http://localhost:3000/health`) and check that the frontend port is correct |
 | "Network Error" in browser | CORS issue or backend not reachable -- check `VITE_API_URL` and `CORS_ORIGINS` in `.env` |
 | SLURM queue not updating | Check that the HPC connection is still active (green badge) -- reconnect if needed |
 
