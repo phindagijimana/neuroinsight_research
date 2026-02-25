@@ -198,15 +198,15 @@ cmd_install() {
     step "Installing NeuroInsight Research"
     ensure_dirs
 
-    # -- Python dependencies ---------------------------------------------------
+    # -- Python virtual environment & dependencies ------------------------------
     step "Python dependencies"
-    if command -v pip3 &>/dev/null; then
-        pip3 install -q -r requirements.txt 2>&1 | tail -5
-        success "Python dependencies installed"
-    else
-        error "pip3 not found. Install Python 3.9+ first."
-        exit 1
+    if [ ! -d "venv" ]; then
+        info "Creating virtual environment ..."
+        python3 -m venv venv
     fi
+    source venv/bin/activate
+    python3 -m pip install -q -r requirements.txt 2>&1 | tail -5
+    success "Python dependencies installed (venv)"
 
     # -- Frontend dependencies -------------------------------------------------
     step "Frontend dependencies"
@@ -812,10 +812,16 @@ preflight_checks() {
         error "docker not found -- required for infrastructure and job execution"; exit 1
     fi
 
-    # ── Auto-install dependencies if missing ──────────────────────────────
+    # ── Virtual environment & auto-install dependencies if missing ─────────
+    if [ ! -d "venv" ]; then
+        info "Creating virtual environment ..."
+        python3 -m venv venv
+    fi
+    source venv/bin/activate
+
     if [ -f "requirements.txt" ] && ! python3 -c "import fastapi" &>/dev/null; then
         info "Python dependencies missing — installing ..."
-        pip3 install -q -r requirements.txt 2>&1 | tail -3
+        python3 -m pip install -q -r requirements.txt 2>&1 | tail -3
         success "Python dependencies installed"
     fi
 
