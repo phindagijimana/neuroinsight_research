@@ -772,6 +772,12 @@ preflight_checks() {
     # ── Auto-create .env from .env.example if missing ─────────────────────
     if [ ! -f "$SCRIPT_DIR/.env" ] && [ -f "$SCRIPT_DIR/.env.example" ]; then
         info "No .env found — generating one with random passwords ..."
+
+        # New passwords won't match old Docker volumes, so wipe them
+        if docker info &>/dev/null; then
+            _compose down -v 2>/dev/null || true
+        fi
+
         cp "$SCRIPT_DIR/.env.example" "$SCRIPT_DIR/.env"
         if command -v python3 &>/dev/null; then
             _rand() { python3 -c "import secrets; print(secrets.token_urlsafe(24))"; }
