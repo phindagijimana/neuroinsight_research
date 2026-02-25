@@ -4,27 +4,41 @@ __pycache__/
 *$py.class
 *.so
 .Python
-venv/
-env/
 *.egg-info/
+*.egg
+dist/
+build/
 .pytest_cache/
 .coverage
 
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Node
+node_modules/
+frontend/dist/
+
 # Logs
-*.log
 logs/
-*.out
+*.log
+
+# PID files
+.pids/
 *.pid
 
 # Data directories
-data/uploads/
-data/outputs/
-data/processed/
+data/
+uploads/
+outputs/
 freesurfer_subjects/
 singularity_cache/
 
 # Database
 *.db
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 
@@ -43,39 +57,14 @@ Thumbs.db
 celerybeat-schedule
 celerybeat.pid
 
-# Docker volumes
+# Docker
 docker-volumes/
-
-# Node modules (if any)
-node_modules/
-frontend/node_modules/
-neuroinsight_research/frontend/node_modules/
-
-# Build outputs
-frontend/dist/
-neuroinsight_research/frontend/dist/
-*.pyc
-
-# Temporary files
-*.tmp
-*.bak
-*.orig
-nohup.out
-
-# Development logs (should be cleaned before commit)
-*.log
-logs/
-
-# Process IDs
-*.pid
-
-# Database files
-*.db
-*.sqlite
-*.sqlite3
+docker-compose.override.yml
 
 # Environment and secrets
-.env*
+.env
+.env.*
+!.env.example
 secrets/
 config.local.*
 *.local.md
@@ -85,32 +74,34 @@ ssl/*.pem
 ssl/*.key
 ssl/*.crt
 
-# FreeSurfer License (keep example, ignore real license)
+# FreeSurfer / MELD licenses (contain personal info)
 license.txt
 !license.txt.example
 meld_license.txt
 
-# Data directories (neuroinsight_research)
-neuroinsight_research/data/uploads/
-neuroinsight_research/data/outputs/
-neuroinsight_research/data/processed/
-neuroinsight_research/data/temp/
-neuroinsight_research/*.db
-neuroinsight_research/*.sqlite
-
-# Large binary files (added for GitHub push)
+# Large binary files
 *.nii.gz
 *.raw
 *.pdf
-!sample_reports/*.pdf  # Allow sample report PDFs as examples
 large_files/
 test_data/
+sample_data/
+frontend/public/sample_data/
 
-# Backup files (prevent future clutter)
+# Backup files
 *.backup
 *.old
 *.OLD
 *_BACKUP.*
+*.bak
+*.orig
+*.tmp
+nohup.out
+
+# Dev scripts (local only)
+research-dev
+start_dev.sh
+stop_dev.sh
 
 # Temporary helper scripts
 dual_env_status.sh
@@ -133,3 +124,11 @@ docs/SETUP_SUMMARY.txt
 docs/REPOSITORY_STRUCTURE.md
 docs/FREESURFER_LICENSE_README.md
 docs/WSL_INSTALLATION.md
+
+# Misc
+backend_new.log
+improve.md
+pennsieve.md
+
+# Legacy directories (pre-restructure)
+_legacy/
