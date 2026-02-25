@@ -993,11 +993,35 @@ _infra_running() {
     [ "$count" -ge 3 ]
 }
 
+_port_owner() {
+    local port="$1"
+    # Try lsof first (Linux/macOS)
+    local pid
+    pid=$(lsof -ti :"$port" -sTCP:LISTEN 2>/dev/null | head -1)
+    if [ -n "$pid" ]; then
+        local pname
+        pname=$(ps -p "$pid" -o comm= 2>/dev/null || echo "unknown")
+        echo "PID $pid ($pname)"
+        return
+    fi
+    # Fallback: check if it's a Docker container
+    local cname
+    cname=$(docker ps --format '{{.Names}}' --filter "publish=$port" 2>/dev/null | head -1)
+    if [ -n "$cname" ]; then
+        echo "container '$cname'"
+        return
+    fi
+    echo "unknown process"
+}
+
 _find_free_port() {
-    local default_port="$1" max_port="$2"
+    local default_port="$1" max_port="$2" label="$3"
     if ! port_in_use "$default_port"; then
         echo "$default_port"; return 0
     fi
+    local owner
+    owner=$(_port_owner "$default_port")
+    warn "Port $default_port ($label) in use by $owner — finding alternative"
     for p in $(seq $((default_port + 1)) "$max_port"); do
         if ! port_in_use "$p"; then
             echo "$p"; return 0
@@ -1029,10 +1053,10 @@ _infra_up_quiet() {
     done
 
     # Resolve infrastructure ports (find free ones if defaults are busy)
-    export POSTGRES_PORT;      POSTGRES_PORT=$(_find_free_port "${POSTGRES_PORT:-5432}" 5460)       || { error "No free port for PostgreSQL (5432-5460)"; return 1; }
-    export REDIS_PORT;         REDIS_PORT=$(_find_free_port "${REDIS_PORT:-6379}" 6400)             || { error "No free port for Redis (6379-6400)"; return 1; }
-    export MINIO_PORT;         MINIO_PORT=$(_find_free_port "${MINIO_PORT:-9000}" 9050)             || { error "No free port for MinIO (9000-9050)"; return 1; }
-    export MINIO_CONSOLE_PORT; MINIO_CONSOLE_PORT=$(_find_free_port "${MINIO_CONSOLE_PORT:-9001}" 9050) || { error "No free port for MinIO console (9001-9050)"; return 1; }
+    export POSTGRES_PORT;      POSTGRES_PORT=$(_find_free_port "${POSTGRES_PORT:-5432}" 5460 "PostgreSQL")     || { error "No free port for PostgreSQL (5432-5460)"; return 1; }
+    export REDIS_PORT;         REDIS_PORT=$(_find_free_port "${REDIS_PORT:-6379}" 6400 "Redis")                || { error "No free port for Redis (6379-6400)"; return 1; }
+    export MINIO_PORT;         MINIO_PORT=$(_find_free_port "${MINIO_PORT:-9000}" 9050 "MinIO")                || { error "No free port for MinIO (9000-9050)"; return 1; }
+    export MINIO_CONSOLE_PORT; MINIO_CONSOLE_PORT=$(_find_free_port "${MINIO_CONSOLE_PORT:-9001}" 9050 "MinIO console") || { error "No free port for MinIO console (9001-9050)"; return 1; }
 
     # Update .env so the backend connects to the right ports
     local pg_user="${POSTGRES_USER:-neuroinsight}"
@@ -1046,9 +1070,7 @@ _infra_up_quiet() {
     # Re-source .env so current shell picks up changes
     set -a; source "$SCRIPT_DIR/.env" 2>/dev/null || true; set +a
 
-    local port_info="PostgreSQL:${POSTGRES_PORT}  Redis:${REDIS_PORT}  MinIO:${MINIO_PORT}"
-    [ "$POSTGRES_PORT" != "5432" ] || [ "$REDIS_PORT" != "6379" ] || [ "$MINIO_PORT" != "9000" ] && \
-        info "Ports: $port_info"
+    success "Ports: PostgreSQL:${POSTGRES_PORT}  Redis:${REDIS_PORT}  MinIO:${MINIO_PORT}"
 
     _compose up -d 2>&1 | tail -5
     sleep 5
