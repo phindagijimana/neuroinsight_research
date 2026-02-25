@@ -350,7 +350,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
             </div>
             <button
               onClick={() => selectFolder(browserPath)}
-              className="px-2.5 py-1 text-[10px] font-semibold text-white bg-teal-600 rounded hover:bg-teal-700 whitespace-nowrap"
+              className="px-2.5 py-1 text-[10px] font-semibold text-white bg-navy-600 rounded hover:bg-navy-700 whitespace-nowrap"
               title="Use the current directory as input"
             >
               Use This Folder
@@ -386,7 +386,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
                 <div
                   key={entry.path}
                   className={`flex items-center px-3 py-1.5 text-xs cursor-pointer border-b border-gray-50 group transition ${
-                    isSelected ? 'bg-blue-50 border-blue-100' : 'hover:bg-gray-50'
+                    isSelected ? 'bg-navy-50 border-navy-100' : 'hover:bg-gray-50'
                   }`}
                   onClick={() => isFile ? selectFile(entry) : loadDir(entry.path)}
                 >
@@ -394,7 +394,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
                     nifti ? <FileText className="h-3.5 w-3.5 text-green-600 mr-2 flex-shrink-0" />
                       : <File className="h-3.5 w-3.5 text-gray-400 mr-2 flex-shrink-0" />
                   ) : (
-                    <FolderOpen className="h-3.5 w-3.5 text-yellow-500 mr-2 flex-shrink-0" />
+                    <FolderOpen className="h-3.5 w-3.5 text-navy-500 mr-2 flex-shrink-0" />
                   )}
                   <span className={`flex-1 truncate ${
                     isSelected ? 'font-semibold text-[#003d7a]' :

@@ -129,11 +129,11 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
   };
 
   const selectAllFiles = () => {
-    const allFileIds = items.filter(i => i.type === 'file').map(i => i.id);
-    if (selectedFiles.size === allFileIds.length) {
+    const allIds = items.map(i => i.id);
+    if (selectedFiles.size === allIds.length && allIds.length > 0) {
       setSelectedFiles(new Set());
     } else {
-      setSelectedFiles(new Set(allFileIds));
+      setSelectedFiles(new Set(allIds));
     }
   };
 
@@ -144,6 +144,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
     }
   };
 
+  const selectableCount = items.length;
   const fileCount = items.filter(i => i.type === 'file').length;
   const niftiCount = items.filter(i => i.type === 'file' && isNifti(i.name)).length;
 
@@ -243,12 +244,12 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
               onClick={selectAllFiles}
               className="text-xs text-[#003d7a] hover:underline flex items-center gap-1"
             >
-              {selectedFiles.size === fileCount && fileCount > 0 ? (
+              {selectedFiles.size === selectableCount && selectableCount > 0 ? (
                 <CheckSquare className="h-3.5 w-3.5" />
               ) : (
                 <Square className="h-3.5 w-3.5" />
               )}
-              {selectedFiles.size === fileCount && fileCount > 0 ? 'Deselect all' : 'Select all files'}
+              {selectedFiles.size === selectableCount && selectableCount > 0 ? 'Deselect all' : 'Select all'}
             </button>
             <span className="text-xs text-gray-500">
               {items.length} items{niftiCount > 0 && <> ({niftiCount} NIfTI)</>}
@@ -261,6 +262,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
             )}
             {items.map((item) => {
               const isFile = item.type === 'file';
+              const isDir = item.type === 'directory';
               const isSelected = selectedFiles.has(item.id);
               const nifti = isFile && isNifti(item.name);
               const dicom = isFile && isDicom(item.name);
@@ -268,41 +270,61 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
               return (
                 <div
                   key={item.id}
-                  className={`flex items-center gap-2 px-2 py-1.5 rounded text-sm cursor-pointer transition ${
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded text-sm transition ${
                     isSelected ? 'bg-navy-50 border border-navy-200' : 'hover:bg-gray-50'
                   }`}
-                  onClick={() => isFile ? toggleFileSelection(item.id) : navigateTo(item)}
                 >
-                  {isFile ? (
-                    <button onClick={(e) => { e.stopPropagation(); toggleFileSelection(item.id); }}>
-                      {isSelected ? (
-                        <CheckSquare className="h-4 w-4 text-[#003d7a]" />
-                      ) : (
-                        <Square className="h-4 w-4 text-gray-400" />
-                      )}
-                    </button>
+                  {/* Checkbox for both files and directories */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleFileSelection(item.id); }}
+                    className="flex-shrink-0"
+                  >
+                    {isSelected ? (
+                      <CheckSquare className="h-4 w-4 text-[#003d7a]" />
+                    ) : (
+                      <Square className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+
+                  {/* Icon */}
+                  {isDir ? (
+                    <FolderOpen className="h-4 w-4 text-yellow-500 flex-shrink-0" />
+                  ) : nifti ? (
+                    <FileText className="h-4 w-4 text-green-600 flex-shrink-0" />
+                  ) : dicom ? (
+                    <FileText className="h-4 w-4 text-blue-600 flex-shrink-0" />
                   ) : (
-                    <FolderOpen className="h-4 w-4 text-yellow-500" />
+                    <File className="h-4 w-4 text-gray-400 flex-shrink-0" />
                   )}
 
-                  {isFile ? (
-                    nifti ? <FileText className="h-4 w-4 text-green-600" /> :
-                    dicom ? <FileText className="h-4 w-4 text-blue-600" /> :
-                    <File className="h-4 w-4 text-gray-400" />
-                  ) : null}
-
-                  <span className={`flex-1 truncate ${nifti ? 'text-green-700 font-medium' : 'text-gray-700'}`}>
+                  {/* Name: clickable for dirs (navigate), clickable for files (toggle) */}
+                  <span
+                    className={`flex-1 truncate cursor-pointer ${
+                      nifti ? 'text-green-700 font-medium' :
+                      isDir ? 'text-gray-700 hover:text-[#003d7a]' :
+                      'text-gray-700'
+                    }`}
+                    onClick={() => isDir ? navigateTo(item) : toggleFileSelection(item.id)}
+                  >
                     {item.name}
                   </span>
 
                   {nifti && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">NIfTI</span>}
-                  {dicom && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">DICOM</span>}
+                  {dicom && <span className="text-[10px] bg-navy-100 text-navy-700 px-1.5 py-0.5 rounded font-medium">DICOM</span>}
 
                   {item.size > 0 && (
                     <span className="text-xs text-gray-400 ml-auto">{formatSize(item.size)}</span>
                   )}
 
-                  {!isFile && <ChevronRight className="h-4 w-4 text-gray-400" />}
+                  {isDir && (
+                    <button
+                      onClick={() => navigateTo(item)}
+                      className="flex-shrink-0 text-gray-400 hover:text-[#003d7a]"
+                      title="Open"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -315,7 +337,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
               className="mt-3 w-full px-4 py-2.5 bg-[#003d7a] text-white text-sm font-medium rounded-md hover:bg-[#002b55] transition flex items-center justify-center gap-2"
             >
               <CheckSquare className="h-4 w-4" />
-              Select {selectedFiles.size} File{selectedFiles.size !== 1 ? 's' : ''} for Processing
+              Select {selectedFiles.size} Item{selectedFiles.size !== 1 ? 's' : ''} for Processing
             </button>
           )}
         </>

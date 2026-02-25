@@ -4,14 +4,13 @@
 
 - Python 3.9+, Node.js 18+, Docker (Compose v2), 8GB+ RAM
 
-## Setup
+## Launch
 
 ```bash
-./research-dev install    # First-time: deps + infra + DB
-./research-dev start      # Launch all services
+./research start
 ```
 
-Open http://localhost:3000 (frontend) or http://localhost:3001/docs (API).
+Open **http://localhost:3001**. Everything is automatic on first run.
 
 ## Usage
 
@@ -20,6 +19,17 @@ Open http://localhost:3000 (frontend) or http://localhost:3001/docs (API).
 3. Configure resources (CPU, RAM, GPU)
 4. Submit and monitor progress on the **Dashboard**
 5. View results in the **Viewer**
+
+## Commands
+
+```bash
+./research start          # Start the application
+./research stop           # Stop the application
+./research status         # Check all services
+./research logs all       # Tail all logs
+./research health         # Backend health endpoint
+./research restart        # Restart everything
+```
 
 ## Infrastructure
 
@@ -30,11 +40,9 @@ Open http://localhost:3000 (frontend) or http://localhost:3001/docs (API).
 ./research infra reset    # Stop + delete all data
 ```
 
-## Troubleshooting
+## Development mode
 
 ```bash
-./research-dev status     # Check all services
+./research-dev start      # Hot-reload backend + HMR frontend
 ./research-dev logs all   # Tail all logs
-./research-dev health     # Backend health endpoint
-./research-dev restart    # Restart everything
 ```

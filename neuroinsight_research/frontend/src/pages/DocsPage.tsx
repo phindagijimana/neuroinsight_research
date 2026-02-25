@@ -82,9 +82,9 @@ const domainLabel = (domain: string) => {
 const domainColor = (domain: string) => {
   switch (domain) {
     case 'structural_mri': return 'bg-navy-100 text-navy-800';
-    case 'functional_mri': return 'bg-purple-100 text-purple-800';
+    case 'functional_mri': return 'bg-navy-100 text-navy-800';
     case 'diffusion_mri': return 'bg-green-100 text-green-800';
-    case 'epilepsy': return 'bg-red-100 text-red-800';
+    case 'epilepsy': return 'bg-navy-100 text-navy-800';
     case 'conversion': return 'bg-gray-100 text-gray-800';
     default: return 'bg-gray-100 text-gray-800';
   }
@@ -173,7 +173,7 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
             {domainLabel(plugin.domain)}
           </span>
           {!plugin.user_selectable && (
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-100 text-navy-700">
               Utility (hidden)
             </span>
           )}
@@ -203,16 +203,16 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
               <span className="text-xs bg-navy-50 text-navy-700 px-2 py-1 rounded font-medium">{plugin.resources.cpus} CPUs</span>
             )}
             {plugin.resources?.mem_gb && (
-              <span className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded font-medium">{plugin.resources.mem_gb} GB RAM</span>
+              <span className="text-xs bg-navy-50 text-navy-700 px-2 py-1 rounded font-medium">{plugin.resources.mem_gb} GB RAM</span>
             )}
             {plugin.resources?.memory_gb && !plugin.resources?.mem_gb && (
-              <span className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded font-medium">{plugin.resources.memory_gb} GB RAM</span>
+              <span className="text-xs bg-navy-50 text-navy-700 px-2 py-1 rounded font-medium">{plugin.resources.memory_gb} GB RAM</span>
             )}
             {plugin.resources?.time_hours && (
               <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded font-medium">{plugin.resources.time_hours}h limit</span>
             )}
             {(plugin.resources?.gpus > 0 || plugin.resources?.gpu) && (
-              <span className="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded font-medium">GPU required</span>
+              <span className="text-xs bg-navy-50 text-navy-700 px-2 py-1 rounded font-medium">GPU required</span>
             )}
           </div>
         </div>
@@ -233,7 +233,7 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
               <div key={`req-${i}`} className="bg-white border border-gray-200 rounded-lg px-3 py-2.5">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm text-gray-800">{inp.key}</span>
-                  <span className="text-red-500 text-xs font-bold">required</span>
+                  <span className="text-navy-500 text-xs font-bold">required</span>
                   <span className="text-xs text-gray-400 ml-auto">{inp.type}</span>
                 </div>
                 {inp.description && <p className="text-xs text-gray-500 mt-1">{inp.description}</p>}
@@ -390,7 +390,7 @@ const WorkflowDetail: React.FC<{ workflow: WorkflowDoc }> = ({ workflow }) => {
               <div key={`req-${i}`} className="bg-white border border-gray-200 rounded-lg px-3 py-2.5">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm text-gray-800">{inp.key}</span>
-                  <span className="text-red-500 text-xs font-bold">required</span>
+                  <span className="text-navy-500 text-xs font-bold">required</span>
                   <span className="text-xs text-gray-400 ml-auto">{inp.type}</span>
                 </div>
                 {inp.description && <p className="text-xs text-gray-500 mt-1">{inp.description}</p>}
@@ -537,9 +537,9 @@ const DocsPage: React.FC<DocsPageProps> = () => {
       </div>
 
       {error && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-center gap-2 flex-shrink-0">
-          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-          <span className="text-amber-800 text-sm">{error}</span>
+        <div className="bg-navy-50 border border-navy-200 rounded-lg p-3 mb-4 flex items-center gap-2 flex-shrink-0">
+          <AlertTriangle className="w-5 h-5 text-navy-600 flex-shrink-0" />
+          <span className="text-navy-800 text-sm">{error}</span>
         </div>
       )}
 
@@ -615,7 +615,7 @@ const DocsPage: React.FC<DocsPageProps> = () => {
                         {domainLabel(plugin.domain)}
                       </span>
                       {!plugin.user_selectable && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600">utility</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-navy-100 text-navy-600">utility</span>
                       )}
                     </div>
                   </button>

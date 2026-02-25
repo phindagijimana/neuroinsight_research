@@ -17,44 +17,42 @@ Neuroimaging pipeline platform for processing, monitoring, and visualizing brain
 **Backend:** Python 3.10+, FastAPI, Celery, SQLAlchemy
 **Infrastructure:** PostgreSQL, Redis, MinIO, Docker
 
-## Clone and Install
+## Quick Start
 
 ```bash
-# Clone the repository
-git clone git@github.com:phindagijimana/neuroinsight_research.git
-cd neuroinsight_research
-
-# Install dependencies, start infrastructure, initialize database
-./research install
-
-# Start the application
+git clone https://github.com/phindagijimana/neuroinsight_research.git
+cd neuroinsight_research/neuroinsight_research
 ./research start
-# Frontend: http://localhost:3000
-# API docs: http://localhost:3001/docs
 ```
+
+Open **http://localhost:3001** -- that's it.
+
+The first run automatically:
+- Generates `.env` with secure random passwords
+- Installs Python and Node.js dependencies
+- Starts infrastructure (PostgreSQL, Redis, MinIO via Docker)
+- Runs database migrations
+- Builds the frontend
+- Launches the backend (which serves the frontend)
+
+No manual configuration required.
 
 **Prerequisites:** Python 3.9+, Node.js 18+, Docker with Compose v2
 
-## Docker Compose Deployment
+### Development mode
+
+```bash
+./research-dev start   # Hot-reload backend, HMR frontend (separate ports 3001 + 3000)
+```
+
+### Docker Compose deployment
 
 For a fully containerized production deployment:
 
 ```bash
-# Copy and edit environment variables
-cp .env.example .env
-# Edit .env to set secure passwords and SECRET_KEY
-
-# Start the full stack (app, worker, PostgreSQL, Redis, MinIO, nginx)
-docker compose up -d
-
-# View logs
-docker compose logs -f app
-
-# Stop everything
-docker compose down
+cp .env.example .env   # Edit passwords before starting
+docker compose up -d   # Full stack on http://localhost:3001
 ```
-
-Frontend: `http://localhost:3000`, API: `http://localhost:3001`
 
 ## CLI
 

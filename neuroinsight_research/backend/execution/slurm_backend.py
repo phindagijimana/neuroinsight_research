@@ -743,8 +743,6 @@ class SLURMBackend(ExecutionBackend):
         command template.
         """
         input_files = spec.input_files or []
-        if not input_files:
-            return
 
         # expected_inputs: list of (key, type) tuples for non-scalar inputs
         expected_inputs: list[tuple[str, str]] = []
@@ -827,7 +825,29 @@ class SLURMBackend(ExecutionBackend):
                 input_is_local[idx] = False
                 input_is_dir[idx] = False
 
-        # Name-based matching
+        staged_keys: set[str] = set()
+        dir_inputs_staged: list[str] = []
+
+        # Pre-stage path-type parameters (e.g. freesurfer_subjects_dir) that
+        # the user supplied as parameter values rather than input_files.  This
+        # prevents them from eating an input_files slot during name matching.
+        params = spec.parameters or {}
+        path_type_keys = {k for k, t in expected_inputs if t in ("path", "directory")}
+        for key in list(path_type_keys):
+            val = params.get(key)
+            if not val or not isinstance(val, str) or val.startswith("{"):
+                continue
+            link_path = f"{job_dir}/inputs/{key}"
+            try:
+                self._ssh_exec(f'ln -sf "{val}" "{link_path}"', check=False)
+                logger.info("Staged parameter path: %s -> %s", key, val)
+                staged_keys.add(key)
+                if key in expected_names:
+                    expected_names.remove(key)
+            except Exception as e:
+                logger.debug("Could not symlink parameter path %s: %s", key, e)
+
+        # Name-based matching (only for keys not already staged from params)
         matched: dict[int, str] = {}
         unmatched = list(range(len(input_files)))
 
@@ -855,9 +875,6 @@ class SLURMBackend(ExecutionBackend):
             elif remaining:
                 matched[idx] = remaining.pop(0)
                 unmatched.remove(idx)
-
-        staged_keys: set[str] = set()
-        dir_inputs_staged: list[str] = []
 
         for i, input_file in enumerate(input_files):
             p = PurePosixPath(input_file)
@@ -1248,6 +1265,7 @@ class SLURMBackend(ExecutionBackend):
         container_envs = {
             "OMP_NUM_THREADS": str(res.cpus),
             "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": str(res.cpus),
+            "PYTHONNOUSERSITE": "1",
         }
 
         # Add FreeSurfer and MELD licenses.
@@ -1285,6 +1303,7 @@ class SLURMBackend(ExecutionBackend):
                         meld_hpc = None
             if meld_hpc:
                 bind_mounts.append(f"{meld_hpc}:/run/secrets/meld_license.txt:ro")
+                container_envs["MELD_LICENSE"] = "/run/secrets/meld_license.txt"
 
             # Matlab Compiler Runtime -- optional host-side override for
             # segmentHA_T1/T2.  MCR is baked into the freesurfer-mcr container
@@ -1320,6 +1339,38 @@ class SLURMBackend(ExecutionBackend):
                     )
         except Exception as e:
             logger.debug(f"Could not add license bind mounts: {e}")
+
+        # MELD Graph needs host-backed working directories for intermediate
+        # data (/data/output, /data/input, /data/logs) because the tmpfs
+        # overlay is too small for feature extraction artifacts.
+        _all_plugin_ids = (
+            [s["plugin_id"] for s in workflow_steps] if workflow_steps
+            else [spec.parameters.get("_plugin_id", "")]
+        )
+        # SegmentHA plugins copy FreeSurfer SUBJECTS_DIR to a writable
+        # location; tmpfs is too small so use host-backed directory.
+        _segmentha_ids = {"segmentha_t1", "segmentha_t2"}
+        if _segmentha_ids & set(_all_plugin_ids):
+            host_path = f"{job_dir}/work/subjects_dir_work"
+            lines.append(f"mkdir -p {host_path}")
+            bind_mounts.append(f"{host_path}:/data/work_subjects_dir:rw")
+            logger.info("Added SegmentHA work-directory bind mount: %s", host_path)
+
+        if "meld_graph" in _all_plugin_ids:
+            for sub in ("meld_output:/data/output", "meld_input:/data/input", "meld_logs:/data/logs"):
+                host_sub, container_sub = sub.split(":")
+                host_path = f"{job_dir}/work/{host_sub}"
+                lines.append(f"mkdir -p {host_path}")
+                bind_mounts.append(f"{host_path}:{container_sub}:rw")
+            # MELD data (params + models) downloaded via prepare_classifier.py
+            meld_data_dir = f"{self.work_dir}/meld_data/meld_data"
+            lines.append(f'if [ -d "{meld_data_dir}/meld_params" ]; then')
+            lines.append(f'  echo "Using cached MELD data from {meld_data_dir}"')
+            lines.append(f'fi')
+            bind_mounts.append(f"{meld_data_dir}/meld_params:/data/meld_params:ro")
+            bind_mounts.append(f"{meld_data_dir}/models:/data/models:ro")
+            lines.append("")
+            logger.info("Added MELD work-directory bind mounts under %s/work/", job_dir)
 
         binds_str = " ".join(f"--bind {b}" for b in bind_mounts)
         envs_str = " ".join(f"--env {k}={v}" for k, v in container_envs.items())
@@ -1384,7 +1435,7 @@ class SLURMBackend(ExecutionBackend):
                                     or input_name.replace("_derivatives", "") == prev_pid
                                     or input_name == "subjects_dir"
                                     or input_name == "freesurfer_subjects_dir"):
-                                step_extra_binds += f" --bind {full_host_path}:{container_input}:ro"
+                                step_extra_binds += f" --bind {full_host_path}:{container_input}:rw"
                                 step_override_names.append(input_name)
                                 logger.info(
                                     "Workflow step %d: bind previous output %s -> %s",
@@ -1430,8 +1481,9 @@ class SLURMBackend(ExecutionBackend):
                 lines.append(f"NI_STEP_{step_num}_EOF")
                 lines.append(f"chmod +x {job_dir}/scripts/step_{step_num}_cmd.sh")
                 lines.append("set +e")
+                pwd_flag = "--pwd /app " if step_pid == "meld_graph" else ""
                 lines.append(
-                    f"$CONTAINER_RT exec --writable-tmpfs {envs_str} {binds_str} {input_binds_ref}{step_extra_binds} "
+                    f"$CONTAINER_RT exec --writable-tmpfs {pwd_flag}{envs_str} {binds_str} {input_binds_ref}{step_extra_binds} "
                     f"--bind {job_dir}/scripts/step_{step_num}_cmd.sh:/run_pipeline.sh:ro "
                     f"docker://{step_image} "
                     f"bash /run_pipeline.sh 2>&1 | tee {job_dir}/outputs/logs/step_{step_num}_{step_pid}.log"
@@ -1454,8 +1506,10 @@ class SLURMBackend(ExecutionBackend):
             lines.append("")
             lines.append(f"# Run pipeline in container")
             lines.append("set +e")
+            plugin_id = spec.parameters.get("_plugin_id", "")
+            pwd_flag = "--pwd /app " if plugin_id == "meld_graph" else ""
             lines.append(
-                f"$CONTAINER_RT exec --writable-tmpfs {envs_str} {binds_str} $INPUT_BINDS "
+                f"$CONTAINER_RT exec --writable-tmpfs {pwd_flag}{envs_str} {binds_str} $INPUT_BINDS "
                 f"--bind {job_dir}/scripts/pipeline_cmd.sh:/run_pipeline.sh:ro "
                 f"docker://{image} "
                 f"bash /run_pipeline.sh 2>&1 | tee {job_dir}/outputs/logs/container.log"

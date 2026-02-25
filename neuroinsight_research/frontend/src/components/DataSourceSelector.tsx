@@ -35,9 +35,9 @@ const DATA_SOURCES: { id: DataSourceType; label: string; icon: React.ReactNode; 
 const colorMap: Record<string, { active: string; hover: string }> = {
   navy: { active: 'border-navy-600 bg-navy-50 text-navy-700', hover: 'hover:border-navy-300' },
   green: { active: 'border-green-600 bg-green-50 text-green-700', hover: 'hover:border-green-300' },
-  purple: { active: 'border-purple-600 bg-purple-50 text-purple-700', hover: 'hover:border-purple-300' },
-  blue: { active: 'border-blue-600 bg-blue-50 text-blue-700', hover: 'hover:border-blue-300' },
-  orange: { active: 'border-orange-600 bg-orange-50 text-orange-700', hover: 'hover:border-orange-300' },
+  purple: { active: 'border-navy-600 bg-navy-50 text-navy-700', hover: 'hover:border-navy-300' },
+  blue: { active: 'border-navy-600 bg-navy-50 text-navy-700', hover: 'hover:border-navy-300' },
+  orange: { active: 'border-navy-600 bg-navy-50 text-navy-700', hover: 'hover:border-navy-300' },
 };
 
 export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({
@@ -144,7 +144,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-navy-500"
                 />
               </div>
               <div>
@@ -154,11 +154,11 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({
                   value={apiSecret}
                   onChange={(e) => setApiSecret(e.target.value)}
                   placeholder="Enter API secret"
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-navy-500"
                 />
               </div>
               <p className="text-xs text-gray-400">
-                Find your API keys at <a href="https://app.pennsieve.io" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">app.pennsieve.io</a> &rarr; User Menu &rarr; API Keys
+                Find your API keys at <a href="https://app.pennsieve.io" target="_blank" rel="noopener noreferrer" className="text-navy-600 underline">app.pennsieve.io</a> &rarr; User Menu &rarr; API Keys
               </p>
             </>
           )}
@@ -172,7 +172,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({
                   value={xnatUrl}
                   onChange={(e) => setXnatUrl(e.target.value)}
                   placeholder="https://xnat.example.edu"
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-navy-500"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -183,7 +183,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({
                     value={xnatUser}
                     onChange={(e) => setXnatUser(e.target.value)}
                     placeholder="username"
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-navy-500"
                   />
                 </div>
                 <div>
@@ -193,7 +193,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({
                     value={xnatPass}
                     onChange={(e) => setXnatPass(e.target.value)}
                     placeholder="password"
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-navy-500"
                   />
                 </div>
               </div>
@@ -202,7 +202,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({
                   type="checkbox"
                   checked={xnatSkipSsl}
                   onChange={(e) => setXnatSkipSsl(e.target.checked)}
-                  className="rounded border-gray-300 text-orange-500 focus:ring-orange-500 h-3.5 w-3.5"
+                  className="rounded border-gray-300 text-navy-500 focus:ring-navy-500 h-3.5 w-3.5"
                 />
                 Skip SSL verification (for tunneled or self-signed connections)
               </label>

@@ -111,6 +111,7 @@ execution:
         mkdir -p /data/outputs/logs/xcpd
         mkdir -p /data/outputs/work/xcpd
 
+        set +e
         xcp_d \
           /data/inputs/fmriprep_derivatives \
           /data/outputs/native/xcpd \
@@ -123,8 +124,16 @@ execution:
           --nthreads {threads} \
           --omp-nthreads {omp_nthreads} \
           --work-dir /data/outputs/work/xcpd
+        XCPD_RC=$?
+        set -e
 
-        echo "XCP-D completed successfully"
+        if [ -f "/data/outputs/native/xcpd/dataset_description.json" ] && \
+           ls /data/outputs/native/xcpd/sub-{subject_id}/ >/dev/null 2>&1; then
+          echo "XCP-D completed successfully (exit code $XCPD_RC, outputs validated)"
+        else
+          echo "ERROR: XCP-D failed — expected outputs not found (exit code $XCPD_RC)"
+          exit 1
+        fi
 
 native_outputs:
   preserved: true

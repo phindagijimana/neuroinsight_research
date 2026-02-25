@@ -7,6 +7,8 @@ INPUT_DIR="/data/input"
 OUTPUT_DIR="/data/output"
 
 export FS_LICENSE=/license/license.txt
+export MELD_LICENSE=/run/secrets/meld_license.txt
+export PYTHONNOUSERSITE=1
 export FREESURFER_HOME=/usr/local/freesurfer
 source "$FREESURFER_HOME/SetUpFreeSurfer.sh" 2>/dev/null || true
 
@@ -27,9 +29,23 @@ echo "Using T1w: $T1W"
 echo "=== Step 1/2: FreeSurfer recon-all ==="
 recon-all -i "$T1W" -s "$SUBJECT_ID" -sd "$SUBJECTS_DIR" -all -openmp "$THREADS"
 
-echo "=== Step 2/2: MELD Graph lesion detection ==="
+echo "=== Step 2/2: Focal Cortical Lesion Detection ==="
 
-# Stage T1w and FLAIR into MELD's expected layout
+cd /app
+
+# Ensure MELD data (params + models) is present
+if [ ! -d "/data/meld_params" ]; then
+    echo "Downloading MELD parameters..."
+    python -c "from meld_graph.download_data import get_meld_params; get_meld_params()" \
+        || { echo "ERROR: Could not download meld_params." >&2; exit 1; }
+fi
+if [ ! -d "/data/models" ] || [ -z "$(ls /data/models/ 2>/dev/null)" ]; then
+    echo "Downloading MELD models..."
+    python -c "from meld_graph.download_data import get_model; get_model()" \
+        || { echo "ERROR: Could not download MELD models." >&2; exit 1; }
+fi
+
+# Stage T1w into MELD's expected layout (exclude derived files)
 mkdir -p /data/input/"$SUBJECT_ID"/T1
 ln -sf "$T1W" /data/input/"$SUBJECT_ID"/T1/
 
@@ -44,7 +60,6 @@ else
     echo "No FLAIR found (optional - detection will use T1w only)"
 fi
 
-cd /app
 MELD_CMD="python scripts/new_patient_pipeline/new_pt_pipeline.py"
 MELD_CMD="$MELD_CMD -id $SUBJECT_ID -sd $SUBJECTS_DIR -od $OUTPUT_DIR/meld"
 [ -n "$FLAIR_FLAG" ] && MELD_CMD="$MELD_CMD $FLAIR_FLAG"
@@ -52,4 +67,4 @@ MELD_CMD="$MELD_CMD -id $SUBJECT_ID -sd $SUBJECTS_DIR -od $OUTPUT_DIR/meld"
 echo "Running: $MELD_CMD"
 eval $MELD_CMD
 
-echo "Cortical Lesion Detection workflow complete. Output in $OUTPUT_DIR"
+echo "Focal Cortical Lesion Detection workflow complete. Output in $OUTPUT_DIR"

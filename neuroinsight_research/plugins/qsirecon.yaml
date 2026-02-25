@@ -64,7 +64,7 @@ input_format:
 parameters:
   - name: recon_spec
     type: choice
-    default: mrtrix_multishell_msmt_noACT
+    default: mrtrix_singleshell_ss3t_noACT
     choices:
       - mrtrix_multishell_msmt_noACT
       - mrtrix_multishell_msmt_ACT-fast
@@ -111,6 +111,7 @@ execution:
         mkdir -p /data/outputs/logs/qsirecon
         mkdir -p /data/outputs/work/qsirecon
 
+        set +e
         qsirecon \
           /data/inputs/qsiprep_derivatives \
           /data/outputs/native/qsirecon \
@@ -121,8 +122,16 @@ execution:
           --nthreads {threads} \
           --omp-nthreads {omp_nthreads} \
           --work-dir /data/outputs/work/qsirecon
+        QSIRECON_RC=$?
+        set -e
 
-        echo "QSIRecon completed successfully"
+        if [ -f "/data/outputs/native/qsirecon/dataset_description.json" ] && \
+           ls /data/outputs/native/qsirecon/sub-{subject_id}/ >/dev/null 2>&1; then
+          echo "QSIRecon completed successfully (exit code $QSIRECON_RC, outputs validated)"
+        else
+          echo "ERROR: QSIRecon failed — expected outputs not found (exit code $QSIRECON_RC)"
+          exit 1
+        fi
 
 native_outputs:
   preserved: true

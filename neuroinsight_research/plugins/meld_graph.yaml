@@ -1,6 +1,6 @@
-# Plugin 10: MELD Graph
+# Plugin 10: Focal Cortical Lesion Detection
 id: meld_graph
-name: "MELD Graph"
+name: "Focal Cortical Lesion Detection"
 version: "2.2.4"
 type: plugin
 domain: epilepsy
@@ -8,11 +8,11 @@ domain: epilepsy
 visibility:
   user_selectable: true
   ui_category: primary
-  ui_label: "MELD Graph"
+  ui_label: "Focal Cortical Lesion Detection"
 
 description: >
-  Cortical dysplasia detection for drug-resistant epilepsy using graph
-  neural networks (Wagstyl et al., 2025). Operates on FreeSurfer
+  Focal cortical dysplasia detection for drug-resistant epilepsy using
+  graph neural networks (Wagstyl et al., 2025). Operates on FreeSurfer
   recon-all outputs to produce lesion probability maps and detection
   reports. Uses the official meldproject/meld_graph Docker container
   which bundles FreeSurfer 7.2, FastSurfer 1.1.2, and the MELD
@@ -49,18 +49,13 @@ inputs:
       type: path
       description: "MELD Graph license file (register at https://docs.google.com/forms/d/e/1FAIpQLSdocMWtxbmh9T7Sv8NT4f0Kpev-tmRI-kngDhUeBF9VcZXcfg/viewform)"
   optional:
+    - key: input_dir
+      type: directory
+      description: "Directory containing T1w (and optionally FLAIR) NIfTI files for the subject"
     - key: fastsurfer
       type: bool
       default: false
       description: "Use FastSurfer instead of FreeSurfer for segmentation (faster if GPU available)"
-    - key: harmo_code
-      type: string
-      default: ""
-      description: "Harmonisation code (e.g. H1) if scanner harmonisation was computed"
-    - key: skip_segmentation
-      type: bool
-      default: true
-      description: "Skip FreeSurfer/FastSurfer segmentation (use when recon-all already complete)"
 
 input_format:
   format_name: "FreeSurfer SUBJECTS_DIR"
@@ -101,12 +96,12 @@ resources:
   profiles:
     default:
       cpus: 4
-      mem_gb: 24
+      mem_gb: 48
       time_hours: 2
       gpus: 0
     gpu:
       cpus: 4
-      mem_gb: 24
+      mem_gb: 48
       time_hours: 1
       gpus: 1
 
@@ -124,57 +119,94 @@ execution:
         #!/bin/bash
         set -e
 
+        # Apptainer does not honour Docker WORKDIR; MELD uses relative
+        # paths (e.g. data/icospheres/) that resolve from /app.
+        cd /app
+
+        # Prevent user site-packages from shadowing container libraries
+        # (e.g. nibabel 5.x breaking get_data() calls).
+        export PYTHONNOUSERSITE=1
+
         mkdir -p /data/outputs/native/meld
         mkdir -p /data/outputs/logs/meld
 
-        # ---------------------------------------------------------------
-        # MELD Graph expects data under /data with a specific layout:
-        #   /data/input/<subject_id>/T1/<file>.nii.gz
-        #   /data/output/fs_outputs/<subject_id>/  (FreeSurfer recon-all)
-        # The container mounts host data at /data via compose or bind.
-        #
-        # When run after recon-all (workflow), we link existing FS output
-        # into the expected MELD data layout.
-        # ---------------------------------------------------------------
-
-        # Link FreeSurfer output into MELD's expected /data/output/fs_outputs/
-        mkdir -p /data/output/fs_outputs
-        if [ -d "/data/inputs/freesurfer_subjects_dir/{subject_id}" ]; then
-          ln -sf /data/inputs/freesurfer_subjects_dir/{subject_id} \
-                 /data/output/fs_outputs/{subject_id}
+        # -- Ensure MELD data (params + models) is present ----------------
+        # These are ~450 MB total and are downloaded on first run.  The
+        # backend bind-mounts a cached copy when available; if not, the
+        # container attempts to fetch them from figshare.
+        if [ ! -d "/data/meld_params" ]; then
+          echo "meld_params not found at /data/meld_params — attempting download..."
+          python /app/meld_graph/download_data.py --params 2>/dev/null \
+            || python -c "from meld_graph.download_data import get_meld_params; get_meld_params()" 2>/dev/null \
+            || { echo "ERROR: Could not obtain meld_params. See README for manual download." >&2; exit 1; }
+        fi
+        if [ ! -d "/data/models" ] || [ -z "$(ls /data/models/ 2>/dev/null)" ]; then
+          echo "MELD models not found at /data/models — attempting download..."
+          python /app/meld_graph/download_data.py --model 2>/dev/null \
+            || python -c "from meld_graph.download_data import get_model; get_model()" 2>/dev/null \
+            || { echo "ERROR: Could not obtain MELD models. See README for manual download." >&2; exit 1; }
         fi
 
-        # Build MELD command
-        # Official pipeline: /app/scripts/new_patient_pipeline/new_pt_pipeline.py
-        # Use absolute path because Apptainer does not honor Docker WORKDIR.
+        # -- Stage T1w input ------------------------------------------------
+        # MELD requires exactly one T1 file per modality; derived files
+        # (labels, masks, ROIs) are excluded to avoid an abort.
+        mkdir -p /data/input/{subject_id}/T1
+        if [ -d "/data/inputs/input_dir" ]; then
+          for f in /data/inputs/input_dir/*T1*nii* /data/inputs/input_dir/*t1*nii*; do
+            [ -e "$f" ] || continue
+            case "$(basename "$f")" in
+              *label*|*mask*|*roi*|*lesion*|*seg*) continue ;;
+            esac
+            ln -sf "$f" /data/input/{subject_id}/T1/
+          done
+          mkdir -p /data/input/{subject_id}/FLAIR
+          for f in /data/inputs/input_dir/*FLAIR*nii* /data/inputs/input_dir/*flair*nii*; do
+            [ -e "$f" ] || continue
+            case "$(basename "$f")" in
+              *label*|*mask*|*roi*|*lesion*|*seg*) continue ;;
+            esac
+            ln -sf "$f" /data/input/{subject_id}/FLAIR/
+          done
+          rmdir /data/input/{subject_id}/FLAIR 2>/dev/null || true
+        elif [ -f "/data/inputs/T1w.nii.gz" ]; then
+          ln -sf /data/inputs/T1w.nii.gz /data/input/{subject_id}/T1/T1w.nii.gz
+        fi
+
+        # -- Copy FreeSurfer output (MELD writes into this tree) ------------
+        mkdir -p /data/output/fs_outputs
+        if [ -d "/data/inputs/freesurfer_subjects_dir/{subject_id}" ]; then
+          echo "Copying FreeSurfer results to writable location..."
+          cp -a /data/inputs/freesurfer_subjects_dir/{subject_id} \
+                /data/output/fs_outputs/{subject_id}
+          chmod -R u+w /data/output/fs_outputs/{subject_id}
+        fi
+
+        # -- Run MELD -------------------------------------------------------
         MELD_CMD="python /app/scripts/new_patient_pipeline/new_pt_pipeline.py"
         MELD_CMD="$MELD_CMD -id {subject_id}"
 
-        # Skip FreeSurfer segmentation if already done (default in workflow)
-        if [ "{skip_segmentation}" = "true" ]; then
-          MELD_CMD="$MELD_CMD --skip_feature_extraction"
-        fi
-
-        # Use FastSurfer for segmentation if requested
-        if [ "{fastsurfer}" = "true" ]; then
+        if [ "{fastsurfer}" = "true" ] || [ "{fastsurfer}" = "True" ]; then
           MELD_CMD="$MELD_CMD --fastsurfer"
-        fi
-
-        # Harmonisation code if provided
-        if [ -n "{harmo_code}" ] && [ "{harmo_code}" != "" ]; then
-          MELD_CMD="$MELD_CMD -harmo_code {harmo_code}"
         fi
 
         echo "Running MELD Graph: $MELD_CMD"
         eval $MELD_CMD
 
-        # Copy predictions and reports to our standard output layout
-        if [ -d "/data/output/predictions_reports/{subject_id}" ]; then
-          cp -r /data/output/predictions_reports/{subject_id}/* \
-                /data/outputs/native/meld/ 2>/dev/null || true
+        # -- Collect outputs ------------------------------------------------
+        for src_dir in \
+          /data/output/predictions_reports/{subject_id} \
+          /data/output/predictions_reports; do
+          if [ -d "$src_dir" ] && [ "$(ls -A "$src_dir" 2>/dev/null)" ]; then
+            cp -r "$src_dir"/* /data/outputs/native/meld/ 2>/dev/null || true
+            break
+          fi
+        done
+
+        if [ -d "/data/logs" ]; then
+          cp -r /data/logs/* /data/outputs/logs/meld/ 2>/dev/null || true
         fi
 
-        echo "MELD Graph completed successfully"
+        echo "Focal Cortical Lesion Detection completed successfully"
 
 native_outputs:
   preserved: true

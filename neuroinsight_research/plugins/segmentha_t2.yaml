@@ -99,11 +99,26 @@ execution:
         #!/bin/bash
         set -e
 
-        export SUBJECTS_DIR=/data/inputs/subjects_dir
         mkdir -p /data/outputs/logs/segmentha_t2
+        mkdir -p /data/outputs/native/segmentha_t2
 
-        # Run hippocampal subfield segmentation with T2
+        # segmentHA writes lock files and output into SUBJECTS_DIR,
+        # so copy to a writable location when the input is read-only.
+        if [ -d "/data/inputs/subjects_dir/{subject_id}" ]; then
+          echo "Copying FreeSurfer results to writable location..."
+          cp -a /data/inputs/subjects_dir/. /data/work_subjects_dir/
+          chmod -R u+w /data/work_subjects_dir
+          export SUBJECTS_DIR=/data/work_subjects_dir
+        else
+          export SUBJECTS_DIR=/data/inputs/subjects_dir
+        fi
+
         segmentHA_T2.sh {subject_id} /data/inputs/T2w.nii.gz T2 1
+
+        # Copy results back to outputs
+        if [ -d "/data/work_subjects_dir" ]; then
+          cp -a /data/work_subjects_dir/* /data/outputs/native/segmentha_t2/ 2>/dev/null || true
+        fi
 
         echo "SegmentHA_T2 completed successfully"
 

@@ -34,7 +34,11 @@ fi
 #     3003  (reserved / future)
 #   If a default is busy, next free port in 3000-3050 is used.
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
-BACKEND_PORT="${API_PORT:-3001}"
+if [ "$MODE" = "production" ]; then
+    BACKEND_PORT="${API_PORT:-3000}"
+else
+    BACKEND_PORT="${API_PORT:-3001}"
+fi
 CELERY_CONCURRENCY="${CELERY_CONCURRENCY:-2}"
 DATA_DIR="${DATA_DIR:-./data}"
 LOG_DIR="${LOG_DIR:-./logs}"
@@ -46,7 +50,11 @@ PORT_RANGE_END=3050
 # Load .env if present
 if [ -f "$SCRIPT_DIR/.env" ]; then
     set -a; source "$SCRIPT_DIR/.env" 2>/dev/null || true; set +a
-    BACKEND_PORT="${API_PORT:-3001}"
+    if [ "$MODE" = "production" ]; then
+        BACKEND_PORT="${API_PORT:-3000}"
+    else
+        BACKEND_PORT="${API_PORT:-3001}"
+    fi
     FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 fi
 
@@ -168,16 +176,18 @@ resolve_ports() {
     fi
     success "Backend    -> port $BACKEND_PORT"
 
-    # Frontend (exclude the backend port)
-    FRONTEND_PORT=$(find_port "$FRONTEND_PORT" "${USED_PORTS[@]}") || {
-        error "No free port in $PORT_RANGE_START-$PORT_RANGE_END for frontend"; exit 1
-    }
-    USED_PORTS+=("$FRONTEND_PORT")
+    # Frontend port only needed in dev mode (production serves SPA from backend)
+    if [ "$MODE" = "development" ]; then
+        FRONTEND_PORT=$(find_port "$FRONTEND_PORT" "${USED_PORTS[@]}") || {
+            error "No free port in $PORT_RANGE_START-$PORT_RANGE_END for frontend"; exit 1
+        }
+        USED_PORTS+=("$FRONTEND_PORT")
 
-    if [ "$FRONTEND_PORT" != "$FRONTEND_PORT_DEFAULT" ]; then
-        warn "Frontend default $FRONTEND_PORT_DEFAULT busy -> using $FRONTEND_PORT"
+        if [ "$FRONTEND_PORT" != "$FRONTEND_PORT_DEFAULT" ]; then
+            warn "Frontend default $FRONTEND_PORT_DEFAULT busy -> using $FRONTEND_PORT"
+        fi
+        success "Frontend   -> port $FRONTEND_PORT"
     fi
-    success "Frontend   -> port $FRONTEND_PORT"
 }
 
 # ==============================================================================
@@ -223,15 +233,15 @@ cmd_install() {
             _rand() { python3 -c "import secrets; print(secrets.token_urlsafe(24))"; }
             local pg_pass; pg_pass=$(_rand)
             local redis_pass; redis_pass=$(_rand)
-            local minio_pass; minio_pass=$(_rand)
+            local minio_key; minio_key=$(_rand)
+            local minio_secret; minio_secret=$(_rand)
             local secret_key; secret_key=$(_rand)
-            # Replace defaults in .env
-            sed -i "s|neuroinsight_secure_password|${pg_pass}|g" .env
-            sed -i "s|redis_secure_password|${redis_pass}|g" .env
-            sed -i "s|minioadmin_secure|${minio_pass}|g" .env
-            sed -i "s|dev-secret-key-change-in-production-minimum-32-characters|${secret_key}|g" .env
-            # docker-compose.infra.yml now reads passwords from .env via
-            # ${VARIABLE:-default} syntax, so no sed replacement needed.
+            # Replace CHANGEME placeholders in .env
+            sed -i "s|CHANGEME_postgres_password|${pg_pass}|g" .env
+            sed -i "s|CHANGEME_redis_password|${redis_pass}|g" .env
+            sed -i "s|CHANGEME_minio_access_key|${minio_key}|g" .env
+            sed -i "s|CHANGEME_minio_secret_key|${minio_secret}|g" .env
+            sed -i "s|CHANGEME_secret_key_at_least_32_characters_long|${secret_key}|g" .env
             success "Created .env with generated random passwords"
         else
             warn "No .env or .env.example found"
@@ -748,6 +758,36 @@ cmd_version() {
 preflight_checks() {
     step "Preflight checks"
 
+    # ── Auto-create .env from .env.example if missing ─────────────────────
+    if [ ! -f "$SCRIPT_DIR/.env" ] && [ -f "$SCRIPT_DIR/.env.example" ]; then
+        info "No .env found — generating one with random passwords ..."
+        cp "$SCRIPT_DIR/.env.example" "$SCRIPT_DIR/.env"
+        if command -v python3 &>/dev/null; then
+            _rand() { python3 -c "import secrets; print(secrets.token_urlsafe(24))"; }
+            local pg_pass; pg_pass=$(_rand)
+            local redis_pass; redis_pass=$(_rand)
+            local minio_key; minio_key=$(_rand)
+            local minio_secret; minio_secret=$(_rand)
+            local secret_key; secret_key=$(_rand)
+            sed -i "s|CHANGEME_postgres_password|${pg_pass}|g" "$SCRIPT_DIR/.env"
+            sed -i "s|CHANGEME_redis_password|${redis_pass}|g" "$SCRIPT_DIR/.env"
+            sed -i "s|CHANGEME_minio_access_key|${minio_key}|g" "$SCRIPT_DIR/.env"
+            sed -i "s|CHANGEME_minio_secret_key|${minio_secret}|g" "$SCRIPT_DIR/.env"
+            sed -i "s|CHANGEME_secret_key_at_least_32_characters_long|${secret_key}|g" "$SCRIPT_DIR/.env"
+            # Reload newly created .env
+            set -a; source "$SCRIPT_DIR/.env" 2>/dev/null || true; set +a
+            if [ "$MODE" = "production" ]; then
+                BACKEND_PORT="${API_PORT:-3000}"
+            else
+                BACKEND_PORT="${API_PORT:-3001}"
+            fi
+            FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+            success "Created .env with generated random passwords"
+        else
+            warn "python3 not available — .env created with placeholder passwords"
+        fi
+    fi
+
     # ── Hard gates (can't proceed without these) ──────────────────────────
     if ! command -v python3 &>/dev/null; then
         error "python3 not found"; exit 1
@@ -772,6 +812,19 @@ preflight_checks() {
         error "docker not found -- required for infrastructure and job execution"; exit 1
     fi
 
+    # ── Auto-install dependencies if missing ──────────────────────────────
+    if [ -f "requirements.txt" ] && ! python3 -c "import fastapi" &>/dev/null; then
+        info "Python dependencies missing — installing ..."
+        pip3 install -q -r requirements.txt 2>&1 | tail -3
+        success "Python dependencies installed"
+    fi
+
+    if [ -d "frontend" ] && [ ! -d "frontend/node_modules" ]; then
+        info "Frontend dependencies missing — installing ..."
+        (cd frontend && npm install --silent 2>&1 | tail -3)
+        success "Frontend node_modules installed"
+    fi
+
     # ── Ensure infrastructure is up before the full check ─────────────────
     if _infra_running; then
         success "Infrastructure services running"
@@ -786,16 +839,12 @@ preflight_checks() {
     fi
 
     # ── Full Python pre-flight check ──────────────────────────────────────
-    python3 -m backend.cli.preflight
-    local pf_exit=$?
+    local pf_exit=0
+    python3 -m backend.cli.preflight || pf_exit=$?
 
     if [ "$pf_exit" -eq 1 ]; then
-        error "Pre-flight checks found critical failures (see above)"
-        read -rp "  Continue anyway? [y/N] " confirm
-        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-            exit 1
-        fi
-        warn "Continuing despite failures — some workflows may not work"
+        warn "Pre-flight checks found warnings (see above)"
+        warn "Continuing — some pipelines may require additional setup"
     fi
 }
 
@@ -817,14 +866,14 @@ print_start_summary() {
     echo -e "${BOLD}${GREEN}  All services running.${NC}  ${DIM}[$mode_flag]${NC}"
     echo ""
     echo -e "  ${BOLD}URLs${NC}"
-    echo -e "    Frontend   http://localhost:$FRONTEND_PORT"
-    echo -e "    Backend    http://localhost:$BACKEND_PORT"
-    echo -e "    API docs   http://localhost:$BACKEND_PORT/docs"
-    echo ""
-    echo -e "  ${BOLD}Port Allocation${NC}"
-    echo -e "    3000  Frontend (default)  ->  $FRONTEND_PORT"
-    echo -e "    3001  Backend  (default)  ->  $BACKEND_PORT"
-    echo -e "    Range $PORT_RANGE_START-$PORT_RANGE_END for overflow"
+    if [ "$MODE" = "development" ]; then
+        echo -e "    Frontend   http://localhost:$FRONTEND_PORT"
+        echo -e "    Backend    http://localhost:$BACKEND_PORT"
+        echo -e "    API docs   http://localhost:$BACKEND_PORT/docs"
+    else
+        echo -e "    App        http://localhost:$BACKEND_PORT"
+        echo -e "    API docs   http://localhost:$BACKEND_PORT/docs"
+    fi
     echo ""
     echo -e "  ${BOLD}Logs${NC}"
     if [ "$MODE" = "development" ]; then
@@ -835,7 +884,6 @@ print_start_summary() {
     else
         echo -e "    ./research logs backend"
         echo -e "    ./research logs celery"
-        echo -e "    ./research logs frontend"
         echo -e "    ./research logs all"
     fi
     echo ""

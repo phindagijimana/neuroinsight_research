@@ -89,19 +89,42 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
     setPlatformDatasetId(datasetId);
   };
 
+  const expandDirectories = async (files: PlatformFile[], datasetId: string): Promise<PlatformFile[]> => {
+    const result: PlatformFile[] = [];
+    for (const item of files) {
+      if (item.type === 'file') {
+        result.push(item);
+      } else if (item.type === 'directory' && datasetId) {
+        try {
+          const contents = await apiService.platformBrowse(dataSource, datasetId, item.path);
+          const expanded = await expandDirectories(contents.items as PlatformFile[], datasetId);
+          result.push(...expanded);
+        } catch {
+          result.push(item);
+        }
+      }
+    }
+    return result;
+  };
+
   const handleStartTransfer = async () => {
     if (platformFiles.length === 0) return;
     setError(null);
     const targetPath = `/tmp/neuroinsight/transfers/${Date.now()}`;
     try {
-      const fileIds = platformFiles.map(f => f.id);
+      // Expand any selected directories into individual files
+      const expandedFiles = await expandDirectories(platformFiles, platformDatasetId || '');
+      const fileIds = expandedFiles.filter(f => f.type === 'file').map(f => f.id);
+      if (fileIds.length === 0) {
+        setError('No downloadable files found in the selected items');
+        return;
+      }
+      const backendType = selectedBackend === 'remote_hpc' ? 'hpc' : selectedBackend;
       const result = await apiService.startTransferDownload(
-        dataSource, fileIds,
-        selectedBackend === 'remote_hpc' ? 'hpc' : selectedBackend,
-        targetPath,
+        dataSource, fileIds, backendType, targetPath,
       );
       setTransferId(result.transfer_id);
-      setTransferredPath(targetPath);
+      setTransferredPath((result as any).target_path || targetPath);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to start transfer');
     }

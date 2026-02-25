@@ -29,7 +29,7 @@ inputs:
       default: 1.5
     - key: recon_spec
       type: choice
-      default: "mrtrix_multishell_msmt_noACT"
+      default: "mrtrix_singleshell_ss3t_noACT"
     - key: atlases
       type: string
       default: "AAL116 Brainnetome246Ext Gordon333Ext 4S156Parcels 4S256Parcels"

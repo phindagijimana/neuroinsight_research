@@ -322,8 +322,8 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
 
       {/* New folder input */}
       {showNewFolder && (
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 bg-yellow-50">
-          <FolderPlus className="h-3.5 w-3.5 text-yellow-600" />
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 bg-navy-50">
+          <FolderPlus className="h-3.5 w-3.5 text-navy-600" />
           <input
             autoFocus
             value={newFolderName}
@@ -426,7 +426,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
                       onClick={e => { e.stopPropagation(); navigateInto(entry); }}
                       title="Open folder"
                     >
-                      <FolderOpen className="h-3.5 w-3.5 text-yellow-500 hover:text-yellow-600" />
+                      <FolderOpen className="h-3.5 w-3.5 text-navy-500 hover:text-navy-600" />
                     </button>
                   ) : nifti ? (
                     <FileText className="h-3.5 w-3.5 text-green-600" />
@@ -451,7 +451,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
 
                 {/* Badge */}
                 {nifti && <span className="text-[9px] bg-green-100 text-green-700 px-1 py-0.5 rounded mr-1 font-medium">NIfTI</span>}
-                {dicom && <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded mr-1 font-medium">DICOM</span>}
+                {dicom && <span className="text-[9px] bg-navy-100 text-navy-700 px-1 py-0.5 rounded mr-1 font-medium">DICOM</span>}
                 {isDir && selected && <span className="text-[9px] bg-blue-100 text-[#003d7a] px-1 py-0.5 rounded mr-1 font-medium">FOLDER</span>}
 
                 {/* Size */}
