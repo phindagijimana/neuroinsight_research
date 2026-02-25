@@ -111,7 +111,18 @@ wait_for_url() {
 }
 
 port_in_use() {
-    lsof -Pi :"$1" -sTCP:LISTEN -t > /dev/null 2>&1
+    # Socket-based check works across WSL2/Windows boundaries.
+    # lsof only sees WSL2 processes, not Windows services on the same port.
+    python3 -c "
+import socket, sys
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+try:
+    s.bind(('127.0.0.1', int(sys.argv[1])))
+    s.close()
+    sys.exit(1)  # port is FREE -> exit 1 (not in use)
+except OSError:
+    sys.exit(0)  # port is IN USE -> exit 0
+" "$1" 2>/dev/null
 }
 
 # find_port <default> <exclude...>
@@ -995,7 +1006,7 @@ _infra_running() {
 
 _port_owner() {
     local port="$1"
-    # Try lsof first (Linux/macOS)
+    # Try lsof (Linux/macOS)
     local pid
     pid=$(lsof -ti :"$port" -sTCP:LISTEN 2>/dev/null | head -1)
     if [ -n "$pid" ]; then
@@ -1004,14 +1015,19 @@ _port_owner() {
         echo "PID $pid ($pname)"
         return
     fi
-    # Fallback: check if it's a Docker container
+    # Check if it's a Docker container
     local cname
     cname=$(docker ps --format '{{.Names}}' --filter "publish=$port" 2>/dev/null | head -1)
     if [ -n "$cname" ]; then
         echo "container '$cname'"
         return
     fi
-    echo "unknown process"
+    # On WSL2, the port may be used by a Windows-side process
+    if grep -qi microsoft /proc/version 2>/dev/null; then
+        echo "Windows host process (check Windows Task Manager)"
+    else
+        echo "unknown process"
+    fi
 }
 
 _find_free_port() {
