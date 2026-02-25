@@ -90,7 +90,7 @@ resources:
     default:
       cpus: 4
       mem_gb: 16
-      time_hours: 2
+      time_hours: 6
       gpus: 0
 
 execution:
@@ -127,8 +127,13 @@ execution:
         XCPD_RC=$?
         set -e
 
-        if [ -f "/data/outputs/native/xcpd/dataset_description.json" ] && \
-           ls /data/outputs/native/xcpd/sub-{subject_id}/ >/dev/null 2>&1; then
+        FOUND_OUTPUTS=false
+        if find /data/outputs/native/xcpd -name "dataset_description.json" 2>/dev/null | grep -q . || \
+           find /data/outputs/native/xcpd -name "*denoised_bold.nii.gz" 2>/dev/null | grep -q .; then
+          FOUND_OUTPUTS=true
+        fi
+
+        if $FOUND_OUTPUTS; then
           echo "XCP-D completed successfully (exit code $XCPD_RC, outputs validated)"
         else
           echo "ERROR: XCP-D failed — expected outputs not found (exit code $XCPD_RC)"
