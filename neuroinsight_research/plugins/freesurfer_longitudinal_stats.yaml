@@ -104,7 +104,19 @@ execution:
       fi
     done
     echo "=== Generating longitudinal summary ==="
-    python3 -c "import os,json,glob; sd=os.environ['SUBJECTS_DIR']; bi=os.environ['BASE_ID']; out=os.environ.get('OUT','$OUT'); s={'base_id':bi,'timepoints':[]}; [s['timepoints'].append({'tp_id':os.path.basename(d).split('.long.')[0],'stats_file':os.path.join(d,'stats','aseg.stats')}) for d in sorted(glob.glob(os.path.join(sd,'*.long.'+bi)))]; json.dump(s,open(os.path.join(out,'longitudinal_summary.json'),'w'),indent=2); print('Written summary with %d timepoints'%len(s['timepoints']))"
+    # Pure bash JSON generation (no python3 in FreeSurfer container)
+    SUMMARY="$OUT/longitudinal_summary.json"
+    printf '{\n  "base_id": "%s",\n  "timepoints": [\n' "$BASE_ID" > "$SUMMARY"
+    FIRST=true
+    for long_dir in "${LONG_DIRS[@]}"; do
+      tp_id="${long_dir%%.long.*}"
+      stats_path="$SUBJECTS_DIR/$long_dir/stats/aseg.stats"
+      if $FIRST; then FIRST=false; else printf ',\n' >> "$SUMMARY"; fi
+      printf '    {\n      "tp_id": "%s",\n      "stats_file": "%s"\n    }' \
+        "$tp_id" "$stats_path" >> "$SUMMARY"
+    done
+    printf '\n  ]\n}\n' >> "$SUMMARY"
+    echo "Written summary with ${#LONG_DIRS[@]} timepoints"
     echo "=== Longitudinal stats extraction completed ==="
 
 bundle:

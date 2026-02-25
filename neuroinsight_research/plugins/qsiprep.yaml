@@ -136,9 +136,18 @@ execution:
           QSIPREP_CMD="$QSIPREP_CMD --combine-all-dwis"
         fi
 
+        set +e
         $QSIPREP_CMD
+        QSIPREP_RC=$?
+        set -e
 
-        echo "QSIPrep completed successfully"
+        if [ -f "/data/outputs/native/qsiprep/dataset_description.json" ] && \
+           ls /data/outputs/native/qsiprep/sub-{subject_id}/dwi/*desc-preproc_dwi.nii.gz >/dev/null 2>&1; then
+          echo "QSIPrep completed successfully (exit code $QSIPREP_RC, outputs validated)"
+        else
+          echo "ERROR: QSIPrep failed — expected outputs not found (exit code $QSIPREP_RC)"
+          exit 1
+        fi
 
 native_outputs:
   preserved: true

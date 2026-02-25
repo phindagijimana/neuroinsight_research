@@ -322,23 +322,30 @@ class TransferManager:
             record.progress_percent = ((i + 1) / record.total_files) * 100
 
     def _download_to_remote(self, record: TransferRecord, connector) -> None:
-        """Platform -> HPC/remote via direct download (pre-signed URL + curl).
+        """Platform -> HPC/remote.
 
-        NIR acts purely as orchestrator: it obtains the download URL from the
-        platform and instructs the HPC to fetch the file directly, so data
-        never touches the NIR server.  Falls back to the indirect
-        (platform -> NIR -> SFTP) path if direct download fails.
+        For platforms with pre-signed/public URLs (e.g. Pennsieve), NIR
+        instructs the HPC to curl the file directly so data bypasses NIR.
+
+        For session-authenticated platforms (XNAT) or URLs behind SSH tunnels,
+        direct curl from HPC will fail, so we go straight to indirect:
+        download to NIR temp -> SFTP to HPC.
         """
         from backend.core.ssh_manager import get_ssh_manager
 
         ssh = get_ssh_manager()
 
         try:
-            ssh.execute(f"mkdir -p {record.target_path}")
+            ssh.execute(f'mkdir -p "{record.target_path}"')
         except Exception:
             pass
 
         expanded = getattr(record, "_expanded_names", None)
+
+        # XNAT uses JSESSION cookies and is often behind an SSH tunnel
+        # that only exists on the NIR server, so direct curl from HPC
+        # cannot work.  Skip the attempt entirely.
+        skip_direct = record.platform == "xnat"
 
         for i, file_id in enumerate(record.file_ids):
             if record.cancelled:
@@ -348,7 +355,6 @@ class TransferManager:
                 fname = info["fname"]
                 remote_dest = os.path.join(record.target_path, fname)
 
-                # Ensure parent directory exists for nested paths
                 remote_parent = os.path.dirname(remote_dest)
                 if remote_parent != record.target_path:
                     try:
@@ -356,27 +362,36 @@ class TransferManager:
                     except Exception:
                         pass
 
-                try:
-                    url = info.get("url") or connector.get_download_url(file_id)
-                    exit_code, stdout, stderr = ssh.execute(
-                        f'curl -fsSL -o "{remote_dest}" "{url}"',
-                        timeout=600,
-                    )
-                    if exit_code == 0:
-                        record.local_paths.append(remote_dest)
-                        logger.info(
-                            "Direct download %s -> %s complete",
-                            fname, remote_dest,
-                        )
-                    else:
-                        raise RuntimeError(f"curl failed (exit {exit_code}): {stderr[:200]}")
+                downloaded = False
 
-                except Exception as direct_err:
-                    logger.info(
-                        "Direct download failed for %s, falling back to indirect: %s",
-                        fname, direct_err,
+                if not skip_direct:
+                    try:
+                        url = info.get("url") or connector.get_download_url(file_id)
+                        exit_code, stdout, stderr = ssh.execute(
+                            f'curl -fsSL -o "{remote_dest}" "{url}"',
+                            timeout=600,
+                        )
+                        if exit_code == 0:
+                            record.local_paths.append(remote_dest)
+                            logger.info(
+                                "Direct download %s -> %s complete",
+                                fname, remote_dest,
+                            )
+                            downloaded = True
+                        else:
+                            raise RuntimeError(
+                                f"curl failed (exit {exit_code}): {stderr[:200]}"
+                            )
+                    except Exception as direct_err:
+                        logger.info(
+                            "Direct download failed for %s, falling back to indirect: %s",
+                            fname, direct_err,
+                        )
+
+                if not downloaded:
+                    self._indirect_download_single(
+                        connector, ssh, file_id, fname, remote_dest
                     )
-                    self._indirect_download_single(connector, ssh, file_id, fname, remote_dest)
                     record.local_paths.append(remote_dest)
 
             except Exception as e:

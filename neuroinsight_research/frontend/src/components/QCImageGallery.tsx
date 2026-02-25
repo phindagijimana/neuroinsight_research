@@ -145,8 +145,8 @@ const QCImageGallery: React.FC<QCImageGalleryProps> = ({ jobId }) => {
   }
 
   const classificationColor = (cls: string) => {
-    if (cls.toLowerCase().includes('left')) return 'text-orange-700 bg-orange-50 border-orange-200';
-    if (cls.toLowerCase().includes('right')) return 'text-orange-700 bg-orange-50 border-orange-200';
+    if (cls.toLowerCase().includes('left')) return 'text-navy-700 bg-navy-50 border-navy-200';
+    if (cls.toLowerCase().includes('right')) return 'text-navy-700 bg-navy-50 border-navy-200';
     return 'text-green-700 bg-green-50 border-green-200';
   };
 

@@ -512,7 +512,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
       {/* Data source & license indicators */}
       <div className="mb-3 space-y-1">
         <div className="text-xs text-gray-500 flex items-center gap-1">
-          <span className={`inline-block w-2 h-2 rounded-full ${usingLiveData ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
+          <span className={`inline-block w-2 h-2 rounded-full ${usingLiveData ? 'bg-green-500' : 'bg-navy-500'}`}></span>
           {usingLiveData
             ? `Live: ${userSelectablePlugins.length} plugins, ${activeWorkflows.length} workflows`
             : `Demo: ${userSelectablePlugins.length} plugins, ${activeWorkflows.length} workflows`
@@ -520,7 +520,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
         </div>
         {licenseStatus && (
           <div className="space-y-0.5">
-            <div className={`text-xs flex items-center gap-1 ${licenseStatus.freesurfer.found ? 'text-green-600' : 'text-amber-600'}`}>
+            <div className={`text-xs flex items-center gap-1 ${licenseStatus.freesurfer.found ? 'text-green-600' : 'text-navy-600'}`}>
               {licenseStatus.freesurfer.found ? (
                 <>
                   <CheckCircle className="w-3 h-3" />
@@ -533,7 +533,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
                 </>
               )}
             </div>
-            <div className={`text-xs flex items-center gap-1 ${licenseStatus.meld_graph.found ? 'text-green-600' : 'text-amber-600'}`}>
+            <div className={`text-xs flex items-center gap-1 ${licenseStatus.meld_graph.found ? 'text-green-600' : 'text-navy-600'}`}>
               {licenseStatus.meld_graph.found ? (
                 <>
                   <CheckCircle className="w-3 h-3" />

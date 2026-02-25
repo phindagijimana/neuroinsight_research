@@ -101,7 +101,7 @@ execution:
 
     THREADS={threads}
     BASE_ID={base_id}
-    RESUME={resume}
+    RESUME=$(echo "{resume}" | tr '[:upper:]' '[:lower:]')
 
     # Resolve input directory: check for input_dir symlink, fall back to /data/inputs
     if [ -d /data/inputs/input_dir ]; then
@@ -237,8 +237,13 @@ execution:
         continue
       fi
       echo "  Processing CROSS: $tp_id ($nii)"
-      recon-all -subjid "$tp_id" -i "$nii" -all -openmp "$THREADS" \
-        2>&1 | tee "/data/outputs/logs/freesurfer_longitudinal/cross_${tp_id}.log"
+      if [ -d "$SUBJECTS_DIR/$tp_id" ]; then
+        recon-all -subjid "$tp_id" -all -openmp "$THREADS" \
+          2>&1 | tee "/data/outputs/logs/freesurfer_longitudinal/cross_${tp_id}.log"
+      else
+        recon-all -subjid "$tp_id" -i "$nii" -all -openmp "$THREADS" \
+          2>&1 | tee "/data/outputs/logs/freesurfer_longitudinal/cross_${tp_id}.log"
+      fi
     done
 
     # STAGE 2: BASE template

@@ -119,7 +119,7 @@
  * API INTEGRATION
  * ---------------
  * 
- * Backend URL: http://localhost:3003 (configured in vite.config.ts proxy)
+ * Backend URL: http://localhost:3000 (production), http://localhost:3001 (development proxy)
  * 
  * Key Endpoints:
  *  - GET  /api/pipelines           -> List available pipelines

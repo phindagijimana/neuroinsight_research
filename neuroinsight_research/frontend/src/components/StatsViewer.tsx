@@ -37,12 +37,12 @@ interface LegacyMetricSection {
 type SortDir = 'asc' | 'desc' | null;
 
 const CATEGORY_LABELS: Record<string, { label: string; color: string }> = {
-  volumetric: { label: 'Volumetric', color: 'bg-blue-100 text-blue-800' },
+  volumetric: { label: 'Volumetric', color: 'bg-navy-100 text-navy-800' },
   cortical: { label: 'Cortical', color: 'bg-purple-100 text-purple-800' },
   hippocampal: { label: 'Hippocampal', color: 'bg-green-100 text-green-800' },
   longitudinal: { label: 'Longitudinal', color: 'bg-amber-100 text-amber-800' },
-  clinical: { label: 'Clinical', color: 'bg-red-100 text-red-800' },
-  connectivity: { label: 'Connectivity', color: 'bg-indigo-100 text-indigo-800' },
+  clinical: { label: 'Clinical', color: 'bg-navy-100 text-navy-800' },
+  connectivity: { label: 'Connectivity', color: 'bg-navy-100 text-navy-800' },
   quality: { label: 'Quality Control', color: 'bg-teal-100 text-teal-800' },
   general: { label: 'General', color: 'bg-gray-100 text-gray-700' },
 };
@@ -390,7 +390,7 @@ export const StatsViewer: React.FC<StatsViewerProps> = ({ jobId, pipelineName })
                           </thead>
                           <tbody className="divide-y divide-gray-100">
                             {sortedRows.map((row, rIdx) => (
-                              <tr key={rIdx} className="hover:bg-blue-50/30">
+                              <tr key={rIdx} className="hover:bg-navy-50/30">
                                 {row.map((val, cIdx) => (
                                   <td key={cIdx} className="px-3 py-1.5 text-gray-900 whitespace-nowrap">
                                     {typeof val === 'number'
@@ -413,7 +413,7 @@ export const StatsViewer: React.FC<StatsViewerProps> = ({ jobId, pipelineName })
 
                       {/* Truncation notice */}
                       {csv.truncated && (
-                        <div className="px-4 py-2 bg-amber-50 border-t border-amber-100 text-xs text-amber-700">
+                        <div className="px-4 py-2 bg-navy-50 border-t border-navy-100 text-xs text-navy-700">
                           Showing {csv.rows.length} of {csv.total_rows} rows. Download CSV for the full dataset.
                         </div>
                       )}

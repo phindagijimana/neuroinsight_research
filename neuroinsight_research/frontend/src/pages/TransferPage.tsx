@@ -37,9 +37,9 @@ interface PlatformTabDef {
 const PLATFORM_TABS: PlatformTabDef[] = [
   { id: 'local',     label: 'Local Server',  icon: <Monitor className="h-3.5 w-3.5" />,  activeClass: 'border-navy-600 bg-navy-50 text-navy-700' },
   { id: 'remote',    label: 'Remote',        icon: <Cloud className="h-3.5 w-3.5" />,    activeClass: 'border-green-600 bg-green-50 text-green-700' },
-  { id: 'hpc',       label: 'HPC',           icon: <Server className="h-3.5 w-3.5" />,   activeClass: 'border-purple-600 bg-purple-50 text-purple-700' },
-  { id: 'pennsieve', label: 'Pennsieve',     icon: <Database className="h-3.5 w-3.5" />, activeClass: 'border-blue-600 bg-blue-50 text-blue-700' },
-  { id: 'xnat',      label: 'XNAT',          icon: <Globe className="h-3.5 w-3.5" />,    activeClass: 'border-orange-600 bg-orange-50 text-orange-700' },
+  { id: 'hpc',       label: 'HPC',           icon: <Server className="h-3.5 w-3.5" />,   activeClass: 'border-navy-600 bg-navy-50 text-navy-700' },
+  { id: 'pennsieve', label: 'Pennsieve',     icon: <Database className="h-3.5 w-3.5" />, activeClass: 'border-navy-600 bg-navy-50 text-navy-700' },
+  { id: 'xnat',      label: 'XNAT',          icon: <Globe className="h-3.5 w-3.5" />,    activeClass: 'border-navy-600 bg-navy-50 text-navy-700' },
 ];
 
 interface ActiveTransfer {

@@ -51,10 +51,10 @@ interface HPCConfig {
 
 const TABS: { id: DataSourceType; backendId?: BackendType; label: string; icon: React.ReactNode; activeClass: string; hoverClass: string }[] = [
   { id: 'local',     backendId: 'local',      label: 'Local',         icon: <Monitor className="h-3.5 w-3.5" />, activeClass: 'border-navy-600 bg-navy-50 text-navy-700',     hoverClass: 'hover:border-navy-300' },
-  { id: 'remote',    backendId: 'remote',      label: 'Remote Server', icon: <Cloud className="h-3.5 w-3.5" />,   activeClass: 'border-green-600 bg-green-50 text-green-700',  hoverClass: 'hover:border-green-300' },
-  { id: 'hpc',       backendId: 'remote_hpc',  label: 'HPC',           icon: <Server className="h-3.5 w-3.5" />,  activeClass: 'border-purple-600 bg-purple-50 text-purple-700', hoverClass: 'hover:border-purple-300' },
-  { id: 'pennsieve', label: 'Pennsieve',       icon: <Database className="h-3.5 w-3.5" />, activeClass: 'border-blue-600 bg-blue-50 text-blue-700',    hoverClass: 'hover:border-blue-300' },
-  { id: 'xnat',      label: 'XNAT',             icon: <Globe className="h-3.5 w-3.5" />,    activeClass: 'border-orange-600 bg-orange-50 text-orange-700', hoverClass: 'hover:border-orange-300' },
+  { id: 'remote',    backendId: 'remote',      label: 'Remote Server', icon: <Cloud className="h-3.5 w-3.5" />,   activeClass: 'border-navy-600 bg-navy-50 text-navy-700',  hoverClass: 'hover:border-navy-300' },
+  { id: 'hpc',       backendId: 'remote_hpc',  label: 'HPC',           icon: <Server className="h-3.5 w-3.5" />,  activeClass: 'border-navy-600 bg-navy-50 text-navy-700', hoverClass: 'hover:border-navy-300' },
+  { id: 'pennsieve', label: 'Pennsieve',       icon: <Database className="h-3.5 w-3.5" />, activeClass: 'border-navy-600 bg-navy-50 text-navy-700',    hoverClass: 'hover:border-navy-300' },
+  { id: 'xnat',      label: 'XNAT',             icon: <Globe className="h-3.5 w-3.5" />,    activeClass: 'border-navy-600 bg-navy-50 text-navy-700', hoverClass: 'hover:border-navy-300' },
 ];
 
 export const BackendSelector: React.FC<BackendSelectorProps> = ({
@@ -519,24 +519,24 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
 
       {/* Cross-system info: data and compute on different systems */}
       {!isPlatformSelected && dataSource !== 'local' && selectedBackend === 'local' && dataSourceNeedsSSH && (
-        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded">
-          <p className="text-xs text-amber-700">
+        <div className="mt-2 p-2 bg-navy-50 border border-navy-200 rounded">
+          <p className="text-xs text-navy-700">
             <strong>Note:</strong> Data is on a remote host but compute is local.
             Input paths must be accessible from this machine (e.g. NFS mount) or files will be downloaded before processing.
           </p>
         </div>
       )}
       {!isPlatformSelected && dataSource === 'local' && computeNeedsSSH && (
-        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded">
-          <p className="text-xs text-amber-700">
+        <div className="mt-2 p-2 bg-navy-50 border border-navy-200 rounded">
+          <p className="text-xs text-navy-700">
             <strong>Note:</strong> Data is local but compute is remote.
             Input files will be uploaded to the remote host before processing.
           </p>
         </div>
       )}
       {!isPlatformSelected && dataSourceNeedsSSH && computeNeedsSSH && dataSource !== (selectedBackend === 'remote_hpc' ? 'hpc' : 'remote') && (
-        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded">
-          <p className="text-xs text-amber-700">
+        <div className="mt-2 p-2 bg-navy-50 border border-navy-200 rounded">
+          <p className="text-xs text-navy-700">
             <strong>Note:</strong> Data source and compute are on different remote systems.
             The SSH connection is shared &mdash; input paths must be accessible from the compute server (e.g. shared NFS filesystem).
           </p>
@@ -567,16 +567,16 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
                 <label className="block text-xs font-medium text-gray-600 mb-1">API Key</label>
                 <input type="text" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
                   placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500" />
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-navy-500" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">API Secret</label>
                 <input type="password" value={apiSecret} onChange={(e) => setApiSecret(e.target.value)}
                   placeholder="Enter API secret"
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500" />
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-navy-500" />
               </div>
               <p className="text-xs text-gray-400">
-                Find your API keys at <a href="https://app.pennsieve.io" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">app.pennsieve.io</a> &rarr; User Menu &rarr; API Keys
+                Find your API keys at <a href="https://app.pennsieve.io" target="_blank" rel="noopener noreferrer" className="text-navy-600 underline">app.pennsieve.io</a> &rarr; User Menu &rarr; API Keys
               </p>
             </>
           )}
@@ -587,20 +587,20 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
                 <label className="block text-xs font-medium text-gray-600 mb-1">XNAT URL</label>
                 <input type="text" value={xnatUrl} onChange={(e) => setXnatUrl(e.target.value)}
                   placeholder="https://xnat.example.edu"
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500" />
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-navy-500" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Username</label>
                   <input type="text" value={xnatUser} onChange={(e) => setXnatUser(e.target.value)}
                     placeholder="username"
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500" />
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-navy-500" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Password</label>
                   <input type="password" value={xnatPass} onChange={(e) => setXnatPass(e.target.value)}
                     placeholder="password"
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-orange-500" />
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-navy-500" />
                 </div>
               </div>
               <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
@@ -608,7 +608,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
                   type="checkbox"
                   checked={xnatSkipSsl}
                   onChange={(e) => setXnatSkipSsl(e.target.checked)}
-                  className="rounded border-gray-300 text-orange-500 focus:ring-orange-500 h-3.5 w-3.5"
+                  className="rounded border-gray-300 text-navy-500 focus:ring-navy-500 h-3.5 w-3.5"
                 />
                 Skip SSL verification (for tunneled or self-signed connections)
               </label>

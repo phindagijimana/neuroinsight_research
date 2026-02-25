@@ -30,36 +30,23 @@ Pipelines are defined as YAML plugin files. Adding a new pipeline requires no co
 
 ## Quick Start
 
-### Using Docker Compose
-
 ```bash
 git clone https://github.com/phindagijimana/neuroinsight_research.git
 cd neuroinsight_research/neuroinsight_research
-
-cp .env.example .env
-# Edit .env to set secure passwords and configure your environment
-
-docker compose up -d
-# Access at http://localhost:3001
+./research start
 ```
 
-### Development Setup
+Open **http://localhost:3001** -- that's it.
+
+The first run automatically installs dependencies, generates secure passwords, starts infrastructure (PostgreSQL, Redis, MinIO via Docker), builds the frontend, and launches the application. No manual configuration needed.
+
+**Prerequisites:** Python 3.9+, Node.js 18+, Docker with Compose v2
+
+### Other launch options
 
 ```bash
-git clone https://github.com/phindagijimana/neuroinsight_research.git
-cd neuroinsight_research/neuroinsight_research
-
-# Backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cd backend && uvicorn main:app --port 3001
-
-# Frontend (separate terminal)
-cd neuroinsight_research/frontend
-npm install
-npm run dev
-# Access at http://localhost:3000
+./research-dev start     # Development mode (hot-reload, debug logging)
+docker compose up -d     # Fully containerized deployment (edit .env first)
 ```
 
 ## Repository Structure

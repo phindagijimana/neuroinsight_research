@@ -111,7 +111,7 @@ const FileTreeItem: React.FC<{
         {item.type === 'folder' ? (
           <Folder className="w-4 h-4 text-navy-500 flex-shrink-0" />
         ) : item.isImage ? (
-          <Brain className="w-4 h-4 text-purple-500 flex-shrink-0" />
+          <Brain className="w-4 h-4 text-navy-500 flex-shrink-0" />
         ) : (
           <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
         )}

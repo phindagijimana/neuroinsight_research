@@ -64,15 +64,26 @@ def start_download(request: DownloadRequest):
     """Start async download from platform to processing backend."""
     from backend.core.transfer_manager import get_transfer_manager
 
+    target_path = request.target_path
+
+    # For HPC/remote backends, resolve the target path to the HPC work
+    # directory so files land on shared storage accessible by compute nodes.
+    if request.target_backend in ("hpc", "remote"):
+        import os, time
+        work_dir = os.environ.get("HPC_WORK_DIR", "~")
+        if work_dir == "~":
+            work_dir = f"/home/{os.environ.get('HPC_USER', 'user')}"
+        target_path = f"{work_dir}/transfers/{int(time.time() * 1000)}"
+
     try:
         manager = get_transfer_manager()
         transfer_id = manager.start_download(
             platform=request.platform,
             file_ids=request.file_ids,
             target_backend=request.target_backend,
-            target_path=request.target_path,
+            target_path=target_path,
         )
-        return {"transfer_id": transfer_id, "status": "pending"}
+        return {"transfer_id": transfer_id, "status": "pending", "target_path": target_path}
     except Exception as e:
         logger.error("start_download failed: %s", e)
         raise HTTPException(500, f"Failed to start download: {e}")

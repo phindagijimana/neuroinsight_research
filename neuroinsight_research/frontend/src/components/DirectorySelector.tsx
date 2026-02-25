@@ -239,7 +239,7 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
             </div>
             <button
               onClick={() => handleBrowserSelect(browserPath)}
-              className="px-2.5 py-1 text-[10px] font-semibold text-white bg-teal-600 rounded hover:bg-teal-700 whitespace-nowrap"
+              className="px-2.5 py-1 text-[10px] font-semibold text-white bg-navy-600 rounded hover:bg-navy-700 whitespace-nowrap"
               title="Use the current directory as input"
             >
               Use This Directory
@@ -278,7 +278,7 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
                   }}
                 >
                   {entry.type === 'directory' ? (
-                    <FolderOpen className={`h-3.5 w-3.5 mr-2 flex-shrink-0 ${isSub ? 'text-[#003d7a]' : 'text-yellow-500'}`} />
+                    <FolderOpen className={`h-3.5 w-3.5 mr-2 flex-shrink-0 ${isSub ? 'text-[#003d7a]' : 'text-navy-500'}`} />
                   ) : nifti ? (
                     <FileText className="h-3.5 w-3.5 text-green-600 mr-2 flex-shrink-0" />
                   ) : (

@@ -10,9 +10,9 @@ import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Query
+from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
@@ -134,13 +134,27 @@ app.include_router(platform_routes.router)
 app.include_router(transfer_routes.router)
 
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch-all for unhandled exceptions so clients always get valid JSON."""
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error. Check server logs for details."},
+    )
+
+
 # ---------------------------------------------------------------------------
 # Health & Status
 # ---------------------------------------------------------------------------
 
 @app.get("/")
-def root():
-    """Root endpoint."""
+def root(request: Request):
+    """Root endpoint -- serves SPA for browsers, JSON for API clients."""
+    _dist = Path(__file__).parent.parent / "frontend" / "dist" / "index.html"
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept and _dist.exists():
+        return FileResponse(str(_dist))
     return {
         "app": settings.app_name,
         "version": settings.app_version,
@@ -540,16 +554,18 @@ def submit_plugin_job(plugin_id: str, request: PluginJobSubmitRequest, db: Sessi
     # Check required licenses before submitting
     _check_licenses([plugin_id])
 
-    # Resolve resources
+    # Resolve resources from plugin profile or direct dict
     res = plugin.resources if isinstance(plugin.resources, dict) else {}
+    if "profiles" in res:
+        res = res.get("profiles", {}).get("default", res)
     if request.custom_resources:
         res = {**res, **request.custom_resources}
 
     resources = ResourceSpec(
-        memory_gb=res.get("memory_gb", 8),
+        memory_gb=res.get("memory_gb", res.get("mem_gb", 8)),
         cpus=res.get("cpus", 4),
         time_hours=res.get("time_hours", 6),
-        gpu=res.get("gpu", False),
+        gpu=res.get("gpu", res.get("gpus", 0) > 0 if isinstance(res.get("gpus"), int) else False),
     )
 
     job_id = str(uuid.uuid4())
@@ -1578,6 +1594,32 @@ def deidentify_dicom(request: DeidentifyRequest):
         logger.debug("Audit log unavailable: %s", e)
 
     return {"output_dir": output_dir, **stats}
+
+
+# ---------------------------------------------------------------------------
+# SPA static file serving (production)
+# ---------------------------------------------------------------------------
+# When frontend/dist exists, serve the React SPA from the backend port.
+# This eliminates the need for a separate frontend server or proxy in
+# production — users just open http://localhost:3001.
+
+_frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+
+if _frontend_dist.exists():
+    from starlette.staticfiles import StaticFiles
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+
+    class _SPAStaticFiles(StaticFiles):
+        """StaticFiles subclass that falls back to index.html for SPA routing."""
+
+        async def get_response(self, path: str, scope):
+            try:
+                return await super().get_response(path, scope)
+            except (StarletteHTTPException, Exception):
+                return await super().get_response("index.html", scope)
+
+    app.mount("/", _SPAStaticFiles(directory=str(_frontend_dist), html=True), name="spa")
+    logger.info("Serving frontend SPA from %s", _frontend_dist)
 
 
 # ---------------------------------------------------------------------------

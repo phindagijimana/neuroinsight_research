@@ -179,7 +179,7 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectio
   }
 
   return (
-    <div className="border border-amber-200 bg-amber-50 rounded-lg overflow-hidden">
+    <div className="border border-navy-200 bg-navy-50 rounded-lg overflow-hidden">
       {/* Collapsed header */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -194,7 +194,7 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectio
 
       {/* Expanded form */}
       {expanded && (
-        <div className="px-3 pb-3 space-y-2.5 border-t border-amber-200">
+        <div className="px-3 pb-3 space-y-2.5 border-t border-navy-200">
           {/* SSH form */}
           {(platform === 'remote' || platform === 'hpc') && (
             <>
@@ -249,7 +249,7 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectio
                   className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent" />
               </div>
               <p className="text-[10px] text-gray-400">
-                Get keys at <a href="https://app.pennsieve.io" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">app.pennsieve.io</a> &rarr; User Menu &rarr; API Keys
+                Get keys at <a href="https://app.pennsieve.io" target="_blank" rel="noopener noreferrer" className="text-navy-600 underline">app.pennsieve.io</a> &rarr; User Menu &rarr; API Keys
               </p>
             </>
           )}
@@ -285,7 +285,7 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectio
               </div>
               <label className="flex items-center gap-1.5 text-[11px] text-gray-600 cursor-pointer select-none">
                 <input type="checkbox" checked={xnatSkipSsl} onChange={e => setXnatSkipSsl(e.target.checked)}
-                  className="rounded border-gray-300 text-orange-500 focus:ring-orange-500 h-3 w-3" />
+                  className="rounded border-gray-300 text-navy-500 focus:ring-navy-500 h-3 w-3" />
                 Skip SSL verification (for self-signed certificates)
               </label>
               <p className="text-[10px] text-gray-400">

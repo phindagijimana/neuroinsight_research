@@ -475,10 +475,26 @@ def run_docker_job(self, job_id: str, spec_dict: dict) -> dict:
         container_env = {
             "OMP_NUM_THREADS": str(cpu_count),
             "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": str(cpu_count),
+            "PYTHONNOUSERSITE": "1",
         }
 
         if any(v.get("bind") == "/opt/freesurfer/license.txt" for v in volumes.values()):
             container_env["FS_LICENSE"] = "/opt/freesurfer/license.txt"
+        if any(v.get("bind") == "/run/secrets/meld_license.txt" for v in volumes.values()):
+            container_env["MELD_LICENSE"] = "/run/secrets/meld_license.txt"
+
+        # MELD Graph needs a persistent data volume for params/models
+        # (~450 MB, downloaded on first run).
+        is_meld = "meld_graph" in image or "meld_graph" in (parameters.get("_plugin_id", ""))
+        meld_data_dir = Path(settings.data_dir) / "meld_data"
+        if is_meld and meld_data_dir.exists():
+            volumes[str(meld_data_dir / "meld_params")] = {
+                "bind": "/data/meld_params", "mode": "ro",
+            }
+            volumes[str(meld_data_dir / "models")] = {
+                "bind": "/data/models", "mode": "ro",
+            }
+            logger.info("Mounted cached MELD data from %s", meld_data_dir)
 
         # Device requests for GPU
         device_requests = []
@@ -513,6 +529,8 @@ def run_docker_job(self, job_id: str, spec_dict: dict) -> dict:
             network_mode="none",
             labels={"neuroinsight.job_id": job_id, "managed-by": "neuroinsight"},
         )
+        if is_meld:
+            run_kwargs["working_dir"] = "/app"
         if override_entrypoint is not None:
             run_kwargs["entrypoint"] = override_entrypoint
 
@@ -674,6 +692,9 @@ def _run_single_container(
     """
     import docker as _docker
 
+    from backend.core.config import get_settings
+    settings = get_settings()
+
     client = _docker.from_env()
     from docker.errors import ImageNotFound
 
@@ -693,10 +714,26 @@ def _run_single_container(
     container_env = {
         "OMP_NUM_THREADS": str(cpu_count),
         "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS": str(cpu_count),
+        "PYTHONNOUSERSITE": "1",
     }
 
     if any(v.get("bind") == "/opt/freesurfer/license.txt" for v in volumes.values()):
         container_env["FS_LICENSE"] = "/opt/freesurfer/license.txt"
+    if any(v.get("bind") == "/run/secrets/meld_license.txt" for v in volumes.values()):
+        container_env["MELD_LICENSE"] = "/run/secrets/meld_license.txt"
+
+    is_meld = "meld_graph" in image
+    meld_data_dir = Path(settings.data_dir) / "meld_data"
+    if is_meld and meld_data_dir.exists():
+        if (meld_data_dir / "meld_params").is_dir():
+            volumes[str(meld_data_dir / "meld_params")] = {
+                "bind": "/data/meld_params", "mode": "ro",
+            }
+        if (meld_data_dir / "models").is_dir():
+            volumes[str(meld_data_dir / "models")] = {
+                "bind": "/data/models", "mode": "ro",
+            }
+        logger.info("Mounted cached MELD data from %s", meld_data_dir)
 
     device_requests = []
     if gpu_requested:
@@ -731,6 +768,8 @@ def _run_single_container(
         network_mode="none",
         labels={"neuroinsight.job_id": job_id, "managed-by": "neuroinsight"},
     )
+    if is_meld:
+        run_kwargs["working_dir"] = "/app"
     if override_entrypoint is not None:
         run_kwargs["entrypoint"] = override_entrypoint
 

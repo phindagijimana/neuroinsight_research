@@ -315,7 +315,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
             </div>
           </div>
           {gpuNeededButMissing && !isRemoteCompute && (
-            <p className="text-[10px] text-amber-600 flex items-center gap-1 -mt-1 ml-1">
+            <p className="text-[10px] text-navy-600 flex items-center gap-1 -mt-1 ml-1">
               <AlertTriangle className="h-3 w-3" />
               GPU requested but no GPU detected on this host.
             </p>
@@ -428,9 +428,9 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
 
       {/* Warnings -- only for local compute where exceeding host limits matters */}
       {useCustom && !isRemoteCompute && (overCpu || overMem) && (
-        <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-          <p className="text-[11px] text-amber-800">
+        <div className="p-2.5 bg-navy-50 border border-navy-200 rounded-md flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-navy-500 flex-shrink-0 mt-0.5" />
+          <p className="text-[11px] text-navy-800">
             {overCpu && overMem
               ? 'CPU and memory exceed host capacity. Job may fail or be very slow.'
               : overCpu
@@ -456,10 +456,10 @@ const Row: React.FC<{
 }> = ({ icon, label, value, accent }) => (
   <div className="flex items-center justify-between py-1.5 px-3 bg-navy-50/60 rounded-md">
     <div className="flex items-center gap-2">
-      {React.cloneElement(icon, { className: `h-4 w-4 ${accent ? 'text-amber-500' : 'text-[#003d7a]'}` })}
+      {React.cloneElement(icon, { className: `h-4 w-4 ${accent ? 'text-navy-500' : 'text-[#003d7a]'}` })}
       <span className="text-sm text-gray-700">{label}</span>
     </div>
-    <span className={`text-sm font-medium ${accent ? 'text-amber-600' : 'text-gray-900'}`}>{value}</span>
+    <span className={`text-sm font-medium ${accent ? 'text-navy-600' : 'text-gray-900'}`}>{value}</span>
   </div>
 );
 
@@ -497,7 +497,7 @@ const SliderField: React.FC<{
           if (!isNaN(v) && v >= min) onChange(v);
         }}
         className={`w-16 px-2 py-1 text-sm text-center border rounded-md focus:outline-none focus:ring-1 focus:ring-[#003d7a] ${
-          warn ? 'border-amber-400 bg-amber-50' : 'border-gray-300'
+          warn ? 'border-navy-400 bg-navy-50' : 'border-gray-300'
         }`}
       />
     </div>

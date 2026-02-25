@@ -145,9 +145,21 @@ execution:
           FMRIPREP_CMD="$FMRIPREP_CMD --ignore fieldmaps"
         fi
 
+        # fMRIPrep sometimes returns exit code 1 despite successful processing
+        # (e.g. deprecation warnings, non-critical FreeSurfer issues).
+        # Capture the exit code and validate by checking outputs instead.
+        set +e
         $FMRIPREP_CMD
+        FMRIPREP_RC=$?
+        set -e
 
-        echo "fMRIPrep completed successfully"
+        if [ -f "/data/outputs/native/fmriprep/dataset_description.json" ] && \
+           ls /data/outputs/native/fmriprep/sub-{subject_id}/*/func/*desc-preproc_bold.nii.gz >/dev/null 2>&1; then
+          echo "fMRIPrep completed successfully (exit code $FMRIPREP_RC, outputs validated)"
+        else
+          echo "ERROR: fMRIPrep failed — expected outputs not found (exit code $FMRIPREP_RC)"
+          exit 1
+        fi
 
 native_outputs:
   preserved: true

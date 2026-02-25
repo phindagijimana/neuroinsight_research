@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
     # -- API Server --
     api_host: str = Field(default="0.0.0.0", description="API server bind address")
-    api_port: int = Field(default=3003, ge=1024, le=65535, description="API server port")
+    api_port: int = Field(default=3000, ge=1024, le=65535, description="API server port")
     cors_origins: str = Field(
         default="http://localhost:3000,http://localhost:5173",
         description="Comma-separated list of allowed frontend origins",
