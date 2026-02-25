@@ -993,16 +993,63 @@ _infra_running() {
     [ "$count" -ge 3 ]
 }
 
+_find_free_port() {
+    local default_port="$1"
+    if ! port_in_use "$default_port"; then
+        echo "$default_port"; return 0
+    fi
+    for p in $(seq $((default_port + 1)) $((default_port + 50))); do
+        if ! port_in_use "$p"; then
+            echo "$p"; return 0
+        fi
+    done
+    return 1
+}
+
+_update_env_var() {
+    local key="$1" value="$2" file="$SCRIPT_DIR/.env"
+    [ -f "$file" ] || return 0
+    if grep -q "^${key}=" "$file"; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+    else
+        echo "${key}=${value}" >> "$file"
+    fi
+}
+
 _infra_up_quiet() {
     if ! docker info &>/dev/null; then
         warn "Docker is not running"
         info "Start Docker Desktop (Windows/Mac) or run: sudo systemctl start docker"
         return 1
     fi
+
     # Remove any stale containers by name (may be from a different compose project)
     for name in neuroinsight-db neuroinsight-redis neuroinsight-minio; do
         docker rm -f "$name" 2>/dev/null || true
     done
+
+    # Resolve infrastructure ports (find free ones if defaults are busy)
+    export POSTGRES_PORT; POSTGRES_PORT=$(_find_free_port "${POSTGRES_PORT:-5432}") || { error "No free port for PostgreSQL"; return 1; }
+    export REDIS_PORT;    REDIS_PORT=$(_find_free_port "${REDIS_PORT:-6379}")       || { error "No free port for Redis"; return 1; }
+    export MINIO_PORT;    MINIO_PORT=$(_find_free_port "${MINIO_PORT:-9000}")       || { error "No free port for MinIO"; return 1; }
+    export MINIO_CONSOLE_PORT; MINIO_CONSOLE_PORT=$(_find_free_port "${MINIO_CONSOLE_PORT:-9001}") || { error "No free port for MinIO console"; return 1; }
+
+    # Update .env so the backend connects to the right ports
+    local pg_user="${POSTGRES_USER:-neuroinsight}"
+    local pg_pass="${POSTGRES_PASSWORD:-neuroinsight_secure_password}"
+    local pg_db="${POSTGRES_DB:-neuroinsight}"
+    _update_env_var "POSTGRES_PORT" "$POSTGRES_PORT"
+    _update_env_var "DATABASE_URL" "postgresql://${pg_user}:${pg_pass}@localhost:${POSTGRES_PORT}/${pg_db}"
+    _update_env_var "REDIS_PORT" "$REDIS_PORT"
+    _update_env_var "MINIO_PORT" "$MINIO_PORT"
+
+    # Re-source .env so current shell picks up changes
+    set -a; source "$SCRIPT_DIR/.env" 2>/dev/null || true; set +a
+
+    local port_info="PostgreSQL:${POSTGRES_PORT}  Redis:${REDIS_PORT}  MinIO:${MINIO_PORT}"
+    [ "$POSTGRES_PORT" != "5432" ] || [ "$REDIS_PORT" != "6379" ] || [ "$MINIO_PORT" != "9000" ] && \
+        info "Ports: $port_info"
+
     _compose up -d 2>&1 | tail -5
     sleep 5
     _infra_running
