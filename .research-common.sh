@@ -999,8 +999,10 @@ _infra_up_quiet() {
         info "Start Docker Desktop (Windows/Mac) or run: sudo systemctl start docker"
         return 1
     fi
+    # Remove any stale stopped containers to avoid name conflicts
+    _compose down 2>/dev/null || true
     _compose up -d 2>&1 | tail -5
-    sleep 3
+    sleep 5
     _infra_running
 }
 
