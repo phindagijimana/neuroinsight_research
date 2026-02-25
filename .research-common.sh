@@ -1010,6 +1010,28 @@ _infra_running() {
     [ "$count" -ge 3 ]
 }
 
+_wait_for_infra() {
+    # Wait for services to actually accept connections (up to 30s)
+    local max_wait=30
+    local i
+    info "Waiting for services to be ready ..."
+    for i in $(seq 1 "$max_wait"); do
+        local ready=0
+        python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${POSTGRES_PORT})); s.close()" 2>/dev/null && ready=$((ready+1))
+        python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${REDIS_PORT})); s.close()" 2>/dev/null && ready=$((ready+1))
+        python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${MINIO_PORT})); s.close()" 2>/dev/null && ready=$((ready+1))
+        if [ "$ready" -ge 3 ]; then
+            return 0
+        fi
+        sleep 1
+    done
+    # Report which services failed
+    python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${POSTGRES_PORT})); s.close()" 2>/dev/null || warn "PostgreSQL not responding on port ${POSTGRES_PORT}"
+    python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${REDIS_PORT})); s.close()" 2>/dev/null || warn "Redis not responding on port ${REDIS_PORT}"
+    python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${MINIO_PORT})); s.close()" 2>/dev/null || warn "MinIO not responding on port ${MINIO_PORT}"
+    return 1
+}
+
 _port_owner() {
     local port="$1"
     # Try lsof (Linux/macOS)
@@ -1106,12 +1128,10 @@ _infra_up_quiet() {
         conflict_port=$(echo "$compose_output" | grep -oP 'port TCP 127\.0\.0\.1:\K[0-9]+' | head -1)
 
         if [ -z "$conflict_port" ]; then
-            # No port conflict -- wait and verify
-            sleep 5
-            if _infra_running; then
+            # No port conflict -- wait for services to accept connections
+            if _infra_running && _wait_for_infra; then
                 return 0
             fi
-            # Containers not all running but no port error -- still a failure
             return 1
         fi
 
