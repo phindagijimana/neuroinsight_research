@@ -1,6 +1,8 @@
 # NeuroInsight Research
 
-An open-source platform for running neuroimaging pipelines from a web interface. Select your data, pick a pipeline, choose where to process, and click Submit -- no terminal commands or container expertise required.
+An open-source platform for running neuroimaging tools from a web interface. Select your data, pick a plugin or workflow, choose where to process, and click Submit -- no terminal commands or container expertise required.
+
+A **plugin** wraps a single neuroimaging tool (e.g., FreeSurfer, fMRIPrep) so it can run in a container with one click. A **workflow** chains multiple plugins into a single job with automatic data passing between steps (e.g., fMRIPrep then XCP-D). Both are defined as YAML files -- drop a new one in `plugins/` or `workflows/` to extend the platform.
 
 ## Quick Start
 
@@ -28,7 +30,7 @@ Open **http://localhost:3000** -- that's it.
 6. **Submit** -- the job runs in a container; monitor progress on the **Dashboard**
 7. **View results** -- open outputs in the built-in **NIfTI Viewer** with segmentation overlays
 
-## Pipeline Licenses
+## Plugin Licenses
 
 Some plugins require a free license file before you can submit jobs. Run the interactive setup:
 
@@ -47,8 +49,6 @@ This checks for `license.txt` (FreeSurfer) and `meld_license.txt` (MELD Graph), 
 Place license files in the project root directory. The app also checks `~/.freesurfer/license.txt` and `~/.meld/meld_license.txt`.
 
 ## Plugins and Workflows
-
-**Plugins** are single-tool processing steps. **Workflows** chain multiple plugins into one job with automatic data passing between steps. Both are defined as YAML files -- no code changes needed to add new ones.
 
 ### Plugins
 
@@ -102,7 +102,7 @@ The app runs jobs locally by default. To process on a remote machine or HPC clus
 2. In the app, go to **Jobs** and select **Remote Server** or **HPC (SLURM)**
 3. Enter your hostname and username, click **Connect**
 4. For HPC, configure the partition, account, and work directory in **Advanced Settings**
-5. Browse files on the remote system, pick a pipeline, and submit
+5. Browse files on the remote system, pick a plugin or workflow, and submit
 
 The app uses your local SSH agent for authentication -- your private key never leaves your machine. On HPC, jobs are submitted via `sbatch` and run in Apptainer/Singularity containers (auto-detected).
 
@@ -114,7 +114,7 @@ For detailed SSH key setup instructions, see the [User Guide](https://github.com
 - **Multiple compute backends** -- Local Docker, Remote Server (SSH + Docker), or HPC/SLURM (SSH + Singularity)
 - **Mix and match** -- Browse data on XNAT, process on HPC; pull from Pennsieve, process locally
 - **Real-time monitoring** -- SLURM queue monitor, job progress tracking, and log streaming
-- **Plugins** -- Each tool is a single YAML file; drop a new one in `plugins/` to add a pipeline
+- **Plugins** -- Each tool is a single YAML file; drop a new one in `plugins/` to add support for a new tool
 - **Workflows** -- Chain multiple plugins into one job with automatic data passing between steps
 - **Built-in NIfTI viewer** -- View results with segmentation overlays powered by Niivue
 
@@ -130,7 +130,7 @@ If you use NeuroInsight Research in your work, please cite:
 ```bibtex
 @software{neuroinsight_research,
   author       = {Phindagijimana},
-  title        = {NeuroInsight Research: Neuroimaging Pipeline Platform},
+  title        = {NeuroInsight Research: Neuroimaging Processing Platform},
   year         = {2026},
   url          = {https://github.com/phindagijimana/neuroinsight_research},
   version      = {1.0.0}
