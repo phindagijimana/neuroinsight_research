@@ -230,15 +230,20 @@ cmd_install() {
     step "Environment configuration"
     if [ ! -f ".env" ]; then
         if [ -f ".env.example" ]; then
+            # New passwords won't match old Docker volumes — wipe them
+            if docker info &>/dev/null; then
+                _compose down -v 2>/dev/null || true
+                for name in neuroinsight-db neuroinsight-redis neuroinsight-minio; do
+                    docker rm -f "$name" 2>/dev/null || true
+                done
+            fi
             cp .env.example .env
-            # Generate random passwords for local services
             _rand() { python3 -c "import secrets; print(secrets.token_urlsafe(24))"; }
             local pg_pass; pg_pass=$(_rand)
             local redis_pass; redis_pass=$(_rand)
             local minio_key; minio_key=$(_rand)
             local minio_secret; minio_secret=$(_rand)
             local secret_key; secret_key=$(_rand)
-            # Replace CHANGEME placeholders in .env
             sed -i "s|CHANGEME_postgres_password|${pg_pass}|g" .env
             sed -i "s|CHANGEME_redis_password|${redis_pass}|g" .env
             sed -i "s|CHANGEME_minio_access_key|${minio_key}|g" .env
@@ -572,11 +577,11 @@ cmd_stop() {
 
     if [ "$stop_all" = true ]; then
         $quiet || step "Stopping infrastructure (PostgreSQL, Redis, MinIO)"
-        _compose down 2>/dev/null || true
+        _compose down -v 2>/dev/null || true
         for name in neuroinsight-db neuroinsight-redis neuroinsight-minio; do
             docker rm -f "$name" 2>/dev/null || true
         done
-        $quiet || success "Infrastructure stopped"
+        $quiet || success "Infrastructure stopped (containers + volumes removed)"
     else
         $quiet || info "Infrastructure still running (use ${BOLD}./research stop --all${NC} to stop everything)"
     fi
@@ -1216,14 +1221,27 @@ _infra_running() {
     [ "$count" -ge 3 ]
 }
 
+_pg_ready() {
+    # Deep PostgreSQL health check via pg_isready inside the container
+    docker exec neuroinsight-db pg_isready -U "${POSTGRES_USER:-neuroinsight}" &>/dev/null
+}
+
+_redis_ready() {
+    python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${REDIS_PORT})); s.close()" 2>/dev/null
+}
+
+_minio_ready() {
+    python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${MINIO_PORT})); s.close()" 2>/dev/null
+}
+
 _wait_for_infra_quick() {
-    # Quick connectivity test (5 seconds max) -- used to detect stale containers
+    # Quick health test (10 seconds max) -- used to detect stale containers
     local i
-    for i in $(seq 1 5); do
+    for i in $(seq 1 10); do
         local ready=0
-        python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${POSTGRES_PORT})); s.close()" 2>/dev/null && ready=$((ready+1))
-        python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${REDIS_PORT})); s.close()" 2>/dev/null && ready=$((ready+1))
-        python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${MINIO_PORT})); s.close()" 2>/dev/null && ready=$((ready+1))
+        _pg_ready && ready=$((ready+1))
+        _redis_ready && ready=$((ready+1))
+        _minio_ready && ready=$((ready+1))
         if [ "$ready" -ge 3 ]; then
             return 0
         fi
@@ -1233,24 +1251,24 @@ _wait_for_infra_quick() {
 }
 
 _wait_for_infra() {
-    # Wait for services to actually accept connections (up to 30s)
-    local max_wait=30
+    # Wait for services to be fully ready (up to 45s)
+    local max_wait=45
     local i
     info "Waiting for services to be ready ..."
     for i in $(seq 1 "$max_wait"); do
         local ready=0
-        python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${POSTGRES_PORT})); s.close()" 2>/dev/null && ready=$((ready+1))
-        python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${REDIS_PORT})); s.close()" 2>/dev/null && ready=$((ready+1))
-        python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${MINIO_PORT})); s.close()" 2>/dev/null && ready=$((ready+1))
+        _pg_ready && ready=$((ready+1))
+        _redis_ready && ready=$((ready+1))
+        _minio_ready && ready=$((ready+1))
         if [ "$ready" -ge 3 ]; then
             return 0
         fi
         sleep 1
     done
     # Report which services failed
-    python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${POSTGRES_PORT})); s.close()" 2>/dev/null || warn "PostgreSQL not responding on port ${POSTGRES_PORT}"
-    python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${REDIS_PORT})); s.close()" 2>/dev/null || warn "Redis not responding on port ${REDIS_PORT}"
-    python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${MINIO_PORT})); s.close()" 2>/dev/null || warn "MinIO not responding on port ${MINIO_PORT}"
+    _pg_ready || { warn "PostgreSQL not ready on port ${POSTGRES_PORT}"; docker logs --tail 10 neuroinsight-db 2>&1 | tail -5; }
+    _redis_ready || warn "Redis not responding on port ${REDIS_PORT}"
+    _minio_ready || warn "MinIO not responding on port ${MINIO_PORT}"
     return 1
 }
 
