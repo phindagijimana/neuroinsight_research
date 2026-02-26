@@ -10,8 +10,8 @@ Install these before running `./research install` (the installer handles all Pyt
 
 | Requirement | Minimum | Notes |
 |---|---|---|
-| Python | 3.9+ | Must be pre-installed. The installer creates a venv and installs all Python packages. |
-| Node.js | 18+ | Must be pre-installed. The installer runs `npm install` for the frontend. |
+| Python | 3.9+ | If missing, the installer detects your OS and offers to install it for you. |
+| Node.js | 18+ | If missing, the installer offers to install it via nvm (no sudo needed). |
 | Docker | Compose v2 | Runs infrastructure (PostgreSQL, Redis, MinIO) and all neuroimaging containers. |
 | OS | Linux, macOS, or Windows (WSL2) | **Linux or WSL2 recommended.** macOS works but local processing is slower due to Docker's VM layer and Rosetta emulation on Apple Silicon. See [macOS Notes](docs/USER_GUIDE.md#macos-notes). Windows users need WSL2 with Docker Desktop. |
 | License files | -- | FreeSurfer `license.txt` and/or MELD `meld_license.txt` depending on which plugins you use. Run `./research license` to set up. |
