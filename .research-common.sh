@@ -1573,7 +1573,7 @@ _infra_up_quiet() {
 
         # Check for port conflict in the output
         local conflict_port
-        conflict_port=$(echo "$compose_output" | grep -oP 'port TCP 127\.0\.0\.1:\K[0-9]+' | head -1)
+        conflict_port=$(echo "$compose_output" | sed -n 's/.*port TCP 127\.0\.0\.1:\([0-9]*\).*/\1/p' | head -1)
 
         if [ -z "$conflict_port" ]; then
             # No port conflict -- wait for services to accept connections
