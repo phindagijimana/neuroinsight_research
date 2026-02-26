@@ -62,6 +62,8 @@ wsl --install -d Ubuntu
 
 ## macOS Notes
 
+> **Recommendation:** For the best experience, especially with local processing, use **Linux** or **Windows with WSL2**. macOS is supported but has performance and compatibility limitations described below. If you use macOS primarily as an orchestration layer (submitting jobs to a remote server or HPC), these limitations do not apply.
+
 NeuroInsight runs on macOS for both orchestration and local processing. There are a few differences from Linux to be aware of.
 
 ### Docker Desktop Resource Limits
