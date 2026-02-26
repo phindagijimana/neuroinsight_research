@@ -107,6 +107,58 @@ The NeuroInsight installer handles all Python packages (via venv) and Node packa
 
 ---
 
+## Local vs Remote Deployment
+
+NeuroInsight can run on your own machine (laptop, workstation) or on a remote server (AWS EC2, institutional VM, etc.). Where you deploy it changes how you access the UI and how the app reaches other systems.
+
+### Quick Reference
+
+| | Running locally (laptop/workstation) | Running on a remote server (EC2, cloud VM) |
+|---|---|---|
+| **Access the UI** | `http://localhost:3000` in your browser | SSH into the server with `-L 3000:localhost:3000`, then open `http://localhost:3000` on your laptop |
+| **SSH key location** | `~/.ssh/id_ed25519` on your laptop | `~/.ssh/id_ed25519` on the remote server |
+| **Connect to HPC** | Direct SSH if on the same network; VPN if off-campus | Reverse tunnel (`-R 2222:hpc-login:22`) from a VPN-connected machine, then use `localhost:2222` in the UI |
+| **Connect to Remote Server** | Direct SSH to hostname:22 | Same as HPC -- direct if reachable, reverse tunnel if behind a firewall |
+| **Connect to Pennsieve** | Direct (public API, no tunnel needed) | Direct (public API, no tunnel needed) |
+| **Connect to XNAT** | Direct if on the same network; SSH local forward (`-L 8443:xnat:443`) if behind a firewall | SSH local forward from the server through an intermediary (e.g., HPC login node) to XNAT |
+| **Local Docker processing** | Works directly -- Docker runs on your machine | Works directly -- Docker runs on the server |
+
+### Running on your laptop or workstation
+
+This is the simplest setup. You open `http://localhost:3000` in your browser and all connections go out from your machine. If the HPC or XNAT server is on the same campus network (or you are connected via VPN), you can use their real hostnames directly.
+
+### Running on a remote server (e.g., AWS EC2)
+
+When NeuroInsight runs on an EC2 instance or similar, two things change:
+
+1. **Accessing the UI**: You SSH into the server and forward port 3000 to your laptop so you can open the app in your browser:
+
+```bash
+ssh -i ~/.ssh/your-key.pem -L 3000:localhost:3000 ubuntu@your-server-ip
+```
+
+2. **Reaching firewalled systems (HPC, XNAT)**: The EC2 instance cannot reach campus-internal systems directly. You bridge the gap from a machine that has VPN/network access (typically your laptop):
+
+```bash
+# From your laptop (VPN connected), in the same SSH session:
+ssh -i ~/.ssh/your-key.pem \
+    -L 3000:localhost:3000 \
+    -R 2222:hpc-login.university.edu:22 \
+    ubuntu@your-server-ip
+```
+
+This single command does three things: forwards the UI to your browser (`-L 3000`), and creates a reverse tunnel so the server can reach the HPC (`-R 2222`). In the NeuroInsight UI, enter `localhost` / port `2222` for the HPC connection.
+
+For XNAT behind a firewall, set up a local forward on the server through the HPC login node (see the XNAT section below for the exact command).
+
+**Pennsieve** always works without tunnels because its API (`api.pennsieve.io`) is on the public internet.
+
+### SSH key setup
+
+Regardless of deployment, the SSH key must be on the machine running NeuroInsight (not your laptop, unless that is the NeuroInsight machine). If NeuroInsight is on EC2, generate or copy the key there, and add the public key to your HPC account. See the HPC section below for step-by-step instructions.
+
+---
+
 ## Deployment
 
 ### Using Docker Compose (recommended)
