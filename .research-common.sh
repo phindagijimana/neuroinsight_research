@@ -28,34 +28,33 @@ fi
 
 # -- Configurable defaults (overridable via .env) -----------------------------
 #   Default port allocation:
-#     3000  Frontend
-#     3001  Backend  (FastAPI / Uvicorn)
-#     3002  (reserved / future)
-#     3003  (reserved / future)
-#   If a default is busy, next free port in 3000-3050 is used.
+#     Production:  Backend serves frontend SPA on port 3000 (range 3000-3050)
+#     Development: Frontend 3000 (range 3000-3050), Backend 3051 (range 3051-3100)
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 if [ "$MODE" = "production" ]; then
     BACKEND_PORT="${API_PORT:-3000}"
 else
-    BACKEND_PORT="${API_PORT:-3001}"
+    BACKEND_PORT="${API_PORT:-3051}"
 fi
 CELERY_CONCURRENCY="${CELERY_CONCURRENCY:-2}"
 DATA_DIR="${DATA_DIR:-./data}"
 LOG_DIR="${LOG_DIR:-./logs}"
 PID_DIR="${PID_DIR:-./.pids}"
 
-PORT_RANGE_START=3000
-PORT_RANGE_END=3050
+FRONTEND_PORT_RANGE_START=3000
+FRONTEND_PORT_RANGE_END=3050
+BACKEND_PORT_RANGE_START=3051
+BACKEND_PORT_RANGE_END=3100
 
 # Load .env if present
 if [ -f "$SCRIPT_DIR/.env" ]; then
     set -a; source "$SCRIPT_DIR/.env" 2>/dev/null || true; set +a
+    FRONTEND_PORT="${FRONTEND_PORT:-3000}"
     if [ "$MODE" = "production" ]; then
         BACKEND_PORT="${API_PORT:-3000}"
     else
-        BACKEND_PORT="${API_PORT:-3001}"
+        BACKEND_PORT="${API_PORT:-3051}"
     fi
-    FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 fi
 
 # Remember the requested defaults for "busy" warnings
@@ -125,27 +124,17 @@ except OSError:
 " "$1" 2>/dev/null
 }
 
-# find_port <default> <exclude...>
-#   Returns <default> if free, otherwise the first free port in 3000-3050
-#   that is not in the exclude list.
+# find_port <default> <range_start> <range_end>
+#   Returns <default> if free, otherwise the first free port in the given range.
 find_port() {
-    local default_port="$1"; shift
-    local -a excludes=("$@")
+    local default_port="$1" range_start="$2" range_end="$3"
 
-    _excluded() {
-        local p="$1"
-        for e in "${excludes[@]}"; do
-            [[ "$p" == "$e" ]] && return 0
-        done
-        return 1
-    }
-
-    if ! port_in_use "$default_port" && ! _excluded "$default_port"; then
+    if ! port_in_use "$default_port"; then
         echo "$default_port"; return 0
     fi
 
-    for p in $(seq "$PORT_RANGE_START" "$PORT_RANGE_END"); do
-        if ! port_in_use "$p" && ! _excluded "$p"; then
+    for p in $(seq "$range_start" "$range_end"); do
+        if ! port_in_use "$p"; then
             echo "$p"; return 0
         fi
     done
@@ -174,30 +163,32 @@ kill_by_pattern() {
 resolve_ports() {
     step "Port allocation"
 
-    local USED_PORTS=()
-
-    # Backend first (must be known before frontend for proxy config)
-    BACKEND_PORT=$(find_port "$BACKEND_PORT") || {
-        error "No free port in $PORT_RANGE_START-$PORT_RANGE_END for backend"; exit 1
-    }
-    USED_PORTS+=("$BACKEND_PORT")
-
-    if [ "$BACKEND_PORT" != "$BACKEND_PORT_DEFAULT" ]; then
-        warn "Backend default $BACKEND_PORT_DEFAULT busy -> using $BACKEND_PORT"
-    fi
-    success "Backend    -> port $BACKEND_PORT"
-
-    # Frontend port only needed in dev mode (production serves SPA from backend)
-    if [ "$MODE" = "development" ]; then
-        FRONTEND_PORT=$(find_port "$FRONTEND_PORT" "${USED_PORTS[@]}") || {
-            error "No free port in $PORT_RANGE_START-$PORT_RANGE_END for frontend"; exit 1
+    if [ "$MODE" = "production" ]; then
+        # Production: backend serves SPA on a single port (default 3000, range 3000-3050)
+        BACKEND_PORT=$(find_port "$BACKEND_PORT" "$FRONTEND_PORT_RANGE_START" "$FRONTEND_PORT_RANGE_END") || {
+            error "No free port for app ($FRONTEND_PORT_RANGE_START-$FRONTEND_PORT_RANGE_END)"; exit 1
         }
-        USED_PORTS+=("$FRONTEND_PORT")
-
+        if [ "$BACKEND_PORT" != "$BACKEND_PORT_DEFAULT" ]; then
+            warn "App default $BACKEND_PORT_DEFAULT busy -> using $BACKEND_PORT"
+        fi
+        success "App        -> port $BACKEND_PORT  (backend serves frontend SPA)"
+    else
+        # Development: separate frontend + backend ports
+        FRONTEND_PORT=$(find_port "$FRONTEND_PORT" "$FRONTEND_PORT_RANGE_START" "$FRONTEND_PORT_RANGE_END") || {
+            error "No free port for frontend ($FRONTEND_PORT_RANGE_START-$FRONTEND_PORT_RANGE_END)"; exit 1
+        }
         if [ "$FRONTEND_PORT" != "$FRONTEND_PORT_DEFAULT" ]; then
             warn "Frontend default $FRONTEND_PORT_DEFAULT busy -> using $FRONTEND_PORT"
         fi
         success "Frontend   -> port $FRONTEND_PORT"
+
+        BACKEND_PORT=$(find_port "$BACKEND_PORT" "$BACKEND_PORT_RANGE_START" "$BACKEND_PORT_RANGE_END") || {
+            error "No free port for backend ($BACKEND_PORT_RANGE_START-$BACKEND_PORT_RANGE_END)"; exit 1
+        }
+        if [ "$BACKEND_PORT" != "$BACKEND_PORT_DEFAULT" ]; then
+            warn "Backend default $BACKEND_PORT_DEFAULT busy -> using $BACKEND_PORT"
+        fi
+        success "Backend    -> port $BACKEND_PORT"
     fi
 }
 
@@ -302,8 +293,9 @@ print('OK')
         info "  Check: docker ps | grep neuroinsight-minio"
     fi
 
-    # -- FreeSurfer license ----------------------------------------------------
-    step "FreeSurfer license"
+    # -- Pipeline licenses -----------------------------------------------------
+    step "Pipeline licenses"
+    local _any_license_missing=false
     local _fs_license_found=false
     for _lpath in \
         "./license.txt" \
@@ -313,14 +305,33 @@ print('OK')
         "${FS_LICENSE:-__none__}"; do
         if [ -f "$_lpath" ] && [ -s "$_lpath" ]; then
             _fs_license_found=true
-            success "FreeSurfer license found at $_lpath"
+            success "FreeSurfer license -> $_lpath"
             break
         fi
     done
     if [ "$_fs_license_found" = false ]; then
-        warn "FreeSurfer license.txt not found (needed for FreeSurfer/FastSurfer plugins)"
-        info "Place your license.txt in the app directory or ~/.freesurfer/license.txt"
-        info "Get a free license at: https://surfer.nmr.mgh.harvard.edu/registration.html"
+        warn "FreeSurfer license.txt not found (FreeSurfer, FastSurfer, fMRIPrep, MELD)"
+        _any_license_missing=true
+    fi
+
+    local _meld_license_found=false
+    for _lpath in \
+        "./meld_license.txt" \
+        "./data/meld_license.txt" \
+        "$HOME/.meld/meld_license.txt"; do
+        if [ -f "$_lpath" ] && [ -s "$_lpath" ]; then
+            _meld_license_found=true
+            success "MELD license     -> $_lpath"
+            break
+        fi
+    done
+    if [ "$_meld_license_found" = false ]; then
+        warn "MELD meld_license.txt not found (MELD Graph v2.2.4+)"
+        _any_license_missing=true
+    fi
+
+    if [ "$_any_license_missing" = true ]; then
+        info "Set up licenses: ${BOLD}./research license${NC}"
     fi
 
     # -- Pipeline Docker images ------------------------------------------------
@@ -360,10 +371,145 @@ for yf in sorted(pathlib.Path('plugins').glob('*.yaml')):
 
     echo ""
     success "Installation complete."
+    info "Next: ${BOLD}./research license${NC} to set up pipeline licenses (if needed)."
     if [ "$MODE" = "development" ]; then
-        info "Run ${BOLD}./research-dev start${NC} to launch in development mode."
+        info "Then: ${BOLD}./research-dev start${NC} to launch in development mode."
     else
-        info "Run ${BOLD}./research start${NC} to launch in production mode."
+        info "Then: ${BOLD}./research start${NC} to launch in production mode."
+    fi
+    echo ""
+}
+
+# ==============================================================================
+#  LICENSE — interactive license setup
+# ==============================================================================
+cmd_license() {
+    header
+    step "Pipeline license setup"
+    echo ""
+    info "Some plugins require a free license file before you can run them."
+    info "If your plugin doesn't need one, you can skip this step."
+    echo ""
+
+    local any_missing=false
+
+    # -- FreeSurfer license ------------------------------------------------
+    step "FreeSurfer license  (license.txt)"
+    info "Required by: FreeSurfer, FastSurfer, fMRIPrep, MELD Graph"
+    local _fs_found=false
+    for _lpath in \
+        "./license.txt" \
+        "$HOME/.freesurfer/license.txt" \
+        "$HOME/freesurfer/license.txt" \
+        "/usr/local/freesurfer/license.txt" \
+        "${FS_LICENSE:-__none__}"; do
+        if [ -f "$_lpath" ] && [ -s "$_lpath" ]; then
+            _fs_found=true
+            success "Found at $_lpath"
+            break
+        fi
+    done
+
+    if [ "$_fs_found" = false ]; then
+        any_missing=true
+        warn "Not found"
+        echo ""
+        info "  1. Register (free) at: https://surfer.nmr.mgh.harvard.edu/registration.html"
+        info "  2. A license.txt file will be emailed to you"
+        info "  3. Place it here:"
+        echo ""
+        info "     cp ~/Downloads/license.txt ./license.txt"
+        echo ""
+        echo -n "  Have you placed license.txt? [y/N/skip] "
+        read -r _answer
+        case "$_answer" in
+            y|Y|yes|Yes)
+                if [ -f "./license.txt" ] && [ -s "./license.txt" ]; then
+                    success "FreeSurfer license.txt detected"
+                else
+                    warn "license.txt not found in project root -- you can add it later"
+                fi
+                ;;
+            skip|s|S)
+                info "Skipped -- you can run ./research license again later"
+                ;;
+            *)
+                info "Skipped -- you can run ./research license again later"
+                ;;
+        esac
+    fi
+    echo ""
+
+    # -- MELD Graph license ------------------------------------------------
+    step "MELD Graph license  (meld_license.txt)"
+    info "Required by: MELD Graph (cortical lesion detection, v2.2.4+)"
+    local _meld_found=false
+    for _lpath in \
+        "./meld_license.txt" \
+        "./data/meld_license.txt" \
+        "$HOME/.meld/meld_license.txt"; do
+        if [ -f "$_lpath" ] && [ -s "$_lpath" ]; then
+            _meld_found=true
+            success "Found at $_lpath"
+            break
+        fi
+    done
+
+    if [ "$_meld_found" = false ]; then
+        any_missing=true
+        warn "Not found"
+        echo ""
+        info "  1. Register (free) at:"
+        info "     https://docs.google.com/forms/d/e/1FAIpQLSdocMWtxbmh9T7Sv8NT4f0Kpev-tmRI-kngDhUeBF9VcZXcfg/viewform"
+        info "  2. Place the received file here:"
+        echo ""
+        info "     cp ~/Downloads/meld_license.txt ./meld_license.txt"
+        echo ""
+        echo -n "  Have you placed meld_license.txt? [y/N/skip] "
+        read -r _answer
+        case "$_answer" in
+            y|Y|yes|Yes)
+                if [ -f "./meld_license.txt" ] && [ -s "./meld_license.txt" ]; then
+                    success "MELD Graph meld_license.txt detected"
+                else
+                    warn "meld_license.txt not found in project root -- you can add it later"
+                fi
+                ;;
+            skip|s|S)
+                info "Skipped -- you can run ./research license again later"
+                ;;
+            *)
+                info "Skipped -- you can run ./research license again later"
+                ;;
+        esac
+    fi
+    echo ""
+
+    # -- Summary -----------------------------------------------------------
+    step "License summary"
+    echo ""
+    echo "  | License               | Status    | Required By                              |"
+    echo "  |-----------------------|-----------|------------------------------------------|"
+
+    if [ "$_fs_found" = true ]; then
+        echo "  | license.txt           | FOUND     | FreeSurfer, FastSurfer, fMRIPrep, MELD   |"
+    else
+        echo "  | license.txt           | MISSING   | FreeSurfer, FastSurfer, fMRIPrep, MELD   |"
+    fi
+
+    if [ "$_meld_found" = true ]; then
+        echo "  | meld_license.txt      | FOUND     | MELD Graph (v2.2.4+)                     |"
+    else
+        echo "  | meld_license.txt      | MISSING   | MELD Graph (v2.2.4+)                     |"
+    fi
+
+    echo "  | (none needed)         | --        | QSIPrep, QSIRecon, XCP-D, dcm2niix       |"
+    echo ""
+
+    if [ "$any_missing" = true ]; then
+        info "You can run ${BOLD}./research license${NC} again after placing the files."
+    else
+        success "All licenses found."
     fi
     echo ""
 }
@@ -793,12 +939,12 @@ preflight_checks() {
             sed -i "s|CHANGEME_secret_key_at_least_32_characters_long|${secret_key}|g" "$SCRIPT_DIR/.env"
             # Reload newly created .env
             set -a; source "$SCRIPT_DIR/.env" 2>/dev/null || true; set +a
+            FRONTEND_PORT="${FRONTEND_PORT:-3000}"
             if [ "$MODE" = "production" ]; then
                 BACKEND_PORT="${API_PORT:-3000}"
             else
-                BACKEND_PORT="${API_PORT:-3001}"
+                BACKEND_PORT="${API_PORT:-3051}"
             fi
-            FRONTEND_PORT="${FRONTEND_PORT:-3000}"
             success "Created .env with generated random passwords"
         else
             warn "python3 not available — .env created with placeholder passwords"
@@ -932,6 +1078,7 @@ cmd_help() {
     echo ""
     echo -e "  ${BOLD}Lifecycle${NC}"
     echo "    install              Install deps, start infra, init DB & MinIO"
+    echo "    license              Set up pipeline license files (interactive)"
     echo "    start                Start all services (infra + app)"
     echo "    stop                 Stop app services (keeps infra running)"
     echo "    restart              Restart all app services"
@@ -982,7 +1129,7 @@ cmd_help() {
     fi
     echo -e "  ${BOLD}Examples${NC}"
     echo "    $cli install           # First-time setup (infra + deps + DB)"
-    echo "    $cli infra up          # Start PostgreSQL, Redis, MinIO"
+    echo "    $cli license           # Set up FreeSurfer/MELD license files"
     echo "    $cli start             # Start app services"
     echo "    $cli logs celery       # Watch celery logs"
     echo "    $cli db jobs           # See recent jobs"
@@ -1291,6 +1438,7 @@ dispatch() {
 
     case "$cmd" in
         install)    cmd_install    "$@" ;;
+        license)    cmd_license   "$@" ;;
         start)      cmd_start     "$@" ;;
         stop)       cmd_stop      "$@" ;;
         restart)    cmd_restart   "$@" ;;

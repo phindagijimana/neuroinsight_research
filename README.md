@@ -7,12 +7,14 @@ An open-source platform for running neuroimaging pipelines from a web interface.
 ```bash
 git clone https://github.com/phindagijimana/neuroinsight_research.git
 cd neuroinsight_research
-./research start
+./research install        # install deps, start infra, init DB
+./research license        # set up FreeSurfer / MELD license files
+./research start          # launch the app
 ```
 
 Open **http://localhost:3000** -- that's it.
 
-The first run automatically installs dependencies, generates secure passwords, starts PostgreSQL/Redis/MinIO via Docker, builds the frontend, and launches everything. No manual configuration required.
+`./research install` creates a Python venv, installs Node/Python dependencies, generates secure passwords, and starts PostgreSQL/Redis/MinIO via Docker. `./research license` walks you through placing the required license files interactively. `./research start` builds the frontend and launches the backend.
 
 **Prerequisites:** Python 3.9+, Node.js 18+, Docker with Compose v2
 
@@ -28,32 +30,21 @@ The first run automatically installs dependencies, generates secure passwords, s
 
 ## Pipeline Licenses
 
-Some pipelines require a free license file **before** you can submit your first job. If your pipeline doesn't need one, skip this section.
-
-### FreeSurfer License (required by FreeSurfer, FastSurfer, fMRIPrep, MELD Graph)
-
-1. Register at **https://surfer.nmr.mgh.harvard.edu/registration.html**
-2. A `license.txt` file will be emailed to you
-3. Place it in the project root:
+Some plugins require a free license file before you can submit jobs. Run the interactive setup:
 
 ```bash
-cp ~/Downloads/license.txt ./license.txt
+./research license
 ```
 
-The app auto-detects the license in `./license.txt`, `./data/license.txt`, `$FREESURFER_HOME/license.txt`, or `~/.freesurfer/license.txt`. You can also set `FS_LICENSE_PATH` in `.env`.
+This checks for `license.txt` (FreeSurfer) and `meld_license.txt` (MELD Graph), and guides you through obtaining and placing them.
 
-### MELD Graph License (required by MELD Graph v2.2.4+)
+| License | Required By | Registration |
+|---|---|---|
+| `license.txt` | FreeSurfer, FastSurfer, fMRIPrep, MELD Graph | https://surfer.nmr.mgh.harvard.edu/registration.html |
+| `meld_license.txt` | MELD Graph (v2.2.4+) | https://docs.google.com/forms/d/e/1FAIpQLSdocMWtxbmh9T7Sv8NT4f0Kpev-tmRI-kngDhUeBF9VcZXcfg/viewform |
+| No license needed | QSIPrep, QSIRecon, XCP-D, dcm2niix | -- |
 
-1. Fill the form: **https://docs.google.com/forms/d/e/1FAIpQLSdocMWtxbmh9T7Sv8NT4f0Kpev-tmRI-kngDhUeBF9VcZXcfg/viewform**
-2. Place the received `meld_license.txt` in the project root
-
-### Which pipelines need licenses?
-
-| License | Required By |
-|---|---|
-| FreeSurfer `license.txt` | FreeSurfer, FastSurfer, fMRIPrep, MELD Graph |
-| MELD `meld_license.txt` | MELD Graph (v2.2.4+) |
-| No license needed | QSIPrep, QSIRecon, XCP-D, dcm2niix |
+Place license files in the project root directory. The app also checks `~/.freesurfer/license.txt` and `~/.meld/meld_license.txt`.
 
 ## Plugins and Workflows
 

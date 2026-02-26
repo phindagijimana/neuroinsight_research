@@ -64,25 +64,23 @@ docker compose up -d
 
 Access the UI at `http://localhost:3000` (or the port configured in `.env`).
 
-### Development Setup
+### CLI Setup (recommended)
 
 ```bash
 git clone https://github.com/phindagijimana/neuroinsight_research.git
 cd neuroinsight_research
-
-# Backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cd backend && uvicorn main:app --port 3001
-
-# Frontend (separate terminal)
-cd frontend
-npm install
-npm run dev
+./research install        # Install deps, start infra, init DB
+./research license        # Set up FreeSurfer / MELD license files
+./research start          # Launch the app (production)
 ```
 
-The frontend dev server runs at `http://localhost:3000` and proxies API requests to the backend.
+For development mode with hot-reload:
+
+```bash
+./research-dev start      # Backend auto-reload + Vite HMR frontend
+```
+
+The frontend dev server runs at `http://localhost:3000` and proxies API requests to the backend on port `3051`.
 
 ### Configuration
 
