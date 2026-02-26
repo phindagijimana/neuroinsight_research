@@ -201,6 +201,164 @@ resolve_ports() {
     fi
 }
 
+# -- Guided dependency installation --------------------------------------------
+
+_detect_os() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        case "$ID" in
+            ubuntu|debian|pop|linuxmint) echo "apt" ;;
+            fedora)                      echo "dnf" ;;
+            centos|rhel|rocky|alma)      echo "yum" ;;
+            arch|manjaro)                echo "pacman" ;;
+            *)                           echo "unknown" ;;
+        esac
+    elif [ "$(uname)" = "Darwin" ]; then
+        echo "brew"
+    else
+        echo "unknown"
+    fi
+}
+
+_prompt_yn() {
+    local prompt="$1"
+    local answer
+    printf "  %b [y/N] " "$prompt"
+    read -r answer
+    case "$answer" in
+        [yY]|[yY][eE][sS]) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+_ensure_python() {
+    if command -v python3 &>/dev/null; then
+        local py_ver
+        py_ver=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+        local py_major py_minor
+        py_major=$(echo "$py_ver" | cut -d. -f1)
+        py_minor=$(echo "$py_ver" | cut -d. -f2)
+        if [ "$py_major" -ge 3 ] && [ "$py_minor" -ge 9 ] 2>/dev/null; then
+            success "Python $py_ver found"
+            return 0
+        else
+            warn "Python $py_ver found but 3.9+ is required"
+        fi
+    else
+        warn "Python 3 not found"
+    fi
+
+    local pkg_mgr
+    pkg_mgr=$(_detect_os)
+    local install_cmd=""
+
+    case "$pkg_mgr" in
+        apt)
+            install_cmd="sudo apt update && sudo apt install -y python3 python3-venv python3-pip" ;;
+        dnf)
+            install_cmd="sudo dnf install -y python3 python3-pip" ;;
+        yum)
+            install_cmd="sudo yum install -y python3 python3-pip" ;;
+        pacman)
+            install_cmd="sudo pacman -Sy --noconfirm python python-pip" ;;
+        brew)
+            install_cmd="brew install python@3.11" ;;
+    esac
+
+    if [ -z "$install_cmd" ]; then
+        error "Could not detect package manager. Please install Python 3.9+ manually."
+        error "  https://www.python.org/downloads/"
+        return 1
+    fi
+
+    echo ""
+    info "To install Python, the following command will run:"
+    echo -e "    ${BOLD}${install_cmd}${NC}"
+    echo ""
+
+    if _prompt_yn "Install Python now?"; then
+        info "Installing Python ..."
+        if eval "$install_cmd"; then
+            success "Python installed"
+        else
+            error "Python installation failed. Please install manually:"
+            error "  $install_cmd"
+            return 1
+        fi
+    else
+        info "Skipped. Install Python 3.9+ manually, then re-run ./research install"
+        return 1
+    fi
+}
+
+_ensure_node() {
+    if command -v node &>/dev/null; then
+        local node_ver
+        node_ver=$(node -v 2>/dev/null | sed 's/^v//')
+        local node_major
+        node_major=$(echo "$node_ver" | cut -d. -f1)
+        if [ "$node_major" -ge 18 ] 2>/dev/null; then
+            success "Node.js $node_ver found"
+            return 0
+        else
+            warn "Node.js $node_ver found but 18+ is required"
+        fi
+    else
+        warn "Node.js not found"
+    fi
+
+    local pkg_mgr
+    pkg_mgr=$(_detect_os)
+
+    # nvm works on all platforms without sudo
+    local nvm_install="curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash"
+    local nvm_use="nvm install 22 && nvm use 22"
+    local alt_cmd=""
+
+    case "$pkg_mgr" in
+        apt)    alt_cmd="sudo apt update && sudo apt install -y nodejs npm" ;;
+        dnf)    alt_cmd="sudo dnf install -y nodejs npm" ;;
+        yum)    alt_cmd="sudo yum install -y nodejs npm" ;;
+        pacman) alt_cmd="sudo pacman -Sy --noconfirm nodejs npm" ;;
+        brew)   alt_cmd="brew install node" ;;
+    esac
+
+    echo ""
+    info "Option 1 (recommended, no sudo): Install via nvm"
+    echo -e "    ${BOLD}${nvm_install}${NC}"
+    echo -e "    ${BOLD}${nvm_use}${NC}"
+    if [ -n "$alt_cmd" ]; then
+        info "Option 2 (system package manager):"
+        echo -e "    ${BOLD}${alt_cmd}${NC}"
+    fi
+    echo ""
+
+    if _prompt_yn "Install Node.js via nvm now? (recommended)"; then
+        info "Installing nvm ..."
+        export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+        if curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh 2>/dev/null | bash 2>&1 | tail -3; then
+            # Load nvm into current shell
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+            info "Installing Node.js 22 ..."
+            if nvm install 22 2>&1 | tail -3 && nvm use 22 &>/dev/null; then
+                success "Node.js $(node -v) installed via nvm"
+                return 0
+            fi
+        fi
+        error "nvm installation failed."
+    elif [ -n "$alt_cmd" ] && _prompt_yn "Install via system package manager instead?"; then
+        info "Installing Node.js ..."
+        if eval "$alt_cmd"; then
+            success "Node.js installed"
+            return 0
+        fi
+        error "Node.js installation failed."
+    else
+        info "Skipped. Install Node.js 18+ manually, then re-run ./research install"
+    fi
+    return 1
+}
+
 # ==============================================================================
 #  INSTALL (shared)
 # ==============================================================================
@@ -208,6 +366,20 @@ cmd_install() {
     header
     step "Installing NeuroInsight Research"
     ensure_dirs
+
+    # -- Check / install system dependencies -----------------------------------
+    step "System dependencies"
+    _ensure_python || { error "Python 3.9+ is required. Aborting."; return 1; }
+    _ensure_node   || { error "Node.js 18+ is required. Aborting."; return 1; }
+
+    if command -v docker &>/dev/null && docker compose version &>/dev/null; then
+        success "Docker with Compose v2 found"
+    else
+        warn "Docker or Docker Compose v2 not found"
+        info "Install Docker: https://docs.docker.com/get-docker/"
+        info "Infrastructure services (PostgreSQL, Redis, MinIO) require Docker."
+        info "The app will install but infrastructure steps will be skipped."
+    fi
 
     # -- Python virtual environment & dependencies ------------------------------
     step "Python dependencies"
