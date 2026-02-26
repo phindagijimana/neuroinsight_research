@@ -578,7 +578,11 @@ cmd_stop() {
 
     for p in $BACKEND_PORT $FRONTEND_PORT; do
         if port_in_use "$p"; then
-            fuser -k "$p/tcp" &>/dev/null || true
+            if command -v fuser &>/dev/null; then
+                fuser -k "$p/tcp" &>/dev/null || true
+            elif command -v lsof &>/dev/null; then
+                lsof -ti :"$p" 2>/dev/null | xargs kill 2>/dev/null || true
+            fi
         fi
     done
 

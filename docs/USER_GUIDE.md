@@ -34,6 +34,18 @@ docker compose version
 docker run hello-world
 ```
 
+### macOS
+
+1. Install Docker Desktop from https://www.docker.com/products/docker-desktop/
+2. Open Docker Desktop and verify it is running
+3. Open Terminal and verify:
+
+```bash
+docker --version
+docker compose version
+docker run hello-world
+```
+
 ### Windows (WSL2)
 
 1. Install Docker Desktop from https://www.docker.com/products/docker-desktop/
@@ -45,6 +57,51 @@ If Docker Desktop is not installed yet, also enable WSL2:
 ```powershell
 wsl --install -d Ubuntu
 ```
+
+---
+
+## macOS Notes
+
+NeuroInsight runs on macOS for both orchestration and local processing. There are a few differences from Linux to be aware of.
+
+### Docker Desktop Resource Limits
+
+Docker on macOS runs containers inside a lightweight Linux VM, not natively. By default Docker Desktop allocates limited resources to this VM. For local neuroimaging processing you must increase them:
+
+1. Open **Docker Desktop > Settings > Resources**
+2. Set **Memory** to at least **16 GB** (FreeSurfer and fMRIPrep need this; 8 GB is enough for lighter plugins)
+3. Set **CPUs** to at least **4** (more is better for parallel processing)
+4. Set **Disk image size** to at least **64 GB** (neuroimaging container images are large)
+5. Click **Apply & Restart**
+
+If you only use NeuroInsight as an orchestration layer (submitting jobs to a remote server or HPC), the default Docker Desktop resources are fine since only PostgreSQL, Redis, and MinIO run locally.
+
+### Apple Silicon (M1/M2/M3/M4)
+
+Most neuroimaging Docker images (FreeSurfer, fMRIPrep, QSIPrep, etc.) are built for `linux/amd64`. On Apple Silicon Macs they run under Rosetta 2 emulation, which Docker Desktop enables automatically. This works but has two implications:
+
+- **Performance**: Expect 20-40% slower processing compared to native `amd64` hardware. For large datasets, consider offloading processing to a remote Linux server or HPC.
+- **Compatibility**: Rare edge cases may fail under emulation. If a container crashes unexpectedly, check whether an `arm64`-native image is available from the tool's maintainers.
+
+No configuration changes are needed -- Docker Desktop handles Rosetta emulation transparently.
+
+### File System Performance
+
+Docker Desktop on macOS uses a virtualized file system bridge between the host and containers. This is slower than native Linux Docker, especially for I/O-heavy workflows that read/write many small files (e.g., FreeSurfer surface reconstruction). Tips:
+
+- Keep input data **inside Docker volumes** rather than bind-mounting large host directories.
+- For heavy local processing, a Linux machine (or VM) will be noticeably faster.
+- Orchestration-only use (remote/HPC processing) is not affected.
+
+### Homebrew Dependencies
+
+macOS does not ship `python3` or `node` by default on all versions. If they are missing, install via [Homebrew](https://brew.sh):
+
+```bash
+brew install python@3.11 node
+```
+
+The NeuroInsight installer handles all Python packages (via venv) and Node packages (via npm) automatically after these are available.
 
 ---
 
