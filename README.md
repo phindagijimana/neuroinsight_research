@@ -6,13 +6,16 @@ A **plugin** wraps a single neuroimaging tool (e.g., FreeSurfer, fMRIPrep) so it
 
 ## Requirements
 
-| Requirement | Minimum Version | Notes |
+Install these before running `./research install` (the installer handles all Python/Node packages automatically):
+
+| Requirement | Minimum | Notes |
 |---|---|---|
-| Python | 3.9+ | Used for the backend (FastAPI, Celery) |
-| Node.js | 18+ | Used to build the frontend (React, Vite) |
-| Docker | with Compose v2 | Runs PostgreSQL, Redis, MinIO, and neuroimaging containers |
-| OS | Linux, macOS, or Windows (WSL2) | Windows users need WSL2 with Docker Desktop |
-| RAM | 8 GB+ | Some plugins (e.g., FreeSurfer) need 16 GB+ |
+| Python | 3.9+ | Must be pre-installed. The installer creates a venv and installs all Python packages. |
+| Node.js | 18+ | Must be pre-installed. The installer runs `npm install` for the frontend. |
+| Docker | Compose v2 | Runs infrastructure (PostgreSQL, Redis, MinIO) and all neuroimaging containers. |
+| OS | Linux, macOS, or Windows (WSL2) | All three support local processing via Docker. Windows users need WSL2 with Docker Desktop. |
+| RAM | 8 GB+ | 16 GB+ recommended for plugins like FreeSurfer and fMRIPrep. |
+| License files | -- | FreeSurfer `license.txt` and/or MELD `meld_license.txt` depending on which plugins you use. Run `./research license` to set up. |
 
 ## Quick Start
 
