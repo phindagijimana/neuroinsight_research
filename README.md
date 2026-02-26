@@ -14,8 +14,16 @@ Install these before running `./research install` (the installer handles all Pyt
 | Node.js | 18+ | Must be pre-installed. The installer runs `npm install` for the frontend. |
 | Docker | Compose v2 | Runs infrastructure (PostgreSQL, Redis, MinIO) and all neuroimaging containers. |
 | OS | Linux, macOS, or Windows (WSL2) | All three support local processing via Docker. Windows users need WSL2 with Docker Desktop. |
-| RAM | 8 GB+ | 16 GB+ recommended for plugins like FreeSurfer and fMRIPrep. |
 | License files | -- | FreeSurfer `license.txt` and/or MELD `meld_license.txt` depending on which plugins you use. Run `./research license` to set up. |
+
+**RAM and storage:**
+
+| | App only (orchestration + remote/HPC jobs) | Local processing (Docker) |
+|---|---|---|
+| RAM | 4 GB | 16 GB+ (FreeSurfer, fMRIPrep); 8 GB for lighter plugins |
+| Storage | 2 GB (app + dependencies) | 10-50 GB per plugin image + space for input/output data |
+
+If you only submit jobs to a remote server or HPC, the app itself is lightweight. Local processing requires more resources because the neuroimaging containers run on your machine.
 
 ## Quick Start
 
