@@ -532,7 +532,13 @@ cmd_license() {
 # ==============================================================================
 cmd_stop() {
     local quiet=false
-    [[ "${1:-}" == "--quiet" ]] && quiet=true
+    local stop_all=false
+    for arg in "$@"; do
+        case "$arg" in
+            --quiet) quiet=true ;;
+            --all|-a) stop_all=true ;;
+        esac
+    done
 
     $quiet || header
     $quiet || step "Stopping services"
@@ -560,7 +566,19 @@ cmd_stop() {
         fi
     done
 
-    $quiet || success "All services stopped"
+    $quiet || success "App services stopped"
+
+    if [ "$stop_all" = true ]; then
+        $quiet || step "Stopping infrastructure (PostgreSQL, Redis, MinIO)"
+        _compose down 2>/dev/null || true
+        for name in neuroinsight-db neuroinsight-redis neuroinsight-minio; do
+            docker rm -f "$name" 2>/dev/null || true
+        done
+        $quiet || success "Infrastructure stopped"
+    else
+        $quiet || info "Infrastructure still running (use ${BOLD}./research stop --all${NC} to stop everything)"
+    fi
+
     $quiet || echo ""
 }
 
@@ -1117,6 +1135,7 @@ cmd_help() {
     echo "    license              Set up pipeline license files (interactive)"
     echo "    start                Start all services (infra + app)"
     echo "    stop                 Stop app services (keeps infra running)"
+    echo "    stop --all           Stop everything (app + PostgreSQL/Redis/MinIO)"
     echo "    restart              Restart all app services"
     echo ""
     echo -e "  ${BOLD}Infrastructure${NC}"
