@@ -81,6 +81,15 @@ warn()    { echo -e "  ${YELLOW}!${NC} $*"; }
 error()   { echo -e "  ${RED}[ERR]${NC} $*" >&2; }
 step()    { echo -e "\n${BOLD}-- $* --${NC}"; }
 
+sed_i() {
+    # Portable in-place sed (BSD/macOS requires '' after -i, GNU does not)
+    if sed --version 2>/dev/null | grep -q GNU; then
+        sed -i "$@"
+    else
+        sed -i '' "$@"
+    fi
+}
+
 ensure_dirs() {
     mkdir -p "$LOG_DIR" "$PID_DIR" "$DATA_DIR"/{uploads,outputs}
 }
@@ -244,11 +253,11 @@ cmd_install() {
             local minio_key; minio_key=$(_rand)
             local minio_secret; minio_secret=$(_rand)
             local secret_key; secret_key=$(_rand)
-            sed -i "s|CHANGEME_postgres_password|${pg_pass}|g" .env
-            sed -i "s|CHANGEME_redis_password|${redis_pass}|g" .env
-            sed -i "s|CHANGEME_minio_access_key|${minio_key}|g" .env
-            sed -i "s|CHANGEME_minio_secret_key|${minio_secret}|g" .env
-            sed -i "s|CHANGEME_secret_key_at_least_32_characters_long|${secret_key}|g" .env
+            sed_i "s|CHANGEME_postgres_password|${pg_pass}|g" .env
+            sed_i "s|CHANGEME_redis_password|${redis_pass}|g" .env
+            sed_i "s|CHANGEME_minio_access_key|${minio_key}|g" .env
+            sed_i "s|CHANGEME_minio_secret_key|${minio_secret}|g" .env
+            sed_i "s|CHANGEME_secret_key_at_least_32_characters_long|${secret_key}|g" .env
             success "Created .env with generated random passwords"
         else
             warn "No .env or .env.example found"
@@ -970,11 +979,11 @@ preflight_checks() {
             local minio_key; minio_key=$(_rand)
             local minio_secret; minio_secret=$(_rand)
             local secret_key; secret_key=$(_rand)
-            sed -i "s|CHANGEME_postgres_password|${pg_pass}|g" "$SCRIPT_DIR/.env"
-            sed -i "s|CHANGEME_redis_password|${redis_pass}|g" "$SCRIPT_DIR/.env"
-            sed -i "s|CHANGEME_minio_access_key|${minio_key}|g" "$SCRIPT_DIR/.env"
-            sed -i "s|CHANGEME_minio_secret_key|${minio_secret}|g" "$SCRIPT_DIR/.env"
-            sed -i "s|CHANGEME_secret_key_at_least_32_characters_long|${secret_key}|g" "$SCRIPT_DIR/.env"
+            sed_i "s|CHANGEME_postgres_password|${pg_pass}|g" "$SCRIPT_DIR/.env"
+            sed_i "s|CHANGEME_redis_password|${redis_pass}|g" "$SCRIPT_DIR/.env"
+            sed_i "s|CHANGEME_minio_access_key|${minio_key}|g" "$SCRIPT_DIR/.env"
+            sed_i "s|CHANGEME_minio_secret_key|${minio_secret}|g" "$SCRIPT_DIR/.env"
+            sed_i "s|CHANGEME_secret_key_at_least_32_characters_long|${secret_key}|g" "$SCRIPT_DIR/.env"
             # Reload newly created .env
             set -a; source "$SCRIPT_DIR/.env" 2>/dev/null || true; set +a
             FRONTEND_PORT="${FRONTEND_PORT:-3000}"
@@ -1318,7 +1327,7 @@ _update_env_var() {
     local key="$1" value="$2" file="$SCRIPT_DIR/.env"
     [ -f "$file" ] || return 0
     if grep -q "^${key}=" "$file"; then
-        sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+        sed_i "s|^${key}=.*|${key}=${value}|" "$file"
     else
         echo "${key}=${value}" >> "$file"
     fi
