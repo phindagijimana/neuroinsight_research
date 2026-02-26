@@ -4,6 +4,16 @@ An open-source platform for running neuroimaging tools from a web interface. Sel
 
 A **plugin** wraps a single neuroimaging tool (e.g., FreeSurfer, fMRIPrep) so it can run in a container with one click. A **workflow** chains multiple plugins into a single job with automatic data passing between steps (e.g., fMRIPrep then XCP-D). Both are defined as YAML files -- drop a new one in `plugins/` or `workflows/` to extend the platform.
 
+## Requirements
+
+| Requirement | Minimum Version | Notes |
+|---|---|---|
+| Python | 3.9+ | Used for the backend (FastAPI, Celery) |
+| Node.js | 18+ | Used to build the frontend (React, Vite) |
+| Docker | with Compose v2 | Runs PostgreSQL, Redis, MinIO, and neuroimaging containers |
+| OS | Linux, macOS, or Windows (WSL2) | Windows users need WSL2 with Docker Desktop |
+| RAM | 8 GB+ | Some plugins (e.g., FreeSurfer) need 16 GB+ |
+
 ## Quick Start
 
 ```bash
@@ -17,8 +27,6 @@ cd neuroinsight_research
 Open **http://localhost:3000** -- that's it.
 
 `./research install` creates a Python venv, installs Node/Python dependencies, generates secure passwords, and starts PostgreSQL/Redis/MinIO via Docker. `./research license` walks you through placing the required license files interactively. `./research start` builds the frontend and launches the backend.
-
-**Prerequisites:** Python 3.9+, Node.js 18+, Docker with Compose v2
 
 ## How to Use
 
