@@ -254,10 +254,23 @@ cmd_install() {
 
     # -- Infrastructure services -----------------------------------------------
     step "Infrastructure services (PostgreSQL / Redis / MinIO)"
-    if _infra_running; then
+    export POSTGRES_PORT="${POSTGRES_PORT:-5432}"
+    export REDIS_PORT="${REDIS_PORT:-6379}"
+    export MINIO_PORT="${MINIO_PORT:-9000}"
+    export MINIO_CONSOLE_PORT="${MINIO_CONSOLE_PORT:-9001}"
+
+    if _infra_running && _wait_for_infra_quick; then
         success "Infrastructure services already running"
     else
-        info "Starting infrastructure via docker compose ..."
+        if _infra_running; then
+            warn "Infrastructure containers exist but services are not responding"
+            info "Restarting infrastructure ..."
+            for name in neuroinsight-db neuroinsight-redis neuroinsight-minio; do
+                docker rm -f "$name" 2>/dev/null || true
+            done
+        else
+            info "Starting infrastructure via docker compose ..."
+        fi
         if _infra_up_quiet; then
             success "Infrastructure services started"
         else
@@ -994,9 +1007,32 @@ preflight_checks() {
         success "Frontend node_modules installed"
     fi
 
-    # ── Ensure infrastructure is up before the full check ─────────────────
+    # ── Ensure infrastructure is up AND reachable ──────────────────────────
+    # Load infra ports from .env
+    export POSTGRES_PORT="${POSTGRES_PORT:-5432}"
+    export REDIS_PORT="${REDIS_PORT:-6379}"
+    export MINIO_PORT="${MINIO_PORT:-9000}"
+    export MINIO_CONSOLE_PORT="${MINIO_CONSOLE_PORT:-9001}"
+
     if _infra_running; then
-        success "Infrastructure services running"
+        # Containers exist -- but are the services actually reachable?
+        if _wait_for_infra_quick; then
+            success "Infrastructure services running"
+        else
+            warn "Infrastructure containers exist but services are not responding"
+            info "Restarting infrastructure ..."
+            # Tear down and restart to get a clean state
+            for name in neuroinsight-db neuroinsight-redis neuroinsight-minio; do
+                docker rm -f "$name" 2>/dev/null || true
+            done
+            if _infra_up_quiet; then
+                success "Infrastructure services restarted"
+            else
+                error "Infrastructure services failed to start (PostgreSQL, Redis, MinIO)"
+                info "Make sure Docker is running, then retry: ./research start"
+                exit 1
+            fi
+        fi
     else
         info "Starting infrastructure services ..."
         if _infra_up_quiet; then
@@ -1155,6 +1191,22 @@ _infra_running() {
         fi
     done
     [ "$count" -ge 3 ]
+}
+
+_wait_for_infra_quick() {
+    # Quick connectivity test (5 seconds max) -- used to detect stale containers
+    local i
+    for i in $(seq 1 5); do
+        local ready=0
+        python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${POSTGRES_PORT})); s.close()" 2>/dev/null && ready=$((ready+1))
+        python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${REDIS_PORT})); s.close()" 2>/dev/null && ready=$((ready+1))
+        python3 -c "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1',${MINIO_PORT})); s.close()" 2>/dev/null && ready=$((ready+1))
+        if [ "$ready" -ge 3 ]; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
 }
 
 _wait_for_infra() {
