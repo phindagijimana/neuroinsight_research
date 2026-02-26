@@ -4,13 +4,15 @@
 
 - Python 3.9+, Node.js 18+, Docker (Compose v2), 8GB+ RAM
 
-## Launch
+## Setup and Launch
 
 ```bash
-./research start
+./research install        # Install deps, start infra, init DB
+./research license        # Set up FreeSurfer / MELD license files
+./research start          # Launch the app
 ```
 
-Open **http://localhost:3000**. Everything is automatic on first run.
+Open **http://localhost:3000**.
 
 ## Usage
 
@@ -23,6 +25,8 @@ Open **http://localhost:3000**. Everything is automatic on first run.
 ## Commands
 
 ```bash
+./research install        # First-time setup (deps + infra + DB)
+./research license        # Set up pipeline license files
 ./research start          # Start the application
 ./research stop           # Stop the application
 ./research status         # Check all services

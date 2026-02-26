@@ -5,14 +5,14 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
-    strictPort: false, // If 3000 is taken, try 3001, 3002, etc.
+    strictPort: false,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3051',
         changeOrigin: true,
       },
       '/health': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3051',
         changeOrigin: true,
       },
     },
