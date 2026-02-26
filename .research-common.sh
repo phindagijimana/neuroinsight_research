@@ -264,10 +264,12 @@ cmd_install() {
     else
         if _infra_running; then
             warn "Infrastructure containers exist but services are not responding"
-            info "Restarting infrastructure ..."
+            info "Restarting infrastructure (clean) ..."
+            _compose down -v 2>/dev/null || true
             for name in neuroinsight-db neuroinsight-redis neuroinsight-minio; do
                 docker rm -f "$name" 2>/dev/null || true
             done
+            _regenerate_env_passwords
         else
             info "Starting infrastructure via docker compose ..."
         fi
@@ -1038,11 +1040,13 @@ preflight_checks() {
             success "Infrastructure services running"
         else
             warn "Infrastructure containers exist but services are not responding"
-            info "Restarting infrastructure ..."
-            # Tear down and restart to get a clean state
+            info "Restarting infrastructure (clean) ..."
+            _compose down -v 2>/dev/null || true
             for name in neuroinsight-db neuroinsight-redis neuroinsight-minio; do
                 docker rm -f "$name" 2>/dev/null || true
             done
+            # Regenerate .env with fresh passwords to match new empty volumes
+            _regenerate_env_passwords
             if _infra_up_quiet; then
                 success "Infrastructure services restarted"
             else
@@ -1299,6 +1303,29 @@ _update_env_var() {
         sed -i "s|^${key}=.*|${key}=${value}|" "$file"
     else
         echo "${key}=${value}" >> "$file"
+    fi
+}
+
+_regenerate_env_passwords() {
+    # After wiping Docker volumes, regenerate passwords in .env so they match
+    # the fresh empty databases that will be created on next startup.
+    if [ -f "$SCRIPT_DIR/.env" ] && command -v python3 &>/dev/null; then
+        local _rand_pw
+        _rand_pw() { python3 -c "import secrets; print(secrets.token_urlsafe(24))"; }
+        local pg_pass; pg_pass=$(_rand_pw)
+        local redis_pass; redis_pass=$(_rand_pw)
+        local minio_key; minio_key=$(_rand_pw)
+        local minio_secret; minio_secret=$(_rand_pw)
+        _update_env_var "POSTGRES_PASSWORD" "$pg_pass"
+        _update_env_var "REDIS_PASSWORD" "$redis_pass"
+        _update_env_var "MINIO_ROOT_USER" "$minio_key"
+        _update_env_var "MINIO_ROOT_PASSWORD" "$minio_secret"
+        # Update DATABASE_URL with new password
+        local pg_user="${POSTGRES_USER:-neuroinsight}"
+        local pg_db="${POSTGRES_DB:-neuroinsight}"
+        _update_env_var "DATABASE_URL" "postgresql://${pg_user}:${pg_pass}@localhost:${POSTGRES_PORT:-5432}/${pg_db}"
+        set -a; source "$SCRIPT_DIR/.env" 2>/dev/null || true; set +a
+        info "Regenerated service passwords for clean start"
     fi
 }
 
