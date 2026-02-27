@@ -886,21 +886,32 @@ async def get_provenance(job_id: str):
     if loc.is_remote:
         ssh = _get_ssh()
         if ssh:
-            try:
-                content = _remote_read_text(
-                    ssh, f"{loc.remote_path}/job_spec.json"
-                )
-                spec_data = json.loads(content)
-            except Exception as e:
-                logger.debug("Could not read remote job_spec.json: %s", e)
+            candidates = [
+                f"{loc.remote_path}/job_spec.json",
+                f"{loc.remote_path}/../scripts/job_spec.json",
+            ]
+            for candidate in candidates:
+                try:
+                    content = _remote_read_text(ssh, candidate)
+                    spec_data = json.loads(content)
+                    break
+                except Exception:
+                    continue
+            if not spec_data:
+                logger.debug("Could not read remote job_spec.json for %s", job_id[:8])
     elif loc.local_path:
-        spec_file = loc.local_path / "job_spec.json"
-        if spec_file.exists():
-            try:
-                spec_data = json.loads(spec_file.read_text())
-            except Exception as e:
-                logger.debug("Could not parse job_spec.json for %s: %s",
-                             job_id[:8], e)
+        candidates = [
+            loc.local_path / "job_spec.json",
+            loc.local_path.parent / "scripts" / "job_spec.json",
+        ]
+        for spec_file in candidates:
+            if spec_file.exists():
+                try:
+                    spec_data = json.loads(spec_file.read_text())
+                    break
+                except Exception as e:
+                    logger.debug("Could not parse %s for %s: %s",
+                                 spec_file.name, job_id[:8], e)
 
     # Input file hashes (only for local files)
     input_hashes = {}
