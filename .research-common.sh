@@ -36,7 +36,7 @@ if [ "$MODE" = "production" ]; then
 else
     BACKEND_PORT="${API_PORT:-3051}"
 fi
-CELERY_CONCURRENCY="${CELERY_CONCURRENCY:-2}"
+CELERY_CONCURRENCY="${CELERY_CONCURRENCY:-5}"
 DATA_DIR="${DATA_DIR:-./data}"
 LOG_DIR="${LOG_DIR:-./logs}"
 PID_DIR="${PID_DIR:-./.pids}"

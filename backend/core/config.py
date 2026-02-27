@@ -177,7 +177,7 @@ class Settings(BaseSettings):
     hpc_partition: str = Field(default="general", description="Default SLURM partition")
     hpc_account: Optional[str] = Field(default=None, description="SLURM account/allocation name")
     hpc_qos: Optional[str] = Field(default=None, description="SLURM QoS level")
-    hpc_ssh_port: int = Field(default=22, ge=1, le=65535, description="SSH port for HPC connection")
+    hpc_ssh_port: int = Field(default=22, ge=1, le=65535, description="SSH port for HPC connection (22 direct, or 2222 for reverse tunnel)")
     hpc_ssh_key_path: Optional[str] = Field(default=None, description="Path to SSH private key (None = use agent)")
     hpc_container_runtime: str = Field(default="singularity", description="Container runtime on HPC: singularity or apptainer")
     hpc_modules_to_load: Optional[str] = Field(

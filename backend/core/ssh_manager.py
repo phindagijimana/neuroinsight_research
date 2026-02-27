@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONNECT_TIMEOUT = 15  # seconds
 DEFAULT_COMMAND_TIMEOUT = 120  # seconds
 DEFAULT_KEEPALIVE_INTERVAL = 30  # seconds
-DEFAULT_IDLE_TIMEOUT = 1800  # 30 minutes -- auto-disconnect after idle
+DEFAULT_IDLE_TIMEOUT = 3600  # 1 hour -- auto-disconnect after idle
 
 
 class SSHConnectionError(Exception):
@@ -108,7 +108,7 @@ class SSHManager:
         Args:
             host: HPC hostname or IP
             username: SSH username
-            port: SSH port (default 22)
+            port: SSH port (default 22; use 2222 for reverse tunnel setups)
             key_path: Path to SSH private key (None = use agent)
             connect_timeout: Connection timeout in seconds
             command_timeout: Default command execution timeout
