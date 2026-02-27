@@ -43,6 +43,10 @@ inputs:
       type: string
       default: "MNI152NLin2009cAsym"
       description: "Output space(s) for preprocessing"
+    - key: fs_subjects_dir
+      type: directory
+      default: ""
+      description: "Path to existing FreeSurfer SUBJECTS_DIR (skips recon-all if provided)"
 
 input_format:
   format_name: "BIDS"
@@ -143,6 +147,11 @@ execution:
 
         if [ "{ignore_fieldmaps}" = "true" ]; then
           FMRIPREP_CMD="$FMRIPREP_CMD --ignore fieldmaps"
+        fi
+
+        if [ -n "{fs_subjects_dir}" ] && [ -d "/data/inputs/fs_subjects_dir" ]; then
+          FMRIPREP_CMD="$FMRIPREP_CMD --fs-subjects-dir /data/inputs/fs_subjects_dir"
+          echo "Using existing FreeSurfer outputs from /data/inputs/fs_subjects_dir (skipping recon-all)"
         fi
 
         # fMRIPrep sometimes returns exit code 1 despite successful processing
