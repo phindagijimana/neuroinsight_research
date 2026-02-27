@@ -98,9 +98,9 @@ parameters:
 resources:
   profiles:
     default:
-      cpus: 8
-      mem_gb: 32
-      time_hours: 24
+      cpus: 16
+      mem_gb: 64
+      time_hours: 48
       gpus: 0
 
 execution:

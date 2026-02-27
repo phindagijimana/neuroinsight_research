@@ -52,6 +52,7 @@ class SLURMBackend(ExecutionBackend):
         self,
         ssh_host: str,
         ssh_user: str,
+        ssh_port: int = 22,
         work_dir: str = "~",
         partition: str = "general",
         account: Optional[str] = None,
@@ -65,6 +66,7 @@ class SLURMBackend(ExecutionBackend):
         Args:
             ssh_host: HPC hostname
             ssh_user: SSH username
+            ssh_port: SSH port (22 direct, 2222 for reverse tunnel)
             work_dir: Working directory on HPC (defaults to ~ which resolves to $HOME)
             partition: Default SLURM partition
             account: SLURM account/allocation (optional)
@@ -75,6 +77,7 @@ class SLURMBackend(ExecutionBackend):
         """
         self.ssh_host = ssh_host
         self.ssh_user = ssh_user
+        self.ssh_port = ssh_port
         self.work_dir = work_dir
         self._work_dir_resolved = False
         self.partition = partition
@@ -139,7 +142,7 @@ class SLURMBackend(ExecutionBackend):
     def _ensure_ssh(self) -> None:
         """Ensure SSH is configured and connected."""
         if not self._ssh.is_connected:
-            self._ssh.configure(host=self.ssh_host, username=self.ssh_user)
+            self._ssh.configure(host=self.ssh_host, username=self.ssh_user, port=self.ssh_port)
             try:
                 self._ssh.connect()
             except SSHConnectionError as e:

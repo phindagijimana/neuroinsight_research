@@ -64,6 +64,7 @@ def create_backend(backend_type: Optional[str] = None, **kwargs) -> ExecutionBac
     if backend_type == "slurm":
         ssh_host = kwargs.get("ssh_host", os.getenv("HPC_HOST"))
         ssh_user = kwargs.get("ssh_user", os.getenv("HPC_USER"))
+        ssh_port = int(kwargs.get("ssh_port", os.getenv("HPC_SSH_PORT", "22")))
         work_dir = kwargs.get("work_dir", os.getenv("HPC_WORK_DIR", "~"))
         partition = kwargs.get("partition", os.getenv("HPC_PARTITION", "general"))
         account = kwargs.get("account", os.getenv("HPC_ACCOUNT"))
@@ -79,6 +80,7 @@ def create_backend(backend_type: Optional[str] = None, **kwargs) -> ExecutionBac
         return SLURMBackend(
             ssh_host=ssh_host,
             ssh_user=ssh_user,
+            ssh_port=ssh_port,
             work_dir=work_dir,
             partition=partition,
             account=account,
