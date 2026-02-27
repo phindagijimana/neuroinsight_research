@@ -118,11 +118,24 @@ def ssh_disconnect():
 
 @router.get("/status")
 def ssh_status():
-    """Get current SSH connection status and details."""
-    from backend.core.ssh_manager import get_ssh_manager
+    """Get current SSH connection status and details.
+
+    If the session timed out but connection parameters are still known,
+    automatically attempts to reconnect so the UI stays connected.
+    """
+    from backend.core.ssh_manager import get_ssh_manager, SSHConnectionError
 
     ssh = get_ssh_manager()
     info = ssh.connection_info
+
+    if not info["connected"] and info["host"] and info["username"]:
+        try:
+            ssh.connect()
+            info = ssh.connection_info
+            logger.info("Auto-reconnected SSH to %s@%s:%s", info["username"], info["host"], info["port"])
+        except SSHConnectionError as e:
+            logger.debug("Auto-reconnect failed: %s", e)
+
     return {
         "connected": info["connected"],
         "host": info["host"],
