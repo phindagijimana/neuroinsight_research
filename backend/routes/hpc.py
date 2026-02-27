@@ -6,6 +6,7 @@ HPC clusters), backend switching (local / remote_docker / slurm), SLURM
 partitions, queue info, remote file browsing, and system info.
 """
 import logging
+import os
 from pathlib import PurePosixPath
 from typing import Optional
 
@@ -34,7 +35,7 @@ class SSHConnectRequest(BaseModel):
     """SSH connection request."""
     host: str
     username: str
-    port: int = 22
+    port: int = int(os.getenv("HPC_SSH_PORT", "22"))
     key_path: Optional[str] = None
 
 
@@ -52,7 +53,7 @@ class BackendSwitchRequest(BaseModel):
     # HPC-specific fields (required when backend_type == 'slurm')
     ssh_host: Optional[str] = None
     ssh_user: Optional[str] = None
-    ssh_port: int = 22
+    ssh_port: int = int(os.getenv("HPC_SSH_PORT", "22"))
     work_dir: str = "~"
     partition: str = "general"
     account: Optional[str] = None
@@ -221,6 +222,7 @@ def switch_backend(request: BackendSwitchRequest):
             new_backend = SLURMBackend(
                 ssh_host=request.ssh_host,
                 ssh_user=request.ssh_user,
+                ssh_port=request.ssh_port,
                 work_dir=request.work_dir,
                 partition=request.partition,
                 account=request.account,

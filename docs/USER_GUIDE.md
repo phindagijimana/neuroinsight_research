@@ -504,9 +504,19 @@ Keep this terminal open while using NeuroInsight.
 - **Port**: `2222`
 - **Username**: your HPC username
 
+To avoid entering port 2222 every time, set it in your `.env` file:
+
+```bash
+HPC_HOST=localhost
+HPC_USER=your-hpc-username
+HPC_SSH_PORT=2222
+```
+
+The app will use these as defaults whenever you connect.
+
 **If NeuroInsight can reach the HPC directly** (same network, or VPN on the server), use the actual hostname:
 - **Host**: `hpc-login.university.edu`
-- **Port**: `22`
+- **Port**: `22` (default, no `.env` change needed)
 - **Username**: your HPC username
 
 ### Step 3: Connect in the NeuroInsight UI
