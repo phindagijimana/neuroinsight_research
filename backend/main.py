@@ -1520,6 +1520,8 @@ import re as _re
 _slurm_progress_cache: dict[str, tuple[float, int, str]] = {}
 _slurm_progress_state: dict[str, dict] = {}
 _SLURM_PROGRESS_POLL_INTERVAL = 30  # seconds between log reads per job
+_WORKFLOW_MILESTONE_LOOKAHEAD = 4
+_PLUGIN_MILESTONE_LOOKAHEAD = 3
 
 
 def _get_remote_file_size(ssh, remote_path: str) -> int:
@@ -1646,11 +1648,21 @@ def _poll_slurm_progress(job: "Job") -> tuple[int, str] | None:
 
         # Per-job parser state: offset + ordered milestone cursor.
         state = _slurm_progress_state.get(job.id) or {}
+        prior_milestone_idx = int(state.get("milestone_idx", -1))
+        from backend.core.phase_milestones import (
+            get_milestones,
+            get_plugin_checkpoint_milestones,
+            get_workflow_milestones,
+            get_workflow_step_weights,
+        )
+        workflow_milestones = get_workflow_milestones(workflow_id) if workflow_id else []
+        use_workflow_milestones = bool(workflow_milestones)
         if state.get("log_path") != log_path:
             state = {
                 "log_path": log_path,
                 "offset": 0,
-                "milestone_idx": -1,
+                # Keep workflow checkpoint cursor when logs switch between steps.
+                "milestone_idx": prior_milestone_idx if use_workflow_milestones else -1,
                 "active_plugin_id": active_plugin_id,
                 "active_step_idx": active_step_idx,
             }
@@ -1665,24 +1677,48 @@ def _poll_slurm_progress(job: "Job") -> tuple[int, str] | None:
         )
         state["offset"] = file_size
 
-        from backend.core.phase_milestones import get_milestones, get_workflow_step_weights
-        milestones = get_milestones(active_plugin_id)
+        milestones = (
+            workflow_milestones
+            if use_workflow_milestones
+            else get_plugin_checkpoint_milestones(active_plugin_id, step=5)
+        )
+        if not milestones and not use_workflow_milestones:
+            milestones = get_milestones(active_plugin_id)
         milestone_idx = int(state.get("milestone_idx", -1))
 
         # Advance milestones strictly in order based only on newly appended log bytes.
         if log_delta:
             next_idx = milestone_idx + 1
             while 0 <= next_idx < len(milestones):
-                marker, _, _ = milestones[next_idx]
-                matched = False
-                try:
-                    matched = bool(_re.search(marker, log_delta))
-                except _re.error:
-                    matched = marker in log_delta
-                if not matched:
+                max_scan_idx = next_idx
+                if use_workflow_milestones:
+                    max_scan_idx = min(
+                        len(milestones) - 1,
+                        next_idx + _WORKFLOW_MILESTONE_LOOKAHEAD - 1,
+                    )
+                else:
+                    max_scan_idx = min(
+                        len(milestones) - 1,
+                        next_idx + _PLUGIN_MILESTONE_LOOKAHEAD - 1,
+                    )
+
+                matched_idx = -1
+                for candidate_idx in range(next_idx, max_scan_idx + 1):
+                    marker, _, _ = milestones[candidate_idx]
+                    matched = False
+                    try:
+                        matched = bool(_re.search(marker, log_delta))
+                    except _re.error:
+                        matched = marker in log_delta
+                    if matched:
+                        matched_idx = candidate_idx
+                        break
+
+                if matched_idx < 0:
                     break
-                milestone_idx = next_idx
-                next_idx += 1
+
+                milestone_idx = matched_idx
+                next_idx = milestone_idx + 1
 
         state["milestone_idx"] = milestone_idx
         _slurm_progress_state[job.id] = state
@@ -1693,9 +1729,11 @@ def _poll_slurm_progress(job: "Job") -> tuple[int, str] | None:
         if 0 <= milestone_idx < len(milestones):
             _, step_progress, phase_label = milestones[milestone_idx]
 
-        # Scale to workflow-level progress.
+        # Resolve progress:
+        # - workflow checkpoints are already global percentages
+        # - plugin milestones are step-local and require workflow scaling
         best_progress = step_progress
-        if workflow_steps:
+        if workflow_steps and not use_workflow_milestones:
             weights = get_workflow_step_weights(workflow_id, len(workflow_steps))
             step_offset_pct = sum(weights[:active_step_idx]) * 100
             step_pct_range = weights[active_step_idx] * 100
