@@ -5,6 +5,7 @@ FastAPI application for HPC-native neuroimaging pipeline platform.
 """
 import logging
 import os
+import shlex
 import shutil
 import uuid
 from contextlib import asynccontextmanager
@@ -102,6 +103,62 @@ async def lifespan(app):
             logger.info(f"Startup reaper finalised {len(reaped)} orphaned jobs")
     except Exception as e:
         logger.warning(f"Startup stale-job reap failed: {e}")
+
+    # Auto-reconnect to HPC if a previous session config is persisted
+    try:
+        from backend.core.hpc_config_store import load_hpc_config
+        cfg = load_hpc_config()
+        if cfg and cfg.get("backend_type") in ("slurm", "remote_docker"):
+            logger.info(
+                "Found persisted HPC config: %s@%s — attempting auto-reconnect",
+                cfg["ssh_user"], cfg["ssh_host"],
+            )
+            from backend.core.ssh_manager import get_ssh_manager
+            ssh = get_ssh_manager()
+            ssh.configure(
+                host=cfg["ssh_host"],
+                username=cfg["ssh_user"],
+                port=cfg.get("ssh_port", 22),
+            )
+            ssh.connect()
+            logger.info("HPC SSH auto-reconnect successful")
+
+            # Restore the backend instance
+            if cfg["backend_type"] == "slurm":
+                import os, backend.execution as exec_module
+                from backend.execution.slurm_backend import SLURMBackend
+                modules_str = cfg.get("modules", "")
+                modules = [m.strip() for m in modules_str.split(",") if m.strip()] if modules_str else []
+                os.environ["BACKEND_TYPE"] = "slurm"
+                os.environ["HPC_HOST"] = cfg["ssh_host"]
+                os.environ["HPC_USER"] = cfg["ssh_user"]
+                os.environ["HPC_WORK_DIR"] = cfg.get("work_dir", "~")
+                os.environ["HPC_PARTITION"] = cfg.get("partition", "general")
+                exec_module._backend_instance = SLURMBackend(
+                    ssh_host=cfg["ssh_host"],
+                    ssh_user=cfg["ssh_user"],
+                    ssh_port=cfg.get("ssh_port", 22),
+                    work_dir=cfg.get("work_dir", "~"),
+                    partition=cfg.get("partition", "general"),
+                    account=cfg.get("account"),
+                    qos=cfg.get("qos"),
+                    modules=modules,
+                )
+                logger.info("SLURM backend restored from persisted config")
+            elif cfg["backend_type"] == "remote_docker":
+                import os, backend.execution as exec_module
+                from backend.execution.remote_docker_backend import RemoteDockerBackend
+                os.environ["BACKEND_TYPE"] = "remote_docker"
+                os.environ["HPC_HOST"] = cfg["ssh_host"]
+                os.environ["HPC_USER"] = cfg["ssh_user"]
+                exec_module._backend_instance = RemoteDockerBackend(
+                    ssh_host=cfg["ssh_host"],
+                    ssh_user=cfg["ssh_user"],
+                    work_dir=cfg.get("work_dir", "/tmp/neuroinsight"),
+                )
+                logger.info("Remote Docker backend restored from persisted config")
+    except Exception as e:
+        logger.warning("HPC auto-reconnect failed (will retry on first request): %s", e)
 
     yield
 
@@ -512,6 +569,28 @@ FS_LICENSE_PLUGINS = {
     "freesurfer_longitudinal", "freesurfer_longitudinal_stats",
 }
 
+XCPD_VALID_ATLASES = (
+    "4S1056Parcels",
+    "4S156Parcels",
+    "4S256Parcels",
+    "4S356Parcels",
+    "4S456Parcels",
+    "4S556Parcels",
+    "4S656Parcels",
+    "4S756Parcels",
+    "4S856Parcels",
+    "4S956Parcels",
+    "Glasser",
+    "Gordon",
+    "HCP",
+    "Tian",
+)
+_XCPD_VALID_ATLASES_BY_LOWER = {a.lower(): a for a in XCPD_VALID_ATLASES}
+_XCPD_ATLAS_ALIASES = {
+    # Compatibility alias seen in older parameter presets/UI state.
+    "schaefer2018": "4S256Parcels",
+}
+
 
 def _check_licenses(plugin_ids: List[str]):
     """Check that required license files are present before job submission.
@@ -543,6 +622,60 @@ def _check_licenses(plugin_ids: List[str]):
         )
 
 
+def _normalize_xcpd_atlases(atlases_value) -> str:
+    """Normalize/validate XCP-D atlas list to supported values."""
+    if atlases_value is None:
+        return ""
+
+    if isinstance(atlases_value, (list, tuple)):
+        raw_tokens = []
+        for item in atlases_value:
+            raw_tokens.extend(str(item).replace(",", " ").split())
+    else:
+        raw_tokens = str(atlases_value).replace(",", " ").split()
+
+    tokens = [t.strip() for t in raw_tokens if t.strip()]
+    if not tokens:
+        return ""
+
+    invalid = []
+    normalized = []
+    seen = set()
+    for token in tokens:
+        alias_or_token = _XCPD_ATLAS_ALIASES.get(token.lower(), token)
+        canonical = _XCPD_VALID_ATLASES_BY_LOWER.get(alias_or_token.lower())
+        if not canonical:
+            invalid.append(token)
+            continue
+        if canonical not in seen:
+            seen.add(canonical)
+            normalized.append(canonical)
+
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Invalid XCP-D atlas value(s): "
+                f"{', '.join(invalid)}. Supported atlases: {', '.join(XCPD_VALID_ATLASES)}. "
+                "Compatibility alias: Schaefer2018 -> 4S256Parcels."
+            ),
+        )
+
+    return " ".join(normalized)
+
+
+def _normalize_submission_parameters_for_plugins(plugin_ids: List[str], params: dict) -> dict:
+    """Apply plugin-specific submit-time parameter normalization/validation."""
+    normalized = dict(params or {})
+    if "xcpd" in set(plugin_ids) and "atlases" in normalized:
+        value = _normalize_xcpd_atlases(normalized.get("atlases"))
+        if value:
+            normalized["atlases"] = value
+        else:
+            normalized.pop("atlases", None)
+    return normalized
+
+
 @app.post("/api/plugins/{plugin_id}/submit")
 def submit_plugin_job(plugin_id: str, request: PluginJobSubmitRequest, db: Session = Depends(get_db)):
     """Submit a job that runs a single plugin."""
@@ -571,7 +704,7 @@ def submit_plugin_job(plugin_id: str, request: PluginJobSubmitRequest, db: Sessi
     job_id = str(uuid.uuid4())
     output_dir = str(Path(settings.data_dir) / "outputs" / job_id)
 
-    params = dict(request.parameters)
+    params = _normalize_submission_parameters_for_plugins([plugin_id], dict(request.parameters))
     params["_plugin_id"] = plugin_id
 
     spec = JobSpec(
@@ -675,7 +808,7 @@ def submit_workflow_job(workflow_id: str, request: WorkflowJobSubmitRequest, db:
     output_dir = str(Path(settings.data_dir) / "outputs" / job_id)
 
     # Store workflow steps in parameters for the Celery task
-    params = dict(request.parameters)
+    params = _normalize_submission_parameters_for_plugins(step_plugin_ids, dict(request.parameters))
     params["_workflow_steps"] = [step.uses for step in workflow.steps]
     params["_workflow_id"] = workflow_id
 
@@ -796,6 +929,8 @@ def submit_workflow_batch(workflow_id: str, request: WorkflowBatchSubmitRequest,
         gpu=res.get("gpu", False),
     )
 
+    normalized_base_params = _normalize_submission_parameters_for_plugins(step_plugin_ids, dict(request.parameters))
+
     # Submit one job per subject
     submitted = []
     errors = []
@@ -806,7 +941,7 @@ def submit_workflow_batch(workflow_id: str, request: WorkflowBatchSubmitRequest,
             job_id = str(uuid.uuid4())
             output_dir = str(Path(settings.data_dir) / "outputs" / job_id)
 
-            params = dict(request.parameters)
+            params = dict(normalized_base_params)
             params["subject_id"] = sid
             params["_plugin_id"] = step_plugin_ids[0] if len(step_plugin_ids) == 1 else ""
             params["_workflow_steps"] = step_plugin_ids
@@ -1157,6 +1292,7 @@ def get_jobs_progress(db: Session = Depends(get_db)):
                         j.progress = 100
                         j.current_phase = "Completed"
                     _slurm_progress_cache.pop(j.id, None)
+                    _slurm_progress_state.pop(j.id, None)
                 try:
                     db.commit()
                 except Exception:
@@ -1256,7 +1392,87 @@ import time as _time
 import re as _re
 
 _slurm_progress_cache: dict[str, tuple[float, int, str]] = {}
+_slurm_progress_state: dict[str, dict] = {}
 _SLURM_PROGRESS_POLL_INTERVAL = 30  # seconds between log reads per job
+
+
+def _get_remote_file_size(ssh, remote_path: str) -> int:
+    """Return remote file size in bytes (0 if missing/unreadable)."""
+    qpath = shlex.quote(remote_path)
+    _, stdout, _ = ssh.execute(f"wc -c < {qpath} 2>/dev/null || echo 0", timeout=10)
+    try:
+        return int((stdout or "0").strip().splitlines()[-1])
+    except Exception:
+        return 0
+
+
+def _read_remote_log_delta(ssh, remote_path: str, offset: int, max_bytes: int = 262144) -> tuple[str, int]:
+    """Read only newly appended bytes from a remote log file.
+
+    Returns (new_text, current_file_size). If the file shrank (rotation/truncate),
+    offset is reset to 0.
+    """
+    size = _get_remote_file_size(ssh, remote_path)
+    if size <= 0:
+        return "", 0
+
+    safe_offset = max(0, offset)
+    if size < safe_offset:
+        safe_offset = 0
+    if size == safe_offset:
+        return "", size
+
+    qpath = shlex.quote(remote_path)
+    _, stdout, _ = ssh.execute(
+        f"dd if={qpath} bs=1 skip={safe_offset} count={max_bytes} 2>/dev/null",
+        timeout=15,
+    )
+    return stdout or "", size
+
+
+def _resolve_active_slurm_log_path(
+    ssh,
+    output_dir: str,
+    workflow_steps: list[str],
+    slurm_id: str,
+    workflow_id: str = "",
+) -> tuple[str, str, int, float]:
+    """Pick the currently active log path and workflow offset context.
+
+    Returns (log_path, active_plugin_id, active_step_idx, step_offset_pct).
+    """
+    active_plugin_id = ""
+    active_step_idx = 0
+    step_offset_pct = 0.0
+
+    if workflow_steps:
+        total_steps = len(workflow_steps)
+        from backend.core.phase_milestones import get_workflow_step_weights
+        weights = get_workflow_step_weights(workflow_id, total_steps)
+
+        for step_idx in range(total_steps - 1, -1, -1):
+            step_num = step_idx + 1
+            step_pid = workflow_steps[step_idx]
+            candidate = f"{output_dir}/logs/step_{step_num}_{step_pid}.log"
+            if _get_remote_file_size(ssh, candidate) > 0:
+                active_plugin_id = step_pid
+                active_step_idx = step_idx
+                step_offset_pct = sum(weights[:step_idx]) * 100
+                return candidate, active_plugin_id, active_step_idx, step_offset_pct
+
+    # Single-plugin fallback
+    container_log = f"{output_dir}/logs/container.log"
+    if _get_remote_file_size(ssh, container_log) > 0:
+        return container_log, active_plugin_id, active_step_idx, step_offset_pct
+
+    # Last-resort fallback to SLURM stdout (startup/errors)
+    if slurm_id:
+        job_dir = output_dir.rstrip("/").rsplit("/outputs", 1)[0]
+        slurm_log = f"{job_dir}/logs/slurm-{slurm_id}.out"
+        if _get_remote_file_size(ssh, slurm_log) > 0:
+            return slurm_log, active_plugin_id, active_step_idx, step_offset_pct
+
+    return "", active_plugin_id, active_step_idx, step_offset_pct
 
 
 def _poll_slurm_progress(job: "Job") -> tuple[int, str] | None:
@@ -1282,103 +1498,97 @@ def _poll_slurm_progress(job: "Job") -> tuple[int, str] | None:
         params = job.parameters or {}
         plugin_id = params.get("_plugin_id", "")
         workflow_steps = params.get("_workflow_steps", [])
+        workflow_id = params.get("_workflow_id", "")
         output_dir = job.output_dir  # e.g. ~/neuroinsight/jobs/{id}/outputs
+        slurm_id = job.backend_job_id or ""
 
-        log_content = ""
-        active_plugin_id = plugin_id
-        step_offset_pct = 0  # base percentage offset for workflow steps
+        # Resolve active log source for this poll (step log > container log > slurm log)
+        log_path, active_plugin_id, active_step_idx, _ = _resolve_active_slurm_log_path(
+            ssh=ssh,
+            output_dir=output_dir,
+            workflow_steps=workflow_steps,
+            slurm_id=slurm_id,
+            workflow_id=workflow_id,
+        )
+        if not active_plugin_id:
+            active_plugin_id = plugin_id
 
-        # Read last 200KB of log — large enough to capture recent phase markers
-        # even for verbose pipelines like FreeSurfer
-        _TAIL_BYTES = 204800
-
-        if workflow_steps:
-            # Workflow job: find the latest active step log (check newest first)
-            total_steps = len(workflow_steps)
-            workflow_id = params.get("_workflow_id", "")
-            from backend.core.phase_milestones import get_workflow_step_weights
-            weights = get_workflow_step_weights(workflow_id, total_steps)
-
-            for step_idx in range(total_steps - 1, -1, -1):
-                step_num = step_idx + 1
-                step_pid = workflow_steps[step_idx]
-                log_path = f"{output_dir}/logs/step_{step_num}_{step_pid}.log"
-                exit_code, stdout, _ = ssh.execute(
-                    f"tail -c {_TAIL_BYTES} {log_path} 2>/dev/null", timeout=15,
-                )
-                if stdout.strip():
-                    log_content = stdout
-                    active_plugin_id = step_pid
-                    step_offset_pct = sum(weights[:step_idx]) * 100
-                    break
-        else:
-            log_path = f"{output_dir}/logs/container.log"
-            exit_code, stdout, _ = ssh.execute(
-                f"tail -c {_TAIL_BYTES} {log_path} 2>/dev/null", timeout=15,
-            )
-            log_content = stdout
-
-        if not log_content.strip():
-            # No container log yet — check SLURM stdout for setup messages
-            slurm_id = job.backend_job_id
-            if slurm_id:
-                job_dir = output_dir.rstrip("/").rsplit("/outputs", 1)[0]
-                slurm_log = f"{job_dir}/logs/slurm-{slurm_id}.out"
-                exit_code, stdout, _ = ssh.execute(
-                    f"tail -c {_TAIL_BYTES} {slurm_log} 2>/dev/null", timeout=15,
-                )
-                if stdout.strip():
-                    log_content = stdout
-                    if not active_plugin_id:
-                        active_plugin_id = ""
-
-        if not log_content.strip():
-            result = (0, "Running on HPC")
+        if not log_path:
+            result = (0, cached[2] if cached and cached[2] else "Running on HPC")
             _slurm_progress_cache[job.id] = (now, *result)
             return result
 
-        from backend.core.phase_milestones import get_milestones
+        # Per-job parser state: offset + ordered milestone cursor.
+        state = _slurm_progress_state.get(job.id) or {}
+        if state.get("log_path") != log_path:
+            state = {
+                "log_path": log_path,
+                "offset": 0,
+                "milestone_idx": -1,
+                "active_plugin_id": active_plugin_id,
+                "active_step_idx": active_step_idx,
+            }
+        else:
+            state["active_plugin_id"] = active_plugin_id
+            state["active_step_idx"] = active_step_idx
+
+        log_delta, file_size = _read_remote_log_delta(
+            ssh=ssh,
+            remote_path=log_path,
+            offset=int(state.get("offset", 0)),
+        )
+        state["offset"] = file_size
+
+        from backend.core.phase_milestones import get_milestones, get_workflow_step_weights
         milestones = get_milestones(active_plugin_id)
+        milestone_idx = int(state.get("milestone_idx", -1))
 
-        best_progress = 0
-        best_label = ""
-        for marker, pct, label in milestones:
-            if pct > best_progress:
+        # Advance milestones strictly in order based only on newly appended log bytes.
+        if log_delta:
+            next_idx = milestone_idx + 1
+            while 0 <= next_idx < len(milestones):
+                marker, _, _ = milestones[next_idx]
+                matched = False
                 try:
-                    if _re.search(marker, log_content):
-                        best_progress = pct
-                        best_label = label
+                    matched = bool(_re.search(marker, log_delta))
                 except _re.error:
-                    if marker in log_content:
-                        best_progress = pct
-                        best_label = label
-
-        # For workflow jobs, scale step progress into overall progress
-        if workflow_steps:
-            total_steps = len(workflow_steps)
-            workflow_id = params.get("_workflow_id", "")
-            from backend.core.phase_milestones import get_workflow_step_weights
-            weights = get_workflow_step_weights(workflow_id, total_steps)
-            active_step_idx = 0
-            for i, pid in enumerate(workflow_steps):
-                if pid == active_plugin_id:
-                    active_step_idx = i
+                    matched = marker in log_delta
+                if not matched:
                     break
+                milestone_idx = next_idx
+                next_idx += 1
+
+        state["milestone_idx"] = milestone_idx
+        _slurm_progress_state[job.id] = state
+
+        # Resolve step-local progress and label from ordered cursor.
+        step_progress = 0
+        phase_label = ""
+        if 0 <= milestone_idx < len(milestones):
+            _, step_progress, phase_label = milestones[milestone_idx]
+
+        # Scale to workflow-level progress.
+        best_progress = step_progress
+        if workflow_steps:
+            weights = get_workflow_step_weights(workflow_id, len(workflow_steps))
+            step_offset_pct = sum(weights[:active_step_idx]) * 100
             step_pct_range = weights[active_step_idx] * 100
-            best_progress = int(step_offset_pct + (best_progress * step_pct_range / 100))
+            best_progress = int(step_offset_pct + (step_progress * step_pct_range / 100))
             best_progress = min(best_progress, 99)
 
-        # Preserve the previously known phase label if no milestone matched
-        if not best_label:
-            if cached:
-                best_label = cached[2]
-            elif job.current_phase:
-                best_label = job.current_phase
-            else:
-                best_label = "Running on HPC"
+        if cached:
+            best_progress = max(best_progress, cached[1])
 
-        _slurm_progress_cache[job.id] = (now, best_progress, best_label)
-        return (best_progress, best_label)
+        if not phase_label:
+            if cached and cached[2]:
+                phase_label = cached[2]
+            elif job.current_phase:
+                phase_label = job.current_phase
+            else:
+                phase_label = "Running on HPC"
+
+        _slurm_progress_cache[job.id] = (now, best_progress, phase_label)
+        return (best_progress, phase_label)
 
     except Exception as e:
         logger.debug("SLURM progress parse failed for %s: %s", job.id[:8], e)
