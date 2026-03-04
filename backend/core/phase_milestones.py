@@ -23,6 +23,7 @@ from typing import Dict, List, Tuple
 # Type: List of (log_marker_regex_or_substring, pct, label)
 #
 PhaseMilestone = Tuple[str, int, str]
+WorkflowMilestone = Tuple[str, int, str]
 
 # ══════════════════════════════════════════════════════════════════════
 #  FreeSurfer recon-all  (~6-8 hours)
@@ -575,6 +576,102 @@ WORKFLOW_STEP_WEIGHTS: Dict[str, List[float]] = {
     "hippo_subfields_t2": [0.90, 0.10],
 }
 
+# Workflow-level checkpoints (global percentages across whole workflow).
+# These are used to provide stable stage progress for multi-step workflows.
+WORKFLOW_MILESTONES: Dict[str, List[WorkflowMilestone]] = {
+    "fmri_full": [
+        ("fMRIPrep started", 5, "fMRIPrep initializing"),
+        ("Executing.*brain_extraction_wf", 10, "Anatomical brain extraction"),
+        ("Executing.*gcareg", 20, "FreeSurfer autorecon started"),
+        ("Finished.*autorecon2_vol", 35, "FreeSurfer volume stage complete"),
+        ("Finished.*autorecon_surfs", 50, "FreeSurfer surface stage complete"),
+        ("Finished.*anat_norm", 60, "Anatomical normalization complete"),
+        ("Finished.*slice_timing_correction", 70, "BOLD timing correction complete"),
+        ("Finished.*bold_confounds_wf\\.concat", 80, "fMRIPrep confounds complete"),
+        ("fMRIPrep finished", 85, "fMRIPrep complete"),
+        ("xcp_d", 90, "XCP-D started"),
+        ("Finished.*connectivity", 95, "XCP-D connectivity complete"),
+        ("XCP-D completed successfully", 99, "XCP-D complete"),
+    ],
+    "diffusion_full": [
+        ("qsiprep_wf", 5, "QSIPrep workflow started"),
+        ("anat_preproc_wf", 10, "Anatomical preprocessing"),
+        ("Finished.*anat_nlin_normalization", 20, "Anatomical normalization complete"),
+        ("dwi_preproc_wf", 30, "DWI preprocessing"),
+        ("Finished.*eddy", 45, "Eddy correction complete"),
+        ("Finished.*merge_dwis", 55, "DWI merge complete"),
+        ("Finished.*dwi_resampling", 65, "DWI resampling complete"),
+        ("QSIPrep completed successfully", 75, "QSIPrep complete"),
+        ("qsirecon", 80, "QSIRecon started"),
+        ("Finished.*tractography", 88, "Tractography complete"),
+        ("Finished.*connectivity", 94, "Connectivity complete"),
+        ("QSIRecon completed successfully", 99, "QSIRecon complete"),
+    ],
+    "cortical_lesion_detection": [
+        ("recon-all", 5, "FreeSurfer started"),
+        ("MotionCorrect", 10, "FreeSurfer motion correction"),
+        ("SubCortSeg", 20, "Subcortical segmentation"),
+        ("Tessellate", 35, "Surface tessellation"),
+        ("SphericalMapping", 50, "Surface mapping"),
+        ("CorticalParcellation", 65, "Cortical parcellation"),
+        ("FreeSurfer recon-all completed", 80, "FreeSurfer complete"),
+        ("Running MELD Graph", 85, "MELD Graph started"),
+        ("feature.*complete", 90, "Feature extraction complete"),
+        ("cluster", 95, "Lesion clustering"),
+        ("MELD Graph completed successfully", 99, "MELD Graph complete"),
+    ],
+    "wf_freesurfer_longitudinal_full": [
+        ("STAGE 1.*Cross-sectional", 10, "Cross-sectional stage"),
+        ("SubCortSeg", 20, "Cross subcortical segmentation"),
+        ("CorticalParcellation", 35, "Cross cortical parcellation"),
+        ("STAGE 2.*Base template", 50, "Base template stage"),
+        ("recon-all -base", 60, "Building base template"),
+        ("STAGE 3.*Longitudinal", 70, "Longitudinal stage"),
+        ("recon-all -long", 80, "Longitudinal recon-all running"),
+        ("longitudinal processing complete", 90, "Longitudinal recon complete"),
+        ("Extracting longitudinal stats", 94, "Stats extraction started"),
+        ("Written summary", 98, "Stats summary written"),
+        ("Longitudinal stats extraction completed", 99, "Longitudinal workflow complete"),
+    ],
+    "wf_hs_detection_v1": [
+        ("Running FreeSurfer autorecon1", 10, "FreeSurfer volonly started"),
+        ("Talairach", 20, "Talairach registration"),
+        ("SkullStripping", 35, "Skull stripping complete"),
+        ("SubCortSeg", 55, "Subcortical segmentation"),
+        ("aseg.stats", 70, "Volume stats written"),
+        ("FreeSurfer VolOnly.*completed", 82, "Volumetric stage complete"),
+        ("neuroinsight_hs.postprocess", 88, "HS postprocess started"),
+        ("asymmetry", 93, "Asymmetry analysis"),
+        ("PDF.*report", 96, "Report generation"),
+        ("HS postprocess completed", 99, "HS workflow complete"),
+    ],
+    "hippo_subfields_t1": [
+        ("recon-all", 5, "FreeSurfer started"),
+        ("SkullStripping", 15, "Skull stripping"),
+        ("SubCortSeg", 25, "Subcortical segmentation"),
+        ("Tessellate", 40, "Surface tessellation"),
+        ("SphericalMapping", 55, "Surface mapping"),
+        ("CorticalParcellation", 65, "Parcellation"),
+        ("FreeSurfer recon-all completed", 80, "FreeSurfer complete"),
+        ("segmentHA_T1", 88, "SegmentHA T1 started"),
+        ("right.*amygdala", 95, "Amygdala segmentation"),
+        ("SegmentHA_T1 completed successfully", 99, "Hippo subfields complete"),
+    ],
+    "hippo_subfields_t2": [
+        ("recon-all", 5, "FreeSurfer started"),
+        ("SkullStripping", 15, "Skull stripping"),
+        ("SubCortSeg", 25, "Subcortical segmentation"),
+        ("Tessellate", 40, "Surface tessellation"),
+        ("SphericalMapping", 55, "Surface mapping"),
+        ("CorticalParcellation", 65, "Parcellation"),
+        ("FreeSurfer recon-all completed", 80, "FreeSurfer complete"),
+        ("segmentHA_T2", 88, "SegmentHA T2 started"),
+        ("Registering T2", 92, "T2 registration"),
+        ("right.*amygdala", 96, "Amygdala segmentation"),
+        ("SegmentHA_T2 completed successfully", 99, "Hippo subfields complete"),
+    ],
+}
+
 
 def get_workflow_step_weights(workflow_id: str, num_steps: int) -> List[float]:
     """Get step weights for a workflow, falling back to equal weights."""
@@ -587,6 +684,36 @@ def get_workflow_step_weights(workflow_id: str, num_steps: int) -> List[float]:
 def get_milestones(plugin_id: str) -> List[PhaseMilestone]:
     """Get phase milestones for a plugin, falling back to generic."""
     return MILESTONES.get(plugin_id, GENERIC)
+
+
+def get_workflow_milestones(workflow_id: str) -> List[WorkflowMilestone]:
+    """Get workflow-level stage checkpoints for stable progress tracking."""
+    return WORKFLOW_MILESTONES.get(workflow_id, [])
+
+
+def get_plugin_checkpoint_milestones(plugin_id: str, step: int = 5) -> List[PhaseMilestone]:
+    """Get plugin milestones quantized into coarse stage checkpoints.
+
+    This normalizes plugin progress into stable increments (default 5%),
+    while preserving marker ordering and monotonicity.
+    """
+    base = get_milestones(plugin_id)
+    if not base:
+        return []
+
+    qstep = max(1, int(step))
+    checkpoints: List[PhaseMilestone] = []
+    last_pct = 0
+
+    for marker, pct, label in base:
+        qpct = int(round(float(pct) / qstep) * qstep)
+        qpct = max(qstep, min(100, qpct))
+        if qpct <= last_pct:
+            continue
+        checkpoints.append((marker, qpct, label))
+        last_pct = qpct
+
+    return checkpoints
 
 
 def get_coverage_report() -> Dict[str, str]:
