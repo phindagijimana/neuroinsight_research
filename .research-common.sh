@@ -94,6 +94,22 @@ ensure_dirs() {
     mkdir -p "$LOG_DIR" "$PID_DIR" "$DATA_DIR"/{uploads,outputs}
 }
 
+enforce_secret_key_policy() {
+    # Production mode must not run with weak/default secret key values.
+    if [ "$MODE" != "production" ]; then
+        return 0
+    fi
+    local sk="${SECRET_KEY:-}"
+    local lower
+    lower=$(printf "%s" "$sk" | tr '[:upper:]' '[:lower:]')
+    if [ -z "$sk" ] || [ "${#sk}" -lt 32 ] || [[ "$lower" == *"changeme"* ]] || [[ "$lower" == *"dev-secret"* ]] || [[ "$lower" == *"insecure"* ]]; then
+        error "Insecure SECRET_KEY for production mode."
+        info "Set SECRET_KEY in .env to a random value with at least 32 characters."
+        info "Tip: python3 -c \"import secrets; print(secrets.token_urlsafe(48))\""
+        exit 1
+    fi
+}
+
 write_pid() {
     echo "$2" > "$PID_DIR/$1.pid"
 }
@@ -1043,8 +1059,12 @@ print(json.dumps(images))
 #  CLEAN (shared)
 # ==============================================================================
 cmd_clean() {
+    local mode="${1:-safe}"
+    if [ "$mode" = "--safe" ]; then mode="safe"; fi
+    if [ "$mode" = "--aggressive" ]; then mode="aggressive"; fi
+
     header
-    step "Cleaning up"
+    step "Cleaning up ($mode)"
 
     if [ -d "$LOG_DIR" ]; then
         local sz
@@ -1070,6 +1090,12 @@ cmd_clean() {
         success "Removed stale job containers"
     fi
 
+    if [ "$mode" = "aggressive" ]; then
+        info "Running aggressive Docker cleanup ..."
+        docker system prune -f >/dev/null 2>&1 || true
+        success "Docker system prune completed"
+    fi
+
     for f in neuroinsight_research.db neuroinsight_research.db-wal neuroinsight_research.db-shm; do
         [ -f "$f" ] && rm -f "$f" && success "Removed legacy SQLite file: $f"
     done
@@ -1077,6 +1103,75 @@ cmd_clean() {
     echo ""
     success "Cleanup complete"
     echo ""
+}
+
+# ==============================================================================
+#  AUTOSTART (user-level systemd)
+# ==============================================================================
+cmd_autostart() {
+    local sub="${1:-status}"
+    local user_dir="$HOME/.config/systemd/user"
+    local unit_file="$user_dir/neuroinsight-research.service"
+    local script_path="$SCRIPT_DIR/research"
+
+    case "$sub" in
+        enable)
+            header
+            step "Enabling autostart (systemd --user)"
+            if ! command -v systemctl >/dev/null 2>&1; then
+                error "systemctl is not available on this machine."
+                exit 1
+            fi
+            mkdir -p "$user_dir"
+            cat > "$unit_file" <<EOF
+[Unit]
+Description=NeuroInsight Research (local user service)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=$SCRIPT_DIR
+ExecStart=$script_path start
+ExecStop=$script_path stop
+TimeoutStartSec=0
+
+[Install]
+WantedBy=default.target
+EOF
+            systemctl --user daemon-reload
+            systemctl --user enable neuroinsight-research.service >/dev/null
+            success "Autostart enabled (user service)"
+            info "Start now: systemctl --user start neuroinsight-research.service"
+            info "Check status: systemctl --user status neuroinsight-research.service"
+            echo ""
+            ;;
+
+        disable)
+            header
+            step "Disabling autostart (systemd --user)"
+            systemctl --user disable neuroinsight-research.service >/dev/null 2>&1 || true
+            systemctl --user stop neuroinsight-research.service >/dev/null 2>&1 || true
+            rm -f "$unit_file"
+            systemctl --user daemon-reload >/dev/null 2>&1 || true
+            success "Autostart disabled"
+            echo ""
+            ;;
+
+        status)
+            if [ -f "$unit_file" ]; then
+                success "Autostart unit present: $unit_file"
+            else
+                info "Autostart unit not installed"
+            fi
+            systemctl --user status neuroinsight-research.service --no-pager 2>/dev/null || true
+            ;;
+
+        *)
+            echo "Usage: ./research autostart <enable|disable|status>"
+            ;;
+    esac
 }
 
 # ==============================================================================
@@ -1173,6 +1268,9 @@ preflight_checks() {
             warn "python3 not available — .env created with placeholder passwords"
         fi
     fi
+
+    # Production secret-key hard gate.
+    enforce_secret_key_policy
 
     # ── Hard gates (can't proceed without these) ──────────────────────────
     if ! command -v python3 &>/dev/null; then
@@ -1353,10 +1451,11 @@ cmd_help() {
     echo ""
     echo -e "  ${BOLD}Docker${NC}"
     echo "    pull [image|all|missing]  Pre-pull pipeline images"
-    echo "    clean                Remove logs, caches, stale containers"
+    echo "    clean [--safe|--aggressive]  Remove logs, caches, stale containers"
     echo ""
     echo -e "  ${BOLD}System${NC}"
     echo "    preflight [--json]   Run full pre-flight system check"
+    echo "    autostart <cmd>      Manage user-level systemd autostart"
     echo ""
     echo -e "  ${BOLD}Info${NC}"
     echo "    env                  Print resolved environment variables"
@@ -1750,6 +1849,7 @@ dispatch() {
         infra)      cmd_infra     "$@" ;;
         pull)       cmd_pull      "$@" ;;
         clean)      cmd_clean     "$@" ;;
+        autostart)  cmd_autostart "$@" ;;
         preflight)  cmd_preflight "$@" ;;
         env)        cmd_env       "$@" ;;
         version)    cmd_version   "$@" ;;
