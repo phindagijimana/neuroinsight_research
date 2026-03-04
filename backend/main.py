@@ -160,6 +160,14 @@ async def lifespan(app):
     except Exception as e:
         logger.warning("HPC auto-reconnect failed (will retry on first request): %s", e)
 
+    # Reconcile active SLURM jobs after restart so statuses do not remain stale.
+    try:
+        reconciled = _reconcile_active_slurm_jobs_on_startup()
+        if reconciled:
+            logger.info("Startup reconciliation updated %d active SLURM jobs", reconciled)
+    except Exception as e:
+        logger.warning("Startup SLURM reconciliation failed: %s", e)
+
     yield
 
     logger.info("Shutting down...")
@@ -1383,6 +1391,70 @@ _SLURM_STATUS_MAP = {
     "TIMEOUT": "failed", "NODE_FAIL": "failed",
     "OUT_OF_MEMORY": "failed", "PREEMPTED": "failed",
 }
+
+
+def _reconcile_active_slurm_jobs_on_startup() -> int:
+    """Refresh status for active SLURM jobs after backend restart.
+
+    This prevents long-lived 'running/pending' rows from staying stale when
+    the API process is restarted mid-job.
+    """
+    from backend.core.database import get_db_context
+
+    updated = 0
+    with get_db_context() as db:
+        active = (
+            db.query(Job)
+            .filter(
+                Job.deleted == False,  # noqa: E712
+                Job.backend_type == "slurm",
+                Job.status.in_(["pending", "running"]),
+                Job.backend_job_id.isnot(None),
+            )
+            .all()
+        )
+        if not active:
+            return 0
+
+        slurm_ids = [j.backend_job_id for j in active if j.backend_job_id]
+        if not slurm_ids:
+            return 0
+
+        statuses = _poll_slurm_status_batch(slurm_ids)
+        if not statuses:
+            return 0
+
+        now = datetime.utcnow()
+        for job in active:
+            new_status = statuses.get(job.backend_job_id)
+            if not new_status or new_status == job.status:
+                continue
+
+            job.status = new_status
+            if new_status in ("completed", "failed", "cancelled"):
+                job.completed_at = now
+                if new_status == "completed":
+                    job.progress = 100
+                    job.current_phase = "Completed"
+                    job.exit_code = 0
+                    job.error_message = None
+                elif new_status == "failed":
+                    if job.exit_code is None:
+                        job.exit_code = 1
+                    if not job.error_message:
+                        job.error_message = f"SLURM job {job.backend_job_id or 'unknown'} reported FAILED"
+                elif new_status == "cancelled":
+                    if job.exit_code is None:
+                        job.exit_code = 130
+                    if not job.error_message:
+                        job.error_message = f"SLURM job {job.backend_job_id or 'unknown'} was CANCELLED"
+            _slurm_progress_cache.pop(job.id, None)
+            _slurm_progress_state.pop(job.id, None)
+            updated += 1
+
+        if updated:
+            db.commit()
+    return updated
 
 
 def _poll_slurm_status_batch(slurm_job_ids: list[str]) -> dict[str, str]:

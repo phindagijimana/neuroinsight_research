@@ -94,6 +94,40 @@ ensure_dirs() {
     mkdir -p "$LOG_DIR" "$PID_DIR" "$DATA_DIR"/{uploads,outputs}
 }
 
+rotate_log_file() {
+    # rotate_log_file <path> [max_mb] [keep]
+    local log_path="$1"
+    local max_mb="${2:-50}"
+    local keep="${3:-5}"
+    [ -f "$log_path" ] || return 0
+
+    local max_bytes=$((max_mb * 1024 * 1024))
+    local size
+    size=$(wc -c < "$log_path" 2>/dev/null || echo 0)
+    [ "${size:-0}" -gt "$max_bytes" ] || return 0
+
+    local ts
+    ts=$(date +%Y%m%d-%H%M%S)
+    local rotated="${log_path}.${ts}"
+    mv "$log_path" "$rotated" 2>/dev/null || return 0
+    : > "$log_path"
+
+    # Keep only the newest N rotated files
+    local old
+    old=$(ls -1t "${log_path}".20* 2>/dev/null | awk "NR>${keep}")
+    if [ -n "$old" ]; then
+        echo "$old" | xargs rm -f 2>/dev/null || true
+    fi
+}
+
+rotate_runtime_logs() {
+    ensure_dirs
+    rotate_log_file "$LOG_DIR/backend.log" 50 5
+    rotate_log_file "$LOG_DIR/celery.log" 50 5
+    rotate_log_file "$LOG_DIR/frontend.log" 25 5
+    rotate_log_file "$LOG_DIR/alembic.log" 10 5
+}
+
 enforce_secret_key_policy() {
     # Production mode must not run with weak/default secret key values.
     if [ "$MODE" != "production" ]; then
@@ -919,6 +953,65 @@ cmd_logs() {
 }
 
 # ==============================================================================
+#  SUPPORT BUNDLE (shared)
+# ==============================================================================
+cmd_support_bundle() {
+    local out="${1:-support-bundle-$(date +%Y%m%d-%H%M%S).tar.gz}"
+    local tmp
+    tmp=$(mktemp -d 2>/dev/null || echo "/tmp/nir-support-$$")
+    mkdir -p "$tmp"
+    mkdir -p "$tmp/logs"
+
+    header
+    step "Collecting support bundle"
+
+    # Sanitized environment snapshot
+    if [ -f "$SCRIPT_DIR/.env" ]; then
+        python3 - "$SCRIPT_DIR/.env" "$tmp/env.sanitized" <<'PY'
+import re, sys, pathlib
+src = pathlib.Path(sys.argv[1]).read_text().splitlines()
+out = []
+for line in src:
+    if not line or line.lstrip().startswith("#") or "=" not in line:
+        out.append(line); continue
+    k, v = line.split("=", 1)
+    if any(s in k for s in ("PASSWORD", "SECRET", "KEY", "TOKEN")):
+        out.append(f"{k}=***REDACTED***")
+    else:
+        out.append(f"{k}={v}")
+pathlib.Path(sys.argv[2]).write_text("\n".join(out) + "\n")
+PY
+        success "Captured sanitized env"
+    fi
+
+    # Core command outputs
+    ./research status > "$tmp/status.txt" 2>&1 || true
+    ./research health > "$tmp/health.txt" 2>&1 || true
+    ./research db jobs > "$tmp/db-jobs.txt" 2>&1 || true
+    ./research preflight --json > "$tmp/preflight.json" 2>/dev/null || true
+
+    # Logs (tail to keep bundle small)
+    for f in backend.log celery.log frontend.log alembic.log; do
+        if [ -f "$LOG_DIR/$f" ]; then
+            tail -n 400 "$LOG_DIR/$f" > "$tmp/logs/$f" 2>/dev/null || true
+        fi
+    done
+
+    # Infra status
+    docker ps > "$tmp/docker-ps.txt" 2>&1 || true
+    docker system df > "$tmp/docker-df.txt" 2>&1 || true
+
+    tar -czf "$out" -C "$tmp" . 2>/dev/null || {
+        error "Failed to create support bundle"
+        rm -rf "$tmp" 2>/dev/null || true
+        return 1
+    }
+    rm -rf "$tmp" 2>/dev/null || true
+    success "Support bundle created: $out"
+    echo ""
+}
+
+# ==============================================================================
 #  DB (shared)
 # ==============================================================================
 cmd_db() {
@@ -1442,6 +1535,7 @@ cmd_help() {
     echo "    status               Service status & infrastructure health"
     echo "    health               Query /health API endpoint"
     echo "    logs [service]       Tail logs (backend|celery|frontend|all)"
+    echo "    support-bundle [out]  Export sanitized diagnostics bundle"
     echo ""
     echo -e "  ${BOLD}Database${NC}"
     echo "    db init              Create/verify tables"
@@ -1845,6 +1939,7 @@ dispatch() {
         status)     cmd_status    "$@" ;;
         health)     cmd_health    "$@" ;;
         logs)       cmd_logs      "$@" ;;
+        support-bundle) cmd_support_bundle "$@" ;;
         db)         cmd_db        "$@" ;;
         infra)      cmd_infra     "$@" ;;
         pull)       cmd_pull      "$@" ;;
