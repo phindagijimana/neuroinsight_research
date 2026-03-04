@@ -118,8 +118,9 @@ execution:
           participant \
           --participant-label {subject_id} \
           --smoothing {smoothing} \
-          --fd-threshold {fd_threshold} \
-          --low-pass {low_pass} \
+          -f {fd_threshold} \
+          --lower-bpf 0.01 \
+          --upper-bpf {low_pass} \
           --atlases {atlases} \
           --nthreads {threads} \
           --omp-nthreads {omp_nthreads} \
