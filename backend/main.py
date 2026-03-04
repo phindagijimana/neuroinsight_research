@@ -569,6 +569,19 @@ FS_LICENSE_PLUGINS = {
     "freesurfer_longitudinal", "freesurfer_longitudinal_stats",
 }
 
+_HEAVY_SUBMIT_PLUGIN_IDS = {
+    "fmriprep",
+    "xcpd",
+    "qsiprep",
+    "qsirecon",
+    "freesurfer_recon",
+    "freesurfer_autorecon_volonly",
+    "freesurfer_longitudinal",
+    "fastsurfer",
+    "meld_graph",
+}
+_MIN_SUBMIT_DISK_GB = 20
+
 XCPD_VALID_ATLASES = (
     "4S1056Parcels",
     "4S156Parcels",
@@ -676,6 +689,31 @@ def _normalize_submission_parameters_for_plugins(plugin_ids: List[str], params: 
     return normalized
 
 
+def _enforce_disk_guard_for_submission(plugin_ids: List[str], submission_label: str) -> None:
+    """Block heavy submissions when free disk is below safety threshold."""
+    if os.getenv("NIR_ALLOW_LOW_DISK_SUBMIT", "").lower() in {"1", "true", "yes"}:
+        return
+
+    if not any(pid in _HEAVY_SUBMIT_PLUGIN_IDS for pid in plugin_ids):
+        return
+
+    data_dir = Path(settings.data_dir)
+    probe_path = data_dir if data_dir.exists() else Path(".")
+    usage = shutil.disk_usage(str(probe_path))
+    free_gb = usage.free / (1024 ** 3)
+    total_gb = usage.total / (1024 ** 3)
+    if free_gb < _MIN_SUBMIT_DISK_GB:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Insufficient disk space for {submission_label}: "
+                f"{free_gb:.1f} GB free / {total_gb:.1f} GB total. "
+                f"Minimum required: {_MIN_SUBMIT_DISK_GB} GB free. "
+                "Free space and retry, or set NIR_ALLOW_LOW_DISK_SUBMIT=true to override."
+            ),
+        )
+
+
 @app.post("/api/plugins/{plugin_id}/submit")
 def submit_plugin_job(plugin_id: str, request: PluginJobSubmitRequest, db: Session = Depends(get_db)):
     """Submit a job that runs a single plugin."""
@@ -686,6 +724,7 @@ def submit_plugin_job(plugin_id: str, request: PluginJobSubmitRequest, db: Sessi
 
     # Check required licenses before submitting
     _check_licenses([plugin_id])
+    _enforce_disk_guard_for_submission([plugin_id], f"plugin '{plugin.name}'")
 
     # Resolve resources from plugin profile or direct dict
     res = plugin.resources if isinstance(plugin.resources, dict) else {}
@@ -776,6 +815,7 @@ def submit_workflow_job(workflow_id: str, request: WorkflowJobSubmitRequest, db:
 
     # Check required licenses for all plugins in the workflow
     _check_licenses(step_plugin_ids)
+    _enforce_disk_guard_for_submission(step_plugin_ids, f"workflow '{workflow.name}'")
 
     # Compute resources from all steps: sum time_hours, take max of mem/cpus
     first_plugin = pw_registry.get_plugin(workflow.steps[0].uses)
@@ -876,6 +916,7 @@ def submit_workflow_batch(workflow_id: str, request: WorkflowBatchSubmitRequest,
 
     step_plugin_ids = [step.uses for step in workflow.steps]
     _check_licenses(step_plugin_ids)
+    _enforce_disk_guard_for_submission(step_plugin_ids, f"workflow '{workflow.name}' (batch)")
 
     # Discover subjects -- via SSH for SLURM, local filesystem otherwise
     bids_dir = request.bids_dir
@@ -1291,6 +1332,19 @@ def get_jobs_progress(db: Session = Depends(get_db)):
                         phase = "Completed"
                         j.progress = 100
                         j.current_phase = "Completed"
+                        j.exit_code = 0
+                        if not j.error_message:
+                            j.error_message = None
+                    elif status == "failed":
+                        if not j.error_message:
+                            j.error_message = f"SLURM job {j.backend_job_id or 'unknown'} reported FAILED"
+                        if j.exit_code is None:
+                            j.exit_code = 1
+                    elif status == "cancelled":
+                        if not j.error_message:
+                            j.error_message = f"SLURM job {j.backend_job_id or 'unknown'} was CANCELLED"
+                        if j.exit_code is None:
+                            j.exit_code = 130
                     _slurm_progress_cache.pop(j.id, None)
                     _slurm_progress_state.pop(j.id, None)
                 try:
