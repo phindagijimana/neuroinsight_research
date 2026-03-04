@@ -70,8 +70,8 @@ const ViewerPage: React.FC<ViewerPageProps> = ({ selectedJobId, setSelectedJobId
   };
 
   const loadJobResults = async (jobId: string) => {
+    setError(null);
     try {
-      // Find volume and segmentation files from the real results API
       const [volData, segData] = await Promise.allSettled([
         apiService.getJobVolumes(jobId),
         apiService.getJobSegmentations(jobId),
@@ -79,10 +79,23 @@ const ViewerPage: React.FC<ViewerPageProps> = ({ selectedJobId, setSelectedJobId
 
       const baseUrl = apiService.getBaseUrl();
 
+      const volFailed = volData.status === 'rejected';
+      const volNotFound = volFailed && String(volData.reason).includes('404');
+
       if (volData.status === 'fulfilled' && volData.value.volumes.length > 0) {
         setImageUrl(`${baseUrl}${volData.value.volumes[0].path}`);
       } else {
         setImageUrl('');
+        if (volNotFound) {
+          const selectedJob = jobs.find(j => j.id === jobId);
+          const isRemote = selectedJob?.backend_type === 'slurm' || selectedJob?.backend_type === 'remote_docker';
+          if (isRemote) {
+            setError(
+              'Cannot access remote results — HPC connection may be lost. ' +
+              'Go to Jobs page and reconnect to the HPC, then try again.'
+            );
+          }
+        }
       }
 
       if (segData.status === 'fulfilled' && segData.value.segmentations.length > 0) {
