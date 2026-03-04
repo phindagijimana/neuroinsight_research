@@ -23,6 +23,7 @@ source "$SELF_DIR/.research-common.sh"
 cmd_start() {
     header
     ensure_dirs
+    rotate_runtime_logs
 
     preflight_checks
     cmd_stop --quiet 2>/dev/null || true

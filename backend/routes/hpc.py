@@ -18,6 +18,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/hpc", tags=["hpc"])
 
 
+def _ssh_error_hint(message: str) -> str:
+    """Return a user-actionable hint for common SSH failures."""
+    msg = (message or "").lower()
+    if "permission denied" in msg or "publickey" in msg:
+        return "SSH auth failed. Ensure your private key/agent is loaded and authorized on the HPC host."
+    if "timed out" in msg or "no route to host" in msg or "name or service not known" in msg:
+        return "Network/host check failed. Verify host, DNS/VPN, and SSH port."
+    if "unable to connect to port" in msg or "connection refused" in msg:
+        return "SSH port is unreachable. Verify ssh_port and tunnel/port-forward settings."
+    if "host key" in msg:
+        return "Host key verification failed. Check known_hosts or trust the host key manually."
+    return "Review SSH host/user/port and key-agent configuration, then retry."
+
+
 def _audit(event: str, **details):
     """Helper to record audit events."""
     try:
@@ -99,7 +113,7 @@ def ssh_connect(request: SSHConnectRequest):
     except SSHConnectionError as e:
         return SSHConnectResponse(
             connected=False,
-            message=str(e),
+            message=f"{e} Hint: {_ssh_error_hint(str(e))}",
             host=request.host,
             username=request.username,
         )
@@ -169,6 +183,68 @@ def hpc_health():
 
     # Fallback: basic SSH health check
     return ssh.health_check()
+
+
+@router.get("/diagnose")
+def hpc_diagnose():
+    """Run SSH/HPC diagnostics with actionable guidance."""
+    from backend.core.ssh_manager import get_ssh_manager, SSHConnectionError
+
+    ssh = get_ssh_manager()
+    info = ssh.connection_info
+    result = {
+        "connected": info["connected"],
+        "host": info.get("host"),
+        "username": info.get("username"),
+        "port": info.get("port"),
+        "message": "SSH connected" if info["connected"] else "SSH not connected",
+        "hint": "",
+    }
+
+    if info["connected"]:
+        return result
+
+    # Attempt reconnect if host/user are known.
+    if info.get("host") and info.get("username"):
+        try:
+            ssh.connect()
+            info = ssh.connection_info
+            result.update({
+                "connected": info["connected"],
+                "message": "Auto-reconnect successful",
+                "hint": "",
+            })
+            return result
+        except SSHConnectionError as e:
+            emsg = str(e)
+            result.update({
+                "connected": False,
+                "message": emsg,
+                "hint": _ssh_error_hint(emsg),
+            })
+            return result
+
+    # Fall back to persisted configuration diagnostics.
+    try:
+        from backend.core.hpc_config_store import load_hpc_config
+        cfg = load_hpc_config()
+        if cfg:
+            result["message"] = "No active SSH session; persisted HPC config is available"
+            result["hint"] = "Open HPC settings or call /api/hpc/connect to re-establish SSH."
+            result["persisted_config"] = {
+                "backend_type": cfg.get("backend_type"),
+                "ssh_host": cfg.get("ssh_host"),
+                "ssh_user": cfg.get("ssh_user"),
+                "ssh_port": cfg.get("ssh_port", 22),
+            }
+        else:
+            result["message"] = "No active SSH session and no persisted HPC config"
+            result["hint"] = "Connect first via /api/hpc/connect or backend switch."
+    except Exception as e:
+        result["message"] = f"Diagnostics error: {e}"
+        result["hint"] = "Retry diagnostics or check backend logs."
+
+    return result
 
 
 # ---------------------------------------------------------------------------
