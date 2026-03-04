@@ -82,8 +82,8 @@ parameters:
     description: "Low-pass filter frequency (Hz)"
   - name: atlases
     type: string
-    default: "Schaefer2018"
-    description: "Atlas(es) for parcellation"
+    default: "Glasser Gordon 4S256Parcels"
+    description: "Atlas(es) for parcellation (Glasser, Gordon, HCP, Tian, 4S156Parcels, 4S256Parcels, etc.)"
 
 resources:
   profiles:
