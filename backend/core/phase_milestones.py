@@ -283,30 +283,31 @@ FMRIPREP: List[PhaseMilestone] = [
     ("fMRIPrep started", 2, "Initializing fMRIPrep"),
 
     # Anatomical preprocessing (~60% of total due to FreeSurfer)
-    ("brain_extraction_wf", 5, "Brain extraction"),
-    ("anat_template_wf", 8, "Building anatomical template"),
+    # Use "Executing" prefix to avoid matching early "Setting-up" lines
+    ("Executing.*brain_extraction_wf", 5, "Brain extraction"),
+    ("Executing.*anat_template_wf", 8, "Building anatomical template"),
     ("Finished.*brain_mask", 12, "Brain mask complete"),
-    ("surface_recon_wf", 15, "Surface reconstruction started"),
-    ("autorecon_resume_wf", 18, "FreeSurfer autorecon"),
-    ("autorecon2_vol", 22, "FreeSurfer volume processing"),
+    ("Executing.*skull_strip_extern", 15, "Surface reconstruction started"),
+    ("Executing.*gcareg", 18, "FreeSurfer autorecon"),
+    ("Executing.*autorecon2_vol", 22, "FreeSurfer volume processing"),
     ("Finished.*autorecon2_vol", 30, "Volume processing complete"),
-    ("autorecon_surfs", 32, "FreeSurfer surface reconstruction"),
+    ("Executing.*autorecon_surfs", 32, "FreeSurfer surface reconstruction"),
     ("Finished.*autorecon_surfs", 50, "Surface reconstruction complete"),
-    ("register_template_wf", 55, "Template registration"),
+    ("Executing.*register_template_wf", 55, "Template registration"),
     ("Finished.*anat_norm", 58, "Anatomical normalization complete"),
 
     # BOLD preprocessing (~35% of total)
-    ("hmc_boldref_wf", 60, "BOLD reference & head motion"),
-    ("slice_timing_correction", 63, "Slice-timing correction"),
-    ("bold_reg_wf\\.coreg", 66, "BOLD-T1 coregistration"),
-    ("bold_std_wf\\.resample", 70, "BOLD resampling to standard"),
-    ("bold_confounds_wf", 75, "Confound estimation"),
-    ("Finished.*bold_confounds", 80, "Confounds complete"),
-    ("carpetplot", 83, "Generating carpet plot"),
+    ("Finished.*hmc_boldref", 60, "BOLD reference complete"),
+    ("Finished.*slice_timing_correction", 63, "Slice-timing correction complete"),
+    ("Executing.*bold_bold_trans_wf", 66, "BOLD transformation"),
+    ("Executing.*bold_confounds_wf\\.acompcor", 70, "Computing aCompCor confounds"),
+    ("Finished.*acompcor", 75, "Confound estimation"),
+    ("Finished.*bold_confounds_wf\\.concat", 80, "Confounds complete"),
+    ("Executing.*carpetplot", 83, "Generating carpet plot"),
 
     # Reports & completion (~5%)
-    ("ds_report", 88, "Writing reports"),
-    ("ds_bold_t1w", 92, "Writing BOLD derivatives"),
+    ("Finished.*ds_report", 88, "Writing reports"),
+    ("Finished.*ds_bold_t1w", 92, "Writing BOLD derivatives"),
     ("resource monitor", 95, "Finalizing"),
     ("fMRIPrep finished", 100, "Completed"),
 ]
