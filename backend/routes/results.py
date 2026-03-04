@@ -42,7 +42,14 @@ class _OutputLocation:
 
 
 def _get_ssh():
-    """Get a connected SSH manager, auto-reconnecting via the SLURM backend."""
+    """Get a connected SSH manager, auto-reconnecting if possible.
+
+    Tries in order:
+    1. Existing SLURM backend (calls _ensure_ssh which reconnects if configured)
+    2. Global SSH manager if already connected
+    3. Auto-reconnect from persisted HPC config
+    """
+    # 1. Try via SLURM backend
     try:
         from backend.execution import get_backend
         backend = get_backend()
@@ -52,6 +59,7 @@ def _get_ssh():
     except Exception as e:
         logger.debug("Could not get SSH via SLURM backend: %s", e)
 
+    # 2. Try global SSH manager
     try:
         from backend.core.ssh_manager import get_ssh_manager
         ssh = get_ssh_manager()
@@ -59,7 +67,71 @@ def _get_ssh():
             return ssh
     except Exception:
         pass
+
+    # 3. Auto-reconnect from persisted config
+    try:
+        from backend.core.hpc_config_store import load_hpc_config
+        cfg = load_hpc_config()
+        if cfg:
+            from backend.core.ssh_manager import get_ssh_manager, SSHConnectionError
+            ssh = get_ssh_manager()
+            if not ssh.is_connected:
+                ssh.configure(
+                    host=cfg["ssh_host"],
+                    username=cfg["ssh_user"],
+                    port=cfg.get("ssh_port", 22),
+                )
+                ssh.connect()
+                logger.info(
+                    "Auto-reconnected SSH to %s@%s:%s from persisted config",
+                    cfg["ssh_user"], cfg["ssh_host"], cfg.get("ssh_port", 22),
+                )
+
+                # Also restore the SLURM backend if needed
+                if cfg.get("backend_type") == "slurm":
+                    _restore_slurm_backend(cfg)
+
+                return ssh
+    except Exception as e:
+        logger.debug("Auto-reconnect from persisted config failed: %s", e)
+
     return None
+
+
+def _restore_slurm_backend(cfg: dict) -> None:
+    """Restore the SLURM backend from persisted config."""
+    try:
+        import os
+        import backend.execution as exec_module
+        from backend.execution.slurm_backend import SLURMBackend
+
+        current = getattr(exec_module, "_backend_instance", None)
+        if current and getattr(current, "backend_type", None) == "slurm":
+            return
+
+        modules_str = cfg.get("modules", "")
+        modules = [m.strip() for m in modules_str.split(",") if m.strip()] if modules_str else []
+
+        os.environ["BACKEND_TYPE"] = "slurm"
+        os.environ["HPC_HOST"] = cfg["ssh_host"]
+        os.environ["HPC_USER"] = cfg["ssh_user"]
+        os.environ["HPC_WORK_DIR"] = cfg.get("work_dir", "~")
+        os.environ["HPC_PARTITION"] = cfg.get("partition", "general")
+
+        backend = SLURMBackend(
+            ssh_host=cfg["ssh_host"],
+            ssh_user=cfg["ssh_user"],
+            ssh_port=cfg.get("ssh_port", 22),
+            work_dir=cfg.get("work_dir", "~"),
+            partition=cfg.get("partition", "general"),
+            account=cfg.get("account"),
+            qos=cfg.get("qos"),
+            modules=modules,
+        )
+        exec_module._backend_instance = backend
+        logger.info("SLURM backend restored from persisted config")
+    except Exception as e:
+        logger.warning("Could not restore SLURM backend: %s", e)
 
 
 def _resolve_output(job_id: str) -> _OutputLocation:

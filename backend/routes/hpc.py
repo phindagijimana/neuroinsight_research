@@ -263,6 +263,21 @@ def switch_backend(request: BackendSwitchRequest):
     except Exception as e:
         health = {"healthy": False, "message": str(e)}
 
+    # Persist config so the app can auto-reconnect after restart
+    if request.backend_type in ("remote_docker", "slurm"):
+        from backend.core.hpc_config_store import save_hpc_config
+        save_hpc_config(
+            backend_type=request.backend_type,
+            ssh_host=request.ssh_host,
+            ssh_user=request.ssh_user,
+            ssh_port=request.ssh_port,
+            work_dir=request.work_dir,
+            partition=request.partition,
+            account=request.account,
+            qos=request.qos,
+            modules=request.modules,
+        )
+
     _audit("backend_switched", backend_type=request.backend_type,
            host=request.ssh_host, user=request.ssh_user)
     return {
