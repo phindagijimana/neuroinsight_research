@@ -113,6 +113,70 @@ execution:
         mkdir -p /data/outputs/native/qsiprep
         mkdir -p /data/outputs/logs/qsiprep
         mkdir -p /data/outputs/work/qsiprep
+        mkdir -p /data/outputs/bundle/provenance
+
+        # Non-blocking metadata audit for provenance visibility.
+        AUDIT_FILE="/data/outputs/bundle/provenance/metadata_audit.txt"
+        SUBJECT_ID="{subject_id}"
+        {
+          echo "NeuroInsight metadata audit"
+          echo "pipeline: qsiprep"
+          echo "subject: sub-${SUBJECT_ID}"
+          echo "bids_dir: /data/inputs/bids_dir"
+          echo "timestamp_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo
+        } > "$AUDIT_FILE"
+
+        echo "status: WARN_AND_CONTINUE" >> "$AUDIT_FILE"
+        SUBJ_DIR="/data/inputs/bids_dir/sub-${SUBJECT_ID}"
+        if [ ! -d "$SUBJ_DIR" ]; then
+          echo "WARNING: subject directory missing: $SUBJ_DIR" >> "$AUDIT_FILE"
+        else
+          echo "[qsiprep_dwi_json_keys]" >> "$AUDIT_FILE"
+          DWI_JSON_COUNT=0
+          while IFS= read -r jf; do
+            [ -n "$jf" ] || continue
+            DWI_JSON_COUNT=$((DWI_JSON_COUNT + 1))
+            missing=""
+            for key in PhaseEncodingDirection TotalReadoutTime EchoTime; do
+              if ! grep -q "\"$key\"" "$jf"; then
+                missing="${missing}${key}, "
+              fi
+            done
+            if [ -z "$missing" ]; then
+              echo "- ${jf#/data/inputs/bids_dir/} :: OK" >> "$AUDIT_FILE"
+            else
+              echo "- ${jf#/data/inputs/bids_dir/} :: MISSING ${missing%, }" >> "$AUDIT_FILE"
+            fi
+          done < <(find "$SUBJ_DIR" -path "*/dwi/*_dwi.json" -type f 2>/dev/null | sort)
+          if [ "$DWI_JSON_COUNT" -eq 0 ]; then
+            echo "WARNING: no DWI JSON sidecars found" >> "$AUDIT_FILE"
+          fi
+          echo >> "$AUDIT_FILE"
+
+          echo "[qsiprep_gradient_tables]" >> "$AUDIT_FILE"
+          DWI_IMG_COUNT=0
+          while IFS= read -r nii; do
+            [ -n "$nii" ] || continue
+            DWI_IMG_COUNT=$((DWI_IMG_COUNT + 1))
+            stem="$nii"
+            stem="${stem%.nii.gz}"
+            stem="${stem%.nii}"
+            missing=""
+            [ -f "${stem}.bval" ] || missing="${missing}.bval, "
+            [ -f "${stem}.bvec" ] || missing="${missing}.bvec, "
+            if [ -z "$missing" ]; then
+              echo "- ${nii#/data/inputs/bids_dir/} :: OK" >> "$AUDIT_FILE"
+            else
+              echo "- ${nii#/data/inputs/bids_dir/} :: MISSING ${missing%, }" >> "$AUDIT_FILE"
+            fi
+          done < <(find "$SUBJ_DIR" -type f \( -path "*/dwi/*_dwi.nii.gz" -o -path "*/dwi/*_dwi.nii" \) 2>/dev/null | sort)
+          if [ "$DWI_IMG_COUNT" -eq 0 ]; then
+            echo "WARNING: no DWI image files found" >> "$AUDIT_FILE"
+          fi
+        fi
+        echo >> "$AUDIT_FILE"
+        echo "note: this audit is informational and does not block execution." >> "$AUDIT_FILE"
 
         QSIPREP_CMD="qsiprep /data/inputs/bids_dir /data/outputs/native/qsiprep participant"
         QSIPREP_CMD="$QSIPREP_CMD --work-dir /data/outputs/work/qsiprep"

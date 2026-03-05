@@ -1013,6 +1013,34 @@ async def get_provenance(job_id: str):
         logger.debug("Could not load provenance from DB for %s: %s",
                      job_id[:8], e)
 
+    metadata_audit = ""
+    metadata_audit_path = ""
+    audit_candidates = [
+        "bundle/provenance/metadata_audit.txt",
+        "bundle/metadata_audit.txt",
+    ]
+    if loc.is_remote:
+        ssh = _get_ssh()
+        if ssh and loc.remote_path:
+            for rel in audit_candidates:
+                candidate = f"{loc.remote_path}/{rel}"
+                try:
+                    metadata_audit = _remote_read_text(ssh, candidate)
+                    metadata_audit_path = rel
+                    break
+                except Exception:
+                    continue
+    elif loc.local_path:
+        for rel in audit_candidates:
+            p = loc.local_path / rel
+            if p.exists():
+                try:
+                    metadata_audit = p.read_text(errors="replace")
+                    metadata_audit_path = rel
+                    break
+                except Exception:
+                    continue
+
     return {
         "job_id": job_id,
         "container_image": spec_data.get("container_image"),
@@ -1024,6 +1052,8 @@ async def get_provenance(job_id: str):
         "input_hashes": input_hashes,
         "execution": job_info,
         "reproducibility_command": _build_repro_command(spec_data),
+        "metadata_audit": metadata_audit,
+        "metadata_audit_path": metadata_audit_path,
     }
 
 
