@@ -35,6 +35,8 @@ interface Provenance {
   input_hashes: Record<string, string>;
   execution: Record<string, unknown>;
   reproducibility_command: string;
+  metadata_audit?: string;
+  metadata_audit_path?: string;
 }
 
 const DashboardPage: React.FC<DashboardPageProps> = ({
@@ -465,6 +467,17 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                               <h4 className="text-sm font-semibold text-gray-700 mb-2">Reproduce Command</h4>
                               <pre className="text-xs bg-gray-900 text-green-400 rounded p-3 overflow-x-auto font-mono">
                                 {provenance.reproducibility_command}
+                              </pre>
+                            </div>
+                          )}
+                          {provenance.metadata_audit && (
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                                Metadata Audit
+                                {provenance.metadata_audit_path ? ` (${provenance.metadata_audit_path})` : ''}
+                              </h4>
+                              <pre className="text-xs bg-gray-50 rounded p-3 overflow-x-auto font-mono">
+                                {provenance.metadata_audit}
                               </pre>
                             </div>
                           )}

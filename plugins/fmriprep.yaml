@@ -122,6 +122,81 @@ execution:
         mkdir -p /data/outputs/native/fmriprep
         mkdir -p /data/outputs/logs/fmriprep
         mkdir -p /data/outputs/work/fmriprep
+        mkdir -p /data/outputs/bundle/provenance
+
+        # Non-blocking metadata audit for provenance visibility.
+        AUDIT_FILE="/data/outputs/bundle/provenance/metadata_audit.txt"
+        SUBJECT_ID="{subject_id}"
+        {
+          echo "NeuroInsight metadata audit"
+          echo "pipeline: fmriprep"
+          echo "subject: sub-${SUBJECT_ID}"
+          echo "bids_dir: /data/inputs/bids_dir"
+          echo "timestamp_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo
+        } > "$AUDIT_FILE"
+
+        echo "status: WARN_AND_CONTINUE" >> "$AUDIT_FILE"
+        SUBJ_DIR="/data/inputs/bids_dir/sub-${SUBJECT_ID}"
+        if [ ! -d "$SUBJ_DIR" ]; then
+          echo "WARNING: subject directory missing: $SUBJ_DIR" >> "$AUDIT_FILE"
+        else
+          echo "[fmriprep_critical_bold_keys]" >> "$AUDIT_FILE"
+          FUNC_COUNT=0
+          while IFS= read -r jf; do
+            [ -n "$jf" ] || continue
+            FUNC_COUNT=$((FUNC_COUNT + 1))
+            missing=""
+            for key in RepetitionTime SliceTiming PhaseEncodingDirection TotalReadoutTime EchoTime; do
+              if ! grep -q "\"$key\"" "$jf"; then
+                missing="${missing}${key}, "
+              fi
+            done
+            if [ -z "$missing" ]; then
+              echo "- ${jf#/data/inputs/bids_dir/} :: OK" >> "$AUDIT_FILE"
+            else
+              echo "- ${jf#/data/inputs/bids_dir/} :: MISSING ${missing%, }" >> "$AUDIT_FILE"
+            fi
+          done < <(find "$SUBJ_DIR" -path "*/func/*_bold.json" -type f 2>/dev/null | sort)
+          if [ "$FUNC_COUNT" -eq 0 ]; then
+            echo "WARNING: no BOLD sidecars found" >> "$AUDIT_FILE"
+          fi
+          echo >> "$AUDIT_FILE"
+
+          echo "[fmriprep_warn_bold_keys]" >> "$AUDIT_FILE"
+          while IFS= read -r jf; do
+            [ -n "$jf" ] || continue
+            if grep -q "\"TaskName\"" "$jf"; then
+              echo "- ${jf#/data/inputs/bids_dir/} :: TaskName present" >> "$AUDIT_FILE"
+            else
+              echo "- ${jf#/data/inputs/bids_dir/} :: WARNING missing TaskName" >> "$AUDIT_FILE"
+            fi
+          done < <(find "$SUBJ_DIR" -path "*/func/*_bold.json" -type f 2>/dev/null | sort)
+          echo >> "$AUDIT_FILE"
+
+          echo "[fmriprep_fieldmap_keys]" >> "$AUDIT_FILE"
+          FMAP_COUNT=0
+          while IFS= read -r jf; do
+            [ -n "$jf" ] || continue
+            FMAP_COUNT=$((FMAP_COUNT + 1))
+            missing=""
+            for key in IntendedFor PhaseEncodingDirection TotalReadoutTime EchoTime; do
+              if ! grep -q "\"$key\"" "$jf"; then
+                missing="${missing}${key}, "
+              fi
+            done
+            if [ -z "$missing" ]; then
+              echo "- ${jf#/data/inputs/bids_dir/} :: OK" >> "$AUDIT_FILE"
+            else
+              echo "- ${jf#/data/inputs/bids_dir/} :: MISSING ${missing%, }" >> "$AUDIT_FILE"
+            fi
+          done < <(find "$SUBJ_DIR" -path "*/fmap/*.json" -type f 2>/dev/null | sort)
+          if [ "$FMAP_COUNT" -eq 0 ]; then
+            echo "none" >> "$AUDIT_FILE"
+          fi
+        fi
+        echo >> "$AUDIT_FILE"
+        echo "note: this audit is informational and does not block execution." >> "$AUDIT_FILE"
 
         FMRIPREP_CMD="fmriprep /data/inputs/bids_dir /data/outputs/native/fmriprep participant"
         FMRIPREP_CMD="$FMRIPREP_CMD --work-dir /data/outputs/work/fmriprep"
