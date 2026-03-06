@@ -49,6 +49,8 @@ interface ActiveTransfer {
   destLabel: string;
 }
 
+const ACTIVE_TRANSFERS_STORAGE_KEY = 'neuroinsight.activeTransfers.v1';
+
 function TransferPage() {
   // Pane platforms
   const [leftPlatform, setLeftPlatform] = useState<PlatformType>('local');
@@ -72,14 +74,83 @@ function TransferPage() {
   const [recentTransfers, setRecentTransfers] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
 
-  useEffect(() => {
-    loadHistory();
+  const persistActiveTransfers = useCallback((items: ActiveTransfer[]) => {
+    try {
+      window.sessionStorage.setItem(
+        ACTIVE_TRANSFERS_STORAGE_KEY,
+        JSON.stringify(items),
+      );
+    } catch {
+      // Ignore storage errors.
+    }
   }, []);
+
+  const hydrateActiveTransfers = useCallback((): ActiveTransfer[] => {
+    try {
+      const raw = window.sessionStorage.getItem(ACTIVE_TRANSFERS_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter(
+          (t: any) =>
+            t &&
+            typeof t.id === 'string' &&
+            (t.direction === 'left-to-right' || t.direction === 'right-to-left') &&
+            typeof t.sourceLabel === 'string' &&
+            typeof t.destLabel === 'string',
+        )
+        .map((t: any) => ({
+          id: t.id,
+          direction: t.direction,
+          sourceLabel: t.sourceLabel,
+          destLabel: t.destLabel,
+        }));
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const mergeWithoutDuplicates = useCallback((base: ActiveTransfer[], extra: ActiveTransfer[]) => {
+    const byId = new Map<string, ActiveTransfer>();
+    [...base, ...extra].forEach((item) => byId.set(item.id, item));
+    return Array.from(byId.values());
+  }, []);
+
+  const enqueueTransfers = useCallback((incoming: ActiveTransfer[]) => {
+    setActiveTransfers((prev) => mergeWithoutDuplicates(prev, incoming));
+  }, [mergeWithoutDuplicates]);
+
+  useEffect(() => {
+    const restored = hydrateActiveTransfers();
+    if (restored.length > 0) {
+      setActiveTransfers(restored);
+    }
+    loadHistory();
+  }, [hydrateActiveTransfers]);
+
+  useEffect(() => {
+    persistActiveTransfers(activeTransfers);
+  }, [activeTransfers, persistActiveTransfers]);
 
   const loadHistory = async () => {
     try {
       const data = await apiService.getTransferHistory();
-      setRecentTransfers(data.transfers || []);
+      const transfers = data.transfers || [];
+      setRecentTransfers(transfers);
+
+      const running = transfers.filter((t: any) =>
+        ['pending', 'downloading', 'uploading', 'transferring'].includes(t.status),
+      );
+      if (running.length > 0) {
+        const recovered: ActiveTransfer[] = running.map((t: any) => ({
+          id: t.id,
+          direction: 'left-to-right',
+          sourceLabel: String(t.platform || 'Source'),
+          destLabel: 'Destination',
+        }));
+        enqueueTransfers(recovered);
+      }
     } catch { /* ignore */ }
   };
 
@@ -101,11 +172,11 @@ function TransferPage() {
       const result = await apiService.startTransferMove(
         leftPlatform,
         srcIsExternal ? '' : leftPath,
-        srcIsExternal ? fileIds : null,
+        fileIds,
         rightPlatform,
         rightPath,
       );
-      setActiveTransfers(prev => [...prev, {
+      enqueueTransfers([{
         id: result.transfer_id,
         direction: 'left-to-right',
         sourceLabel: PLATFORM_TABS.find(t => t.id === leftPlatform)?.label || leftPlatform,
@@ -115,7 +186,7 @@ function TransferPage() {
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message || 'Failed to start transfer');
     }
-  }, [leftSelected, leftPlatform, rightPlatform, leftPath, rightPath]);
+  }, [leftSelected, leftPlatform, rightPlatform, leftPath, rightPath, enqueueTransfers]);
 
   // Start transfer right -> left
   const transferRightToLeft = useCallback(async () => {
@@ -133,11 +204,11 @@ function TransferPage() {
       const result = await apiService.startTransferMove(
         rightPlatform,
         srcIsExternal ? '' : rightPath,
-        srcIsExternal ? fileIds : null,
+        fileIds,
         leftPlatform,
         leftPath,
       );
-      setActiveTransfers(prev => [...prev, {
+      enqueueTransfers([{
         id: result.transfer_id,
         direction: 'right-to-left',
         sourceLabel: PLATFORM_TABS.find(t => t.id === rightPlatform)?.label || rightPlatform,
@@ -147,7 +218,7 @@ function TransferPage() {
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message || 'Failed to start transfer');
     }
-  }, [rightSelected, leftPlatform, rightPlatform, leftPath, rightPath]);
+  }, [rightSelected, leftPlatform, rightPlatform, leftPath, rightPath, enqueueTransfers]);
 
   const handleTransferComplete = (transferId: string) => {
     setActiveTransfers(prev => prev.filter(t => t.id !== transferId));

@@ -684,12 +684,19 @@ const DocsPage: React.FC<DocsPageProps> = () => {
 
       {/* Quick Reference footer */}
       <div className="mt-4 flex-shrink-0 bg-gray-50 border border-gray-200 rounded-lg px-5 py-3">
-        <div className="flex gap-8 text-sm text-gray-500">
-          <div>
-            <span className="font-medium text-[#003d7a]">Plugin</span> — Wraps one neuroimaging tool in a Docker container. Encodes <em>execution</em>.
+        <h4 className="text-sm font-semibold text-gray-700 mb-2">Quick Reference</h4>
+        <div className="space-y-2 text-sm text-gray-600">
+          <div className="flex gap-2">
+            <span className="font-semibold text-[#003d7a] min-w-[72px]">Plugin:</span>
+            <span>Single neuroimaging tool running one container. Use for individual processing steps or full control.</span>
           </div>
-          <div>
-            <span className="font-medium text-[#003d7a]">Workflow</span> — Chains plugins into a reproducible sequence. Encodes <em>scientific intent</em>.
+          <div className="flex gap-2">
+            <span className="font-semibold text-[#003d7a] min-w-[72px]">Workflow:</span>
+            <span>Sequence of plugins working together. Manages dependencies automatically. Recommended for complete analysis pipelines.</span>
+          </div>
+          <div className="flex gap-2 pt-2 border-t border-gray-200">
+            <span className="font-semibold text-gray-500 min-w-[72px]">Note:</span>
+            <span className="text-gray-500 italic">Some utility plugins are hidden but work within workflows for specialized tasks.</span>
           </div>
         </div>
       </div>

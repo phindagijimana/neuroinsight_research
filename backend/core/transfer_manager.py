@@ -12,6 +12,7 @@ NIR acts as an orchestrator, keeping data off the NIR server when possible:
 
 import logging
 import os
+import shutil
 import tempfile
 import threading
 import uuid
@@ -21,6 +22,12 @@ from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+def _should_skip_work_path(path: str) -> bool:
+    """Skip transient workflow working directories from platform uploads."""
+    parts = [p for p in path.replace("\\", "/").split("/") if p]
+    return "work" in parts
 
 
 class TransferRecord:
@@ -451,15 +458,61 @@ class TransferManager:
 
     def _upload_from_local(self, record: TransferRecord, connector) -> None:
         """Local filesystem -> platform."""
-        for i, fpath in enumerate(record.file_ids):
+        local_files: list[str] = []
+        if record.file_ids:
+            for p in record.file_ids:
+                if os.path.isdir(p):
+                    if _should_skip_work_path(p):
+                        continue
+                    for root, dirs, filenames in os.walk(p):
+                        dirs[:] = [d for d in dirs if d != "work"]
+                        for fname in filenames:
+                            fpath = os.path.join(root, fname)
+                            if _should_skip_work_path(fpath):
+                                continue
+                            local_files.append(fpath)
+                elif os.path.isfile(p):
+                    if _should_skip_work_path(p):
+                        continue
+                    local_files.append(p)
+        else:
+            if os.path.isdir(record.source_path):
+                for root, dirs, filenames in os.walk(record.source_path):
+                    dirs[:] = [d for d in dirs if d != "work"]
+                    for fname in filenames:
+                        fpath = os.path.join(root, fname)
+                        if _should_skip_work_path(fpath):
+                            continue
+                        local_files.append(fpath)
+            elif os.path.isfile(record.source_path):
+                if _should_skip_work_path(record.source_path):
+                    record.source_path = ""
+                else:
+                    local_files.append(record.source_path)
+
+        record.total_files = len(local_files)
+        if record.total_files == 0:
+            raise RuntimeError(
+                f"No files found to upload from local path: {record.source_path}"
+            )
+
+        failed: list[str] = []
+        for i, fpath in enumerate(local_files):
             if record.cancelled:
                 return
             try:
                 connector.upload_file(fpath, record.dataset_id)
             except Exception as e:
                 logger.warning("Failed to upload %s: %s", fpath, e)
+                failed.append(f"{fpath}: {e}")
             record.files_completed = i + 1
             record.progress_percent = ((i + 1) / record.total_files) * 100
+
+        if failed:
+            preview = "; ".join(failed[:3])
+            raise RuntimeError(
+                f"Failed to upload {len(failed)}/{record.total_files} files. {preview}"
+            )
 
     def _upload_from_remote(self, record: TransferRecord, connector) -> None:
         """Remote/HPC -> platform.
@@ -473,37 +526,240 @@ class TransferManager:
 
         ssh = get_ssh_manager()
 
-        remote_files: list[str] = []
-        if record.source_path:
+        upload_items: list[tuple[str, str]] = []
+        remote_archives_to_cleanup: list[str] = []
+        if record.file_ids:
+            for p in record.file_ids:
+                try:
+                    if _should_skip_work_path(p):
+                        continue
+                    # Resolve path type robustly via shell test to avoid SFTP
+                    # "Failure" ambiguity for symlinks/permission edge cases.
+                    check_cmd = (
+                        f'if [ -d "{p}" ]; then echo dir; '
+                        f'elif [ -f "{p}" ]; then echo file; '
+                        f'else echo missing; fi'
+                    )
+                    exit_code, stdout, _stderr = ssh.execute(check_cmd, timeout=60)
+                    ptype = (stdout or "").strip() if exit_code == 0 else "missing"
+
+                    if ptype == "dir":
+                        # For selected folders, upload as archive to preserve
+                        # structure and avoid thousands of tiny API calls.
+                        token = uuid.uuid4().hex[:8]
+                        base = os.path.basename(p.rstrip("/")) or "folder"
+                        parent = os.path.dirname(p.rstrip("/")) or "/"
+                        remote_archive = f"/tmp/neuroinsight_sel_{token}_{base}.tar.gz"
+                        cmd = (
+                            f'tar -C "{parent}" -czf "{remote_archive}" '
+                            f'--exclude="{base}/work" "{base}"'
+                        )
+                        arc_code, _arc_out, arc_err = ssh.execute(cmd, timeout=1800)
+                        if arc_code != 0:
+                            raise RuntimeError(
+                                f"Failed to archive selected folder {p}: {arc_err[:200]}"
+                            )
+                        upload_items.append((remote_archive, f"{base}.tar.gz"))
+                        remote_archives_to_cleanup.append(remote_archive)
+                    elif ptype == "file":
+                        upload_items.append((p, os.path.basename(p)))
+                except Exception as e:
+                    logger.warning("Could not prepare selected path %s: %s", p, e)
+        elif record.source_path:
             try:
-                listing = ssh.list_dir(record.source_path)
-                remote_files = [
-                    f["path"] for f in listing if f.get("type") == "file"
-                ]
+                output_archives = self._build_output_archives_for_upload(ssh, record.source_path)
+                if output_archives:
+                    upload_items = output_archives
+                    remote_archives_to_cleanup = [p for p, _ in output_archives]
+                else:
+                    remote_files = self._collect_remote_files_recursive(ssh, record.source_path)
+                    upload_items = [(p, os.path.basename(p)) for p in remote_files]
             except Exception as e:
                 logger.debug(
                     "Could not list remote dir %s, treating as single file: %s",
                     record.source_path, e,
                 )
-                remote_files = [record.source_path]
+                upload_items = [(record.source_path, os.path.basename(record.source_path))]
 
-        record.total_files = len(remote_files)
+        record.total_files = len(upload_items)
+        if record.total_files == 0:
+            raise RuntimeError(
+                f"No files found to upload from remote path: {record.source_path}"
+            )
 
-        for i, remote_path in enumerate(remote_files):
-            if record.cancelled:
-                return
+        failed: list[str] = []
+        completed_units = 0
+        try:
+            for remote_path, upload_name in upload_items:
+                if record.cancelled:
+                    return
+                try:
+                    # Preserve upload_name in platform by staging with that filename.
+                    with tempfile.TemporaryDirectory(prefix="neuroinsight_up_") as tmpdir:
+                        local_tmp = os.path.join(tmpdir, upload_name)
+                        ssh.get_file(remote_path, local_tmp)
+                        uploaded_units = self._upload_with_fallbacks(
+                            connector, local_tmp, record.dataset_id
+                        )
+                        if uploaded_units > 1:
+                            record.total_files += (uploaded_units - 1)
+                        completed_units += uploaded_units
+                except Exception as e:
+                    logger.warning("Failed to upload %s: %s", remote_path, e)
+                    failed.append(f"{remote_path}: {e}")
+                    completed_units += 1
+
+                record.files_completed = completed_units
+                record.progress_percent = (
+                    completed_units / max(record.total_files, 1)
+                ) * 100
+
+            if failed:
+                preview = "; ".join(failed[:3])
+                raise RuntimeError(
+                    f"Failed to upload {len(failed)}/{record.total_files} files. {preview}"
+                )
+        finally:
+            for archive_path in remote_archives_to_cleanup:
+                try:
+                    ssh.execute(f'rm -f "{archive_path}"', timeout=60)
+                except Exception:
+                    pass
+
+    @staticmethod
+    def _collect_remote_files_recursive(ssh, root_path: str) -> list[str]:
+        """Return all files under remote root_path (recursive).
+
+        If root_path itself is a file, returns [root_path].
+        """
+        stack = [root_path]
+        files: list[str] = []
+
+        while stack:
+            current = stack.pop()
+            listing = ssh.list_dir(current)
+            if not listing:
+                continue
+            for entry in listing:
+                entry_type = entry.get("type")
+                entry_path = entry.get("path")
+                if not entry_path:
+                    continue
+                if entry_type == "directory":
+                    if entry.get("name") == "work":
+                        continue
+                    stack.append(entry_path)
+                elif entry_type == "file":
+                    if _should_skip_work_path(entry_path):
+                        continue
+                    files.append(entry_path)
+
+        return files
+
+    @staticmethod
+    def _build_output_archives_for_upload(
+        ssh, source_path: str
+    ) -> list[tuple[str, str]]:
+        """Build bundle/native/work archives when source_path is outputs directory."""
+        preferred_dirs = ("bundle", "native")
+        listing = ssh.list_dir(source_path)
+        if not listing:
+            return []
+
+        present = {
+            entry.get("name")
+            for entry in listing
+            if entry.get("type") == "directory" and entry.get("name") in preferred_dirs
+        }
+        if not present:
+            return []
+
+        token = uuid.uuid4().hex[:8]
+        archives: list[tuple[str, str]] = []
+        for folder in preferred_dirs:
+            if folder not in present:
+                continue
+            remote_archive = f"/tmp/neuroinsight_{token}_{folder}.tar.gz"
+            cmd = (
+                f'tar -C "{source_path}" -czf "{remote_archive}" "{folder}"'
+            )
+            exit_code, _stdout, stderr = ssh.execute(cmd, timeout=1800)
+            if exit_code != 0:
+                raise RuntimeError(
+                    f"Failed to archive {folder} for upload: {stderr[:200]}"
+                )
+            archives.append((remote_archive, f"{folder}.tar.gz"))
+
+        return archives
+
+    @staticmethod
+    def _upload_with_fallbacks(connector, local_path: str, dataset_id: str) -> int:
+        """Upload file with retries for common Pennsieve API limits.
+
+        Returns number of uploaded units (1 for normal upload, N for split parts).
+        """
+        try:
+            TransferManager._upload_with_405_retry(connector, local_path, dataset_id)
+            return 1
+        except Exception as first_err:
+            err_text = str(first_err)
+
+            # 413 is payload too large; split into 100 MB chunks and upload parts.
+            if " 413" in err_text or "413 " in err_text:
+                parts = TransferManager._split_file(local_path, 100 * 1024 * 1024)
+                try:
+                    for part in parts:
+                        TransferManager._upload_with_405_retry(connector, part, dataset_id)
+                    return len(parts)
+                finally:
+                    for part in parts:
+                        try:
+                            os.remove(part)
+                        except Exception:
+                            pass
+
+            raise
+
+    @staticmethod
+    def _split_file(local_path: str, chunk_bytes: int) -> list[str]:
+        """Split local_path into numbered part files and return their paths."""
+        part_paths: list[str] = []
+        part_idx = 1
+        token = uuid.uuid4().hex[:8]
+        with open(local_path, "rb") as src:
+            while True:
+                chunk = src.read(chunk_bytes)
+                if not chunk:
+                    break
+                part_path = f"{local_path}.{token}.part{part_idx:03d}"
+                with open(part_path, "wb") as dst:
+                    dst.write(chunk)
+                part_paths.append(part_path)
+                part_idx += 1
+        return part_paths
+
+    @staticmethod
+    def _upload_with_405_retry(connector, local_path: str, dataset_id: str) -> None:
+        """Upload file and retry once with unique name on HTTP 405."""
+        try:
+            connector.upload_file(local_path, dataset_id)
+            return
+        except Exception as e:
+            err_text = str(e)
+            if " 405" not in err_text and "405 " not in err_text:
+                raise
+
+        parent = os.path.dirname(local_path)
+        stem, ext = os.path.splitext(os.path.basename(local_path))
+        unique_path = os.path.join(parent, f"{stem}_{uuid.uuid4().hex[:8]}{ext}")
+        shutil.copy2(local_path, unique_path)
+        try:
+            connector.upload_file(unique_path, dataset_id)
+        finally:
             try:
-                fname = os.path.basename(remote_path)
-                with tempfile.NamedTemporaryFile(
-                    prefix="neuroinsight_up_", suffix=f"_{fname}", delete=True
-                ) as tmp:
-                    ssh.get_file(remote_path, tmp.name)
-                    connector.upload_file(tmp.name, record.dataset_id)
-            except Exception as e:
-                logger.warning("Failed to upload %s: %s", remote_path, e)
-
-            record.files_completed = i + 1
-            record.progress_percent = ((i + 1) / max(record.total_files, 1)) * 100
+                os.remove(unique_path)
+            except Exception:
+                pass
 
     # -------------------------------------------------- generic move logic
 

@@ -58,6 +58,12 @@ export const TransferProgress: React.FC<TransferProgressProps> = ({
       setStatus(data);
       if (data.error) setError(data.error);
     } catch (err: any) {
+      if (err?.response?.status === 404) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        setError('Transfer no longer available (likely backend restart).');
+        if (onCancel) onCancel();
+        return;
+      }
       setError(err.message || 'Failed to get transfer progress');
     }
   };

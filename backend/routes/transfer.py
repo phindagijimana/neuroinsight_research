@@ -117,6 +117,12 @@ def start_move(request: MoveRequest):
         raise HTTPException(400, f"Invalid dest_type: {request.dest_type}")
     if request.source_type == request.dest_type:
         raise HTTPException(400, "Source and destination cannot be the same")
+    if request.dest_type == "pennsieve":
+        if not request.dest_path.startswith("N:dataset:"):
+            raise HTTPException(
+                400,
+                "For Pennsieve destination, dest_path must be a dataset ID like N:dataset:<uuid>",
+            )
 
     from backend.core.transfer_manager import get_transfer_manager
 
