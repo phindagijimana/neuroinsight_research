@@ -45,8 +45,11 @@ ALLOWED_IMAGE_PREFIXES = (
     "pennlinc/qsirecon",
     "nipy/heudiconv",
     "meldproject/meld_graph",
+    "phindagijimana321/",
+    "ivansanchezfernandez/",
     "nipreps/mriqc",
     "neuroinsight/",
+    "python",
     "bids/",
 )
 
@@ -724,16 +727,14 @@ def _run_single_container(
 
     is_meld = "meld_graph" in image
     meld_data_dir = Path(settings.data_dir) / "meld_data"
-    if is_meld and meld_data_dir.exists():
-        if (meld_data_dir / "meld_params").is_dir():
-            volumes[str(meld_data_dir / "meld_params")] = {
-                "bind": "/data/meld_params", "mode": "ro",
-            }
-        if (meld_data_dir / "models").is_dir():
-            volumes[str(meld_data_dir / "models")] = {
-                "bind": "/data/models", "mode": "ro",
-            }
-        logger.info("Mounted cached MELD data from %s", meld_data_dir)
+    if is_meld:
+        meld_params_dir = meld_data_dir / "meld_params"
+        meld_models_dir = meld_data_dir / "models"
+        meld_params_dir.mkdir(parents=True, exist_ok=True)
+        meld_models_dir.mkdir(parents=True, exist_ok=True)
+        volumes[str(meld_params_dir)] = {"bind": "/data/meld_params", "mode": "rw"}
+        volumes[str(meld_models_dir)] = {"bind": "/data/models", "mode": "rw"}
+        logger.info("Mounted writable MELD cache dirs from %s", meld_data_dir)
 
     device_requests = []
     if gpu_requested:

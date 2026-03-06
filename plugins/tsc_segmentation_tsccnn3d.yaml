@@ -1,0 +1,122 @@
+# Plugin: TSC Segmentation (TSCCNN3D)
+id: tsc_segmentation_tsccnn3d
+name: "TSC Segmentation (TSCCNN3D)"
+version: "1.0.0"
+type: plugin
+domain: epilepsy
+
+visibility:
+  user_selectable: false
+  ui_category: utility
+  ui_label: "TSC Segmentation (hidden)"
+
+description: >
+  Performs tuber segmentation and tuber burden quantification using TSCCNN3D
+  and writes segmentation outputs plus summary metrics.
+
+authors:
+  - "NeuroInsight Research Team"
+
+references:
+  - "Sanchez Fernandez I, et al. Epilepsia 2025. doi:10.1111/epi.70007"
+  - "PubMed: https://pubmed.ncbi.nlm.nih.gov/41258699/"
+
+container:
+  runtime: docker
+  image: "ivansanchezfernandez/segment_tubers_and_quantify_tuber_burden_with_tsccnn3d_dropout"
+  digest: ""
+
+inputs:
+  required:
+    - key: tsc_registration_ants
+      type: directory
+      description: "MNI-registered outputs from tsc_registration_ants"
+  optional:
+    - key: subject_id
+      type: string
+      default: "subject"
+
+input_format:
+  format_name: "Registered TSC MRI Folder"
+  description: "MNI-registered images for TSCCNN3D tuber segmentation."
+  notes:
+    - "Runs TSCCNN3D segmentation and quantifies tuber burden."
+    - "GPU profile can be used when available."
+  file_types:
+    - ".nii.gz or .nii"
+
+parameters: []
+
+resources:
+  profiles:
+    default:
+      cpus: 8
+      mem_gb: 24
+      time_hours: 3
+      gpus: 0
+    gpu:
+      cpus: 8
+      mem_gb: 24
+      time_hours: 2
+      gpus: 1
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/tsc_segmentation"
+    logs_dir: "{run_root}/logs/tsc_segmentation"
+  stages:
+    - id: segment_tubers
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -euo pipefail
+
+        IN="/data/inputs/tsc_registration_ants"
+        OUT="/data/outputs/native/tsc_segmentation"
+        BUNDLE="/data/outputs/bundle"
+        mkdir -p "$OUT" "$BUNDLE/metrics" "$BUNDLE/qc" "$BUNDLE/volumes"
+
+        ln -sfn "$IN" /input
+        ln -sfn "$OUT" /output
+
+        if command -v conda >/dev/null 2>&1 && [ -f "/app/iterative_loop.py" ]; then
+          cd /app
+          conda run --no-capture-output --name app python -u iterative_loop.py
+        elif [ -f "/app/iterative_loop.py" ]; then
+          cd /app
+          python -u iterative_loop.py
+        else
+          echo "ERROR: TSCCNN3D iterative_loop.py not found in container." >&2
+          exit 1
+        fi
+
+        # Standardize key outputs into bundle where possible.
+        find "$OUT" -type f -name "*segmentation*.nii.gz" -exec cp -f {} "$BUNDLE/volumes/" \; 2>/dev/null || true
+        find "$OUT" -type f -name "*volume_results*.txt" -exec cp -f {} "$BUNDLE/metrics/volume_results.txt" \; 2>/dev/null || true
+
+        echo "TSC_STAGE:SEGMENTATION_DONE"
+
+native_outputs:
+  preserved: true
+  layout: "native/tsc_segmentation/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  extraction:
+    volumes:
+      - from: "{native_root}/*segmentation*.nii.gz"
+        to: "{bundle.root}/volumes/"
+        method: copy
+    metrics:
+      - from: "{native_root}/*volume_results*.txt"
+        to: "{bundle.root}/metrics/volume_results.txt"
+        method: copy
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: false
+  record_inputs_hashes: true

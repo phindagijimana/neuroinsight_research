@@ -574,6 +574,16 @@ WORKFLOW_STEP_WEIGHTS: Dict[str, List[float]] = {
 
     # Hippocampal Subfields T1+T2: freesurfer_recon (~6h) + segmentha_t2 (~40min)
     "hippo_subfields_t2": [0.90, 0.10],
+
+    # Tuberous Sclerosis Detection weighted phases: 5,10,15,20,25
+    # Normalized to sum 1.0 for step-scaling fallback logic.
+    "tuberous_sclerosis_detection": [
+        0.0666666667,  # 5/75
+        0.1333333333,  # 10/75
+        0.2000000000,  # 15/75
+        0.2666666667,  # 20/75
+        0.3333333333,  # 25/75
+    ],
 }
 
 # Workflow-level checkpoints (global percentages across whole workflow).
@@ -619,6 +629,13 @@ WORKFLOW_MILESTONES: Dict[str, List[WorkflowMilestone]] = {
         ("feature.*complete", 90, "Feature extraction complete"),
         ("cluster", 95, "Lesion clustering"),
         ("MELD Graph completed successfully", 99, "MELD Graph complete"),
+    ],
+    "tuberous_sclerosis_detection": [
+        ("TSC_STAGE:DATA_PREP_DONE", 5, "TSC data preparation complete"),
+        ("TSC_STAGE:SKULL_STRIP_DONE", 15, "Skull stripping complete"),
+        ("TSC_STAGE:T2_COMBINE_DONE", 30, "T2 combination complete"),
+        ("TSC_STAGE:REGISTRATION_DONE", 50, "MNI registration complete"),
+        ("TSC_STAGE:SEGMENTATION_DONE", 75, "Tuber segmentation complete"),
     ],
     "wf_freesurfer_longitudinal_full": [
         ("STAGE 1.*Cross-sectional", 10, "Cross-sectional stage"),

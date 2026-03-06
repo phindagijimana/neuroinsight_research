@@ -1,0 +1,133 @@
+# Plugin: TSC T2 Combination (NiftyMIC)
+id: tsc_t2_combine_niftymic
+name: "TSC T2 Combine (NiftyMIC)"
+version: "1.0.0"
+type: plugin
+domain: epilepsy
+
+visibility:
+  user_selectable: false
+  ui_category: utility
+  ui_label: "TSC T2 Combine (hidden)"
+
+description: >
+  Performs T2 super-resolution combination when both axial and coronal T2 are
+  available; otherwise falls back to passing through a single T2 image.
+
+authors:
+  - "NeuroInsight Research Team"
+
+references:
+  - "Ebner M, et al. NiftyMIC. NeuroImage 2020."
+
+container:
+  runtime: docker
+  image: "ivansanchezfernandez/combine_t2_files_with_niftymic"
+  digest: ""
+
+inputs:
+  required:
+    - key: tsc_skull_strip_synthstrip
+      type: directory
+      description: "Skull-stripped outputs from tsc_skull_strip_synthstrip"
+  optional:
+    - key: subject_id
+      type: string
+      default: "subject"
+
+input_format:
+  format_name: "Skull-Stripped T2 Inputs"
+  description: "Skull-stripped outputs containing one or more T2 images."
+  notes:
+    - "Uses NiftyMIC when both axial and coronal T2 are present."
+    - "Falls back to a single T2 passthrough when only one T2 is available."
+  file_types:
+    - ".nii.gz or .nii"
+
+parameters: []
+
+resources:
+  profiles:
+    default:
+      cpus: 4
+      mem_gb: 12
+      time_hours: 2
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/tsc_t2_combine"
+    logs_dir: "{run_root}/logs/tsc_t2_combine"
+  stages:
+    - id: t2_combine
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -euo pipefail
+
+        IN="/data/inputs/tsc_skull_strip_synthstrip"
+        MASKS="$IN/masks"
+        OUT="/data/outputs/native/tsc_t2_combine"
+        TMP="$OUT/_tmp_combined"
+        mkdir -p "$OUT" "$TMP"
+
+        if ! command -v niftymic_reconstruct_volume >/dev/null 2>&1; then
+          echo "ERROR: niftymic_reconstruct_volume not found in container." >&2
+          exit 1
+        fi
+
+        # Preserve non-T2 files for downstream stages.
+        for f in "$IN"/*.nii "$IN"/*.nii.gz; do
+          [ -e "$f" ] || continue
+          b="$(basename "$f")"
+          if [[ "$b" != *_T2_* ]]; then
+            cp -f "$f" "$OUT/$b"
+          fi
+        done
+
+        mapfile -t patients < <(for f in "$IN"/*.nii "$IN"/*.nii.gz; do [ -e "$f" ] || continue; basename "$f" | awk -F'_' '{print $1}'; done | sort -u)
+        for patient in "${patients[@]}"; do
+          mapfile -t t2_files < <(ls "$IN"/"${patient}"*_T2_* 2>/dev/null || true)
+          if [ ${#t2_files[@]} -ge 2 ]; then
+            mask_files=()
+            for t2 in "${t2_files[@]}"; do
+              b="$(basename "$t2")"
+              if [[ "$b" == *.nii.gz ]]; then
+                stem="${b%%.*}"
+              else
+                stem="${b%.*}"
+              fi
+              mask_files+=("$MASKS/${stem}_mask.nii.gz")
+            done
+            niftymic_reconstruct_volume \
+              --filenames "${t2_files[@]}" \
+              --filenames-masks "${mask_files[@]}" \
+              --output "$TMP/${patient}_T2_skull_stripped.nii.gz"
+            cp -f "$TMP/${patient}_T2_skull_stripped.nii.gz" "$OUT/${patient}_T2_skull_stripped.nii.gz"
+          elif [ ${#t2_files[@]} -eq 1 ]; then
+            cp -f "${t2_files[0]}" "$OUT/$(basename "${t2_files[0]}")"
+          fi
+        done
+
+        echo "TSC_STAGE:T2_COMBINE_DONE"
+
+native_outputs:
+  preserved: true
+  layout: "native/tsc_t2_combine/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  extraction:
+    volumes:
+      - from: "{native_root}/*"
+        to: "{bundle.root}/volumes/tsc_t2_combine/"
+        method: copy
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: false
+  record_inputs_hashes: true
