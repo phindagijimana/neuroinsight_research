@@ -166,6 +166,132 @@ class SLURMBackend(ExecutionBackend):
         except SSHConnectionError as e:
             raise BackendUnavailableError(f"SSH command failed: {e}")
 
+    def _remote_path_exists(self, path: str) -> bool:
+        """Check whether a path exists on the HPC host."""
+        out = self._ssh_exec(f'test -e "{path}" && echo yes || echo no', check=False, timeout=20)
+        return "yes" in out
+
+    def _remote_dir_nonempty(self, path: str) -> bool:
+        """Check whether a directory exists and is non-empty on the HPC host."""
+        out = self._ssh_exec(
+            f'test -d "{path}" && ls -A "{path}" 2>/dev/null | head -1 || true',
+            check=False,
+            timeout=20,
+        )
+        return bool((out or "").strip())
+
+    def _require_meld_assets_on_hpc(self, meld_params_dir: str, meld_models_dir: str) -> None:
+        """Fail fast unless required MELD cache assets are present on HPC."""
+        required_files = [
+            f"{meld_params_dir}/fsaverage_sym/surf/lh.inflated",
+            f"{meld_params_dir}/fsaverage_sym/surf/rh.inflated",
+        ]
+        missing = [p for p in required_files if not self._remote_path_exists(p)]
+        if missing:
+            raise ExecutionError(
+                "Missing required MELD cache assets on HPC. "
+                "Pre-stage MELD params before submitting focal detection.\n"
+                f"Expected files: {', '.join(missing)}"
+            )
+        if not self._remote_dir_nonempty(meld_models_dir):
+            raise ExecutionError(
+                "Missing required MELD model cache on HPC. "
+                "Pre-stage models under: "
+                f"{meld_models_dir}"
+            )
+
+    def _resolve_meld_cache_dirs_on_hpc(self) -> tuple[str, str]:
+        """Resolve MELD cache location on HPC.
+
+        Strategy:
+        1) Reuse valid cache if present on HPC.
+        2) If local cache exists, sync once to HPC and reuse it.
+        3) Otherwise create empty cache dirs on HPC and let the MELD plugin
+           bootstrap data on first run.
+        """
+        candidate_roots = [
+            f"{self.work_dir}/meld_data/meld_data",
+            f"{self.work_dir}/meld_data",
+        ]
+        for root in candidate_roots:
+            params_dir = f"{root}/meld_params"
+            models_dir = f"{root}/models"
+            try:
+                self._require_meld_assets_on_hpc(params_dir, models_dir)
+                return params_dir, models_dir
+            except ExecutionError:
+                continue
+
+        # Auto-stage from local cache when available.
+        local_root = self._find_local_meld_cache_root()
+        if local_root:
+            target_root = candidate_roots[0]
+            logger.info(
+                "MELD cache missing on HPC; auto-staging from local %s -> %s",
+                local_root,
+                target_root,
+            )
+            self._sync_local_meld_cache_to_hpc(local_root, target_root)
+            staged_params = f"{target_root}/meld_params"
+            staged_models = f"{target_root}/models"
+            self._require_meld_assets_on_hpc(staged_params, staged_models)
+            logger.info("MELD cache auto-staging completed")
+            return staged_params, staged_models
+
+        # No valid cache found anywhere; create writable dirs for first-run
+        # bootstrap inside the MELD plugin container.
+        target_root = candidate_roots[0]
+        params_dir = f"{target_root}/meld_params"
+        models_dir = f"{target_root}/models"
+        self._ssh_exec(f'mkdir -p "{params_dir}" "{models_dir}"', check=False, timeout=30)
+        logger.warning(
+            "MELD cache not found on HPC or local host; created empty cache dirs "
+            "for first-run bootstrap at %s",
+            target_root,
+        )
+        return params_dir, models_dir
+
+    @staticmethod
+    def _local_meld_cache_valid(root: Path) -> bool:
+        required = [
+            root / "meld_params" / "fsaverage_sym" / "surf" / "lh.inflated",
+            root / "meld_params" / "fsaverage_sym" / "surf" / "rh.inflated",
+        ]
+        if not all(p.is_file() for p in required):
+            return False
+        models_dir = root / "models"
+        if not models_dir.is_dir():
+            return False
+        try:
+            return any(models_dir.iterdir())
+        except Exception:
+            return False
+
+    def _find_local_meld_cache_root(self) -> Optional[Path]:
+        data_dir = Path(os.environ.get("DATA_DIR", "./data"))
+        candidates = [
+            data_dir / "meld_data" / "meld_data",
+            data_dir / "meld_data",
+        ]
+        for root in candidates:
+            if self._local_meld_cache_valid(root):
+                return root
+        return None
+
+    def _sync_local_meld_cache_to_hpc(self, local_root: Path, remote_root: str) -> None:
+        """Upload local MELD cache tree to HPC destination root."""
+        self._ssh_exec(f'mkdir -p "{remote_root}"', check=True, timeout=30)
+        for current_root, _, files in os.walk(local_root):
+            current_path = Path(current_root)
+            rel_dir = current_path.relative_to(local_root).as_posix()
+            if rel_dir != ".":
+                self._ssh_exec(f'mkdir -p "{remote_root}/{rel_dir}"', check=False, timeout=20)
+            for fname in files:
+                src = current_path / fname
+                rel_file = src.relative_to(local_root).as_posix()
+                dst = f"{remote_root}/{rel_file}"
+                self._ssh.put_file(str(src), dst)
+
     # ------------------------------------------------------------------
     # ExecutionBackend interface
     # ------------------------------------------------------------------
@@ -1366,27 +1492,12 @@ class SLURMBackend(ExecutionBackend):
                 host_path = f"{job_dir}/work/{host_sub}"
                 lines.append(f"mkdir -p {host_path}")
                 bind_mounts.append(f"{host_path}:{container_sub}:rw")
-            # MELD data (params + models) downloaded via prepare_classifier.py
-            meld_data_dir = f"{self.work_dir}/meld_data/meld_data"
-            lines.append(f'if [ -d "{meld_data_dir}/meld_params" ]; then')
-            lines.append(f'  echo "Using cached MELD data from {meld_data_dir}"')
-            lines.append(f'fi')
-            meld_params_dir = f"{meld_data_dir}/meld_params"
-            meld_models_dir = f"{meld_data_dir}/models"
-            if os.path.isdir(meld_params_dir):
-                bind_mounts.append(f"{meld_params_dir}:/data/meld_params:ro")
-            else:
-                logger.warning(
-                    "MELD params cache not found on HPC (%s); container will download params.",
-                    meld_params_dir,
-                )
-            if os.path.isdir(meld_models_dir):
-                bind_mounts.append(f"{meld_models_dir}:/data/models:ro")
-            else:
-                logger.warning(
-                    "MELD models cache not found on HPC (%s); container will download models.",
-                    meld_models_dir,
-                )
+            # On-submit auto-prepare mode:
+            # always mount writable MELD cache paths. The plugin will prepare
+            # cache data on first run when missing.
+            meld_params_dir, meld_models_dir = self._resolve_meld_cache_dirs_on_hpc()
+            bind_mounts.append(f"{meld_params_dir}:/data/meld_params:rw")
+            bind_mounts.append(f"{meld_models_dir}:/data/models:rw")
             lines.append("")
             logger.info("Added MELD work-directory bind mounts under %s/work/", job_dir)
 
@@ -1418,6 +1529,11 @@ class SLURMBackend(ExecutionBackend):
             "freesurfer_autorecon_volonly":  "native/freesurfer/SUBJECTS_DIR",
             "freesurfer_longitudinal":      "native/freesurfer/SUBJECTS_DIR",
             "fastsurfer":    "native/fastsurfer",
+            "tsc_data_preparation":         "native/tsc_data_prep",
+            "tsc_skull_strip_synthstrip":   "native/tsc_skull_strip",
+            "tsc_t2_combine_niftymic":      "native/tsc_t2_combine",
+            "tsc_registration_ants":        "native/tsc_registration",
+            "tsc_segmentation_tsccnn3d":    "native/tsc_segmentation",
         }
 
         if workflow_steps:

@@ -1,0 +1,89 @@
+# Workflow 10: Tuberous Sclerosis Detection
+id: tuberous_sclerosis_detection
+name: "Tuberous Sclerosis Detection"
+version: "1.0.0"
+type: workflow
+domain: epilepsy
+
+description: >
+  End-to-end tuberous sclerosis workflow with hidden utility plugins:
+  data preparation, skull stripping (SynthStrip), optional T2
+  combination (NiftyMIC), MNI registration (ANTs), and TSCCNN3D segmentation.
+
+developer_contract: >
+  Workflows only orchestrate plugins. No direct execution steps allowed.
+
+inputs:
+  required:
+    - key: input_dir
+      type: directory
+      description: "Directory containing T1/T2/FLAIR NIfTI files for a subject"
+  optional:
+    - key: subject_id
+      type: string
+      default: "subject"
+
+input_format:
+  format_name: "TSC Multi-contrast MRI Folder"
+  description: >
+    A folder containing T1w, T2 (single or axial+coronal), and FLAIR NIfTI files.
+  notes:
+    - "T1 and FLAIR are required."
+    - "T2 is required (single T2 is accepted; axial+coronal enables NiftyMIC combination)."
+    - "Paper: https://doi.org/10.1111/epi.70007"
+  example_structure: |
+    subject_folder/
+      sub-01_T1w.nii.gz
+      sub-01_T2_axial.nii.gz
+      sub-01_T2_coronal.nii.gz
+      sub-01_FLAIR.nii.gz
+
+validation:
+  preflight_checks:
+    - "directory_exists(input_dir)"
+    - "non_empty(subject_id)"
+
+steps:
+  - id: prepare
+    uses: tsc_data_preparation
+    with:
+      input_dir: "{inputs.input_dir}"
+      subject_id: "{inputs.subject_id}"
+
+  - id: skull_strip
+    uses: tsc_skull_strip_synthstrip
+    with:
+      tsc_data_preparation: "{step.prepare.outputs.native_root}"
+      subject_id: "{inputs.subject_id}"
+
+  - id: t2_combine
+    uses: tsc_t2_combine_niftymic
+    with:
+      tsc_skull_strip_synthstrip: "{step.skull_strip.outputs.native_root}"
+      subject_id: "{inputs.subject_id}"
+
+  - id: registration
+    uses: tsc_registration_ants
+    with:
+      tsc_t2_combine_niftymic: "{step.t2_combine.outputs.native_root}"
+
+  - id: segmentation
+    uses: tsc_segmentation_tsccnn3d
+    with:
+      tsc_registration_ants: "{step.registration.outputs.native_root}"
+      subject_id: "{inputs.subject_id}"
+
+outputs:
+  native:
+    - "{run_root}/native/tsc_data_prep"
+    - "{run_root}/native/tsc_skull_strip"
+    - "{run_root}/native/tsc_t2_combine"
+    - "{run_root}/native/tsc_registration"
+    - "{run_root}/native/tsc_segmentation"
+  bundle:
+    - "{run_root}/bundle"
+
+reproducibility:
+  pin_containers: true
+  write_run_manifest: true
+  store_exact_commands: true

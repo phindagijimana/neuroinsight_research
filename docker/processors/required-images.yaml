@@ -28,8 +28,8 @@ plugins:
     source: phindagijimana321/hs-postprocess:1.0.0
     target: phindagijimana321/hs-postprocess:1.0.0
   meld_graph:
-    source: meldproject/meld_graph:v2.2.4
-    target: phindagijimana321/meld_graph:v2.2.4
+    source: phindagijimana321/meld_graph:v2.2.4-nir2
+    target: phindagijimana321/meld_graph:v2.2.4-nir2
   qsiprep:
     source: pennbbl/qsiprep:0.20.0
     target: phindagijimana321/qsiprep:0.20.0

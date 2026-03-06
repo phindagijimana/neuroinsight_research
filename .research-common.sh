@@ -1016,6 +1016,7 @@ PY
 # ==============================================================================
 cmd_db() {
     local sub="${1:-help}"
+    shift || true
 
     case "$sub" in
         init)
@@ -1060,6 +1061,10 @@ cmd_db() {
                     ORDER BY submitted_at DESC
                     LIMIT 20;" 2>/dev/null || error "Could not query database"
             ;;
+        reindex-jobs)
+            step "Re-indexing jobs from data/outputs"
+            python3 -m backend.cli.reindex_jobs "$@"
+            ;;
         *)
             echo "Usage: ./research db <subcommand>"
             echo ""
@@ -1068,6 +1073,7 @@ cmd_db() {
             echo "  migrate    Run Alembic migrations"
             echo "  shell      Open interactive PostgreSQL shell"
             echo "  jobs       Show recent jobs"
+            echo "  reindex-jobs [--dry-run]  Restore jobs from output folders"
             echo ""
             ;;
     esac
@@ -1466,6 +1472,17 @@ cmd_preflight() {
 }
 
 # ==============================================================================
+#  MELD CACHE (shared)
+# ==============================================================================
+cmd_meld_cache() {
+    local sub="${1:-verify}"
+    shift || true
+    header
+    step "MELD cache"
+    python3 -m backend.cli.meld_cache "$sub" "$@"
+}
+
+# ==============================================================================
 #  Print summary after start
 # ==============================================================================
 print_start_summary() {
@@ -1542,6 +1559,7 @@ cmd_help() {
     echo "    db reset             Drop and recreate (destructive)"
     echo "    db shell             Interactive PostgreSQL shell"
     echo "    db jobs              Show recent jobs"
+    echo "    db reindex-jobs      Restore jobs from data/outputs"
     echo ""
     echo -e "  ${BOLD}Docker${NC}"
     echo "    pull [image|all|missing]  Pre-pull pipeline images"
@@ -1549,6 +1567,7 @@ cmd_help() {
     echo ""
     echo -e "  ${BOLD}System${NC}"
     echo "    preflight [--json]   Run full pre-flight system check"
+    echo "    meld-cache <cmd>     Verify/sync MELD cache for focal workflow"
     echo "    autostart <cmd>      Manage user-level systemd autostart"
     echo ""
     echo -e "  ${BOLD}Info${NC}"
@@ -1576,6 +1595,7 @@ cmd_help() {
     echo "    $cli logs celery       # Watch celery logs"
     echo "    $cli db jobs           # See recent jobs"
     echo "    $cli pull freesurfer   # Pull FreeSurfer image"
+    echo "    $cli meld-cache verify # Check MELD cache local/HPC readiness"
     echo "    $cli stop              # Stop app services"
     echo "    $cli infra down        # Stop infrastructure"
     echo ""
@@ -1944,6 +1964,7 @@ dispatch() {
         infra)      cmd_infra     "$@" ;;
         pull)       cmd_pull      "$@" ;;
         clean)      cmd_clean     "$@" ;;
+        meld-cache) cmd_meld_cache "$@" ;;
         autostart)  cmd_autostart "$@" ;;
         preflight)  cmd_preflight "$@" ;;
         env)        cmd_env       "$@" ;;

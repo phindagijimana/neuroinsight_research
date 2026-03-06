@@ -68,6 +68,34 @@ interface WorkflowDoc {
   yaml: string;
 }
 
+const TSC_HIDDEN_PLUGIN_NOTES = [
+  {
+    id: 'tsc_data_preparation',
+    name: 'TSC Data Preparation',
+    purpose: 'Validates and standardizes T1/T2/FLAIR input files into a workflow-ready layout.',
+  },
+  {
+    id: 'tsc_skull_strip_synthstrip',
+    name: 'TSC Skull Strip (SynthStrip)',
+    purpose: 'Performs brain extraction and mask generation for downstream processing.',
+  },
+  {
+    id: 'tsc_t2_combine_niftymic',
+    name: 'TSC T2 Combine (NiftyMIC)',
+    purpose: 'Combines axial/coronal T2 when available; otherwise falls back to single-T2 passthrough.',
+  },
+  {
+    id: 'tsc_registration_ants',
+    name: 'TSC Registration (ANTs)',
+    purpose: 'Applies bias correction, resampling, and registration into MNI space.',
+  },
+  {
+    id: 'tsc_segmentation_tsccnn3d',
+    name: 'TSC Segmentation (TSCCNN3D)',
+    purpose: 'Runs CNN-based tuber segmentation and quantifies tuber burden outputs.',
+  },
+];
+
 const domainLabel = (domain: string) => {
   switch (domain) {
     case 'structural_mri': return 'Structural MRI';
@@ -697,6 +725,18 @@ const DocsPage: React.FC<DocsPageProps> = () => {
           <div className="flex gap-2 pt-2 border-t border-gray-200">
             <span className="font-semibold text-gray-500 min-w-[72px]">Note:</span>
             <span className="text-gray-500 italic">Some utility plugins are hidden but work within workflows for specialized tasks.</span>
+          </div>
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-gray-200">
+          <h5 className="text-sm font-semibold text-gray-700 mb-2">Tuberous Sclerosis Detection Hidden Plugins</h5>
+          <div className="space-y-1.5 text-sm text-gray-600">
+            {TSC_HIDDEN_PLUGIN_NOTES.map((item) => (
+              <div key={item.id} className="flex gap-2">
+                <span className="font-semibold text-[#003d7a] min-w-[220px]">{item.name}:</span>
+                <span>{item.purpose}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

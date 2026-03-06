@@ -84,6 +84,8 @@ PIPELINE_CONVERTERS: dict[str, str] = {
     "xcpd": "xcpd",
     "qsiprep": "qsiprep",
     "qsirecon": "qsirecon",
+    "tsc segmentation (tsccnn3d)": "tsc_segmentation_tsccnn3d",
+    "tsc_segmentation_tsccnn3d": "tsc_segmentation_tsccnn3d",
 }
 
 WORKFLOW_STEPS: dict[str, list[str]] = {
@@ -101,6 +103,8 @@ WORKFLOW_STEPS: dict[str, list[str]] = {
     "fmri_full": ["fmriprep", "xcpd"],
     "diffusion full": ["qsiprep", "qsirecon"],
     "diffusion_full": ["qsiprep", "qsirecon"],
+    "tuberous sclerosis detection": ["tsc_segmentation_tsccnn3d"],
+    "tuberous_sclerosis_detection": ["tsc_segmentation_tsccnn3d"],
 }
 
 
@@ -840,6 +844,68 @@ def convert_meld_graph(fp: FileProvider) -> list[CSVSheet]:
     )]
 
 
+def convert_tsc_segmentation_tsccnn3d(fp: FileProvider) -> list[CSVSheet]:
+    """TSC Segmentation: parse tuber burden metrics from volume_results.txt."""
+    metric_files = fp.find_files("volume_results.txt")
+    if not metric_files:
+        return []
+
+    contents = fp.batch_read(metric_files)
+    text = contents.get(metric_files[0], "") or ""
+    if not text.strip():
+        return []
+
+    rows: list[list[Any]] = []
+    for ln in (line.strip() for line in text.splitlines()):
+        if not ln:
+            continue
+
+        if ":" in ln:
+            key, raw_val = [p.strip() for p in ln.split(":", 1)]
+        elif "=" in ln:
+            key, raw_val = [p.strip() for p in ln.split("=", 1)]
+        elif "," in ln:
+            parts = [p.strip() for p in ln.split(",", 1)]
+            if len(parts) != 2:
+                continue
+            key, raw_val = parts
+        else:
+            continue
+
+        m = re.match(r"^\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*(.*)$", raw_val)
+        if not m:
+            continue
+        try:
+            value: Any = float(m.group(1))
+        except ValueError:
+            continue
+        unit = (m.group(2) or "").strip()
+
+        rows.append([key, value, unit])
+
+    if not rows:
+        return []
+
+    # Some runs write the same summary block twice; keep first occurrence only.
+    deduped_rows: list[list[Any]] = []
+    seen: set[tuple[Any, Any, Any]] = set()
+    for row in rows:
+        key = (row[0], row[1], row[2])
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped_rows.append(row)
+
+    return [CSVSheet(
+        name="TSC Segmentation Metrics",
+        filename="tsc_segmentation_metrics.csv",
+        description="TSCCNN3D tuber burden metrics parsed from volume_results.txt",
+        headers=["Metric", "Value", "Unit"],
+        rows=deduped_rows,
+        category="epilepsy",
+    )]
+
+
 def convert_fmriprep(fp: FileProvider) -> list[CSVSheet]:
     """fMRIPrep: motion and confound summaries from confounds_timeseries.tsv."""
     sheets: list[CSVSheet] = []
@@ -1221,6 +1287,7 @@ CONVERTER_REGISTRY: dict[str, Any] = {
     "segmentha_t2": convert_segmentha_t2,
     "hs_postprocess": convert_hs_postprocess,
     "meld_graph": convert_meld_graph,
+    "tsc_segmentation_tsccnn3d": convert_tsc_segmentation_tsccnn3d,
     "fmriprep": convert_fmriprep,
     "xcpd": convert_xcpd,
     "qsiprep": convert_qsiprep,

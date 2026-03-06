@@ -14,7 +14,8 @@ description: >
   Focal cortical dysplasia detection for drug-resistant epilepsy using
   graph neural networks (Wagstyl et al., 2025). Operates on FreeSurfer
   recon-all outputs to produce lesion probability maps and detection
-  reports. Uses the official meldproject/meld_graph Docker container
+  reports. Uses a NeuroInsight-managed MELD Graph Docker image derived
+  from meldproject/meld_graph and pinned for deterministic production runs,
   which bundles FreeSurfer 7.2, FastSurfer 1.1.2, and the MELD
   classifier. On HPC, runs via Apptainer/Singularity.
 
@@ -30,7 +31,6 @@ references:
 container:
   runtime: docker
   image: "meldproject/meld_graph:v2.2.4"
-  digest: "sha256:64917b746047a5395ecc5a298cfc097fc0194ee4c483e0730e49f97fe3590ff7"
   # HPC: pull with `apptainer pull docker://meldproject/meld_graph:v2.2.4`
   # Result: meld_graph_v2.2.4.sif (~13 GB)
 
@@ -130,21 +130,56 @@ execution:
         mkdir -p /data/outputs/native/meld
         mkdir -p /data/outputs/logs/meld
 
-        # -- Ensure MELD data (params + models) is present ----------------
-        # These are ~450 MB total and are downloaded on first run.  The
-        # backend bind-mounts a cached copy when available; if not, the
-        # container attempts to fetch them from figshare.
-        if [ ! -d "/data/meld_params" ]; then
-          echo "meld_params not found at /data/meld_params — attempting download..."
-          python /app/meld_graph/download_data.py --params 2>/dev/null \
-            || python -c "from meld_graph.download_data import get_meld_params; get_meld_params()" 2>/dev/null \
-            || { echo "ERROR: Could not obtain meld_params. See README for manual download." >&2; exit 1; }
+        # -- Ensure MELD cache (auto-bootstrap on first run) ---------------
+        mkdir -p /data/meld_params /data/models
+        NEED_PARAMS=0
+        NEED_MODELS=0
+        if [ ! -f "/data/meld_params/fsaverage_sym/surf/lh.inflated" ] || \
+           [ ! -f "/data/meld_params/fsaverage_sym/surf/rh.inflated" ]; then
+          NEED_PARAMS=1
         fi
-        if [ ! -d "/data/models" ] || [ -z "$(ls /data/models/ 2>/dev/null)" ]; then
-          echo "MELD models not found at /data/models — attempting download..."
-          python /app/meld_graph/download_data.py --model 2>/dev/null \
-            || python -c "from meld_graph.download_data import get_model; get_model()" 2>/dev/null \
-            || { echo "ERROR: Could not obtain MELD models. See README for manual download." >&2; exit 1; }
+        if [ ! -d "/data/models" ] || [ -z "$(ls -A /data/models 2>/dev/null)" ]; then
+          NEED_MODELS=1
+        fi
+
+        if [ "$NEED_PARAMS" -eq 1 ] || [ "$NEED_MODELS" -eq 1 ]; then
+          echo "MELD cache missing or incomplete; preparing it now ..."
+          LOCK_FILE="/data/meld_params/.nir_meld_prepare.lock"
+          if command -v flock >/dev/null 2>&1; then
+            exec 9>"$LOCK_FILE"
+            flock 9
+          fi
+
+          # Re-check after lock in case another worker populated cache.
+          NEED_PARAMS=0
+          NEED_MODELS=0
+          if [ ! -f "/data/meld_params/fsaverage_sym/surf/lh.inflated" ] || \
+             [ ! -f "/data/meld_params/fsaverage_sym/surf/rh.inflated" ]; then
+            NEED_PARAMS=1
+          fi
+          if [ ! -d "/data/models" ] || [ -z "$(ls -A /data/models 2>/dev/null)" ]; then
+            NEED_MODELS=1
+          fi
+
+          if [ "$NEED_PARAMS" -eq 1 ]; then
+            python /app/meld_graph/download_data.py --params 2>/dev/null \
+            || python -c "from pathlib import Path; import meld_graph.download_data as d; p=Path('/app/meld_graph/download_data.py'); s=p.read_text(); s=s.replace('percent = int(count*blockSize*100/totalSize)','percent = int(count*blockSize*100/totalSize) if totalSize else 0'); p.write_text(s); d.get_meld_params()"
+          fi
+          if [ "$NEED_MODELS" -eq 1 ]; then
+            python /app/meld_graph/download_data.py --model 2>/dev/null \
+            || python -c "from pathlib import Path; import meld_graph.download_data as d; p=Path('/app/meld_graph/download_data.py'); s=p.read_text(); s=s.replace('percent = int(count*blockSize*100/totalSize)','percent = int(count*blockSize*100/totalSize) if totalSize else 0'); p.write_text(s); d.get_model()"
+          fi
+        fi
+
+        # Final hard validation before processing
+        if [ ! -f "/data/meld_params/fsaverage_sym/surf/lh.inflated" ] || \
+           [ ! -f "/data/meld_params/fsaverage_sym/surf/rh.inflated" ]; then
+          echo "ERROR: Missing MELD params cache after auto-prepare attempt." >&2
+          exit 1
+        fi
+        if [ ! -d "/data/models" ] || [ -z "$(ls -A /data/models 2>/dev/null)" ]; then
+          echo "ERROR: Missing MELD model cache after auto-prepare attempt." >&2
+          exit 1
         fi
 
         # -- Stage T1w input ------------------------------------------------

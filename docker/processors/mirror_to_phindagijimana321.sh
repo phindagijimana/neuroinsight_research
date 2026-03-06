@@ -14,7 +14,7 @@ PAIRS=(
   "deepmi/fastsurfer:cpu-v2.4.2 phindagijimana321/fastsurfer:cpu-v2.4.2"
   "nipreps/fmriprep:23.2.1 phindagijimana321/fmriprep:23.2.1"
   "freesurfer/freesurfer:7.4.1 phindagijimana321/freesurfer:7.4.1"
-  "meldproject/meld_graph:v2.2.4 phindagijimana321/meld_graph:v2.2.4"
+  "phindagijimana321/meld_graph:v2.2.4-nir2 phindagijimana321/meld_graph:v2.2.4-nir2"
   "pennbbl/qsiprep:0.20.0 phindagijimana321/qsiprep:0.20.0"
   "pennlinc/qsirecon:1.1.1 phindagijimana321/qsirecon:1.1.1"
   "pennlinc/xcp_d:0.6.1 phindagijimana321/xcp_d:0.6.1"

@@ -5,6 +5,7 @@ FastAPI application for HPC-native neuroimaging pipeline platform.
 """
 import logging
 import os
+import re
 import shlex
 import shutil
 import uuid
@@ -23,7 +24,7 @@ from backend.core.config import get_settings
 from backend.core.database import init_db, get_db
 from backend.core.pipelines import get_pipeline_registry
 from backend.core.plugin_registry import get_plugin_workflow_registry
-from backend.core.execution import JobSpec, ResourceSpec
+from backend.core.execution import JobSpec, ResourceSpec, ExecutionError
 from backend.execution import get_backend
 from backend.models.job import Job, JobStatusEnum
 from backend.routes import results
@@ -767,7 +768,10 @@ def submit_plugin_job(plugin_id: str, request: PluginJobSubmitRequest, db: Sessi
 
     # Submit via backend
     backend = get_backend()
-    backend.submit_job(spec, job_id=job_id)
+    try:
+        backend.submit_job(spec, job_id=job_id)
+    except ExecutionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     # Persist data-source provenance if the job originated from a platform
     if request.data_source_platform:
@@ -872,7 +876,10 @@ def submit_workflow_job(workflow_id: str, request: WorkflowJobSubmitRequest, db:
     )
 
     backend = get_backend()
-    backend.submit_job(spec, job_id=job_id)
+    try:
+        backend.submit_job(spec, job_id=job_id)
+    except ExecutionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     # Persist data-source provenance if the job originated from a platform
     if request.data_source_platform:
@@ -1281,6 +1288,13 @@ def list_reusable_outputs(
 @app.get("/api/jobs")
 def list_jobs(status: Optional[str] = None, limit: int = 100, db: Session = Depends(get_db)):
     """List jobs with optional status filter."""
+    # Opportunistically reconcile live SLURM queue so active jobs appear even
+    # when DB status drifted (e.g., after DB recovery/reindex).
+    try:
+        _reconcile_live_slurm_queue_for_listing(db)
+    except Exception as e:
+        logger.debug("Live SLURM queue reconcile skipped: %s", e)
+
     query = db.query(Job).filter(Job.deleted == False)
     if status:
         query = query.filter(Job.status == status)
@@ -1391,6 +1405,135 @@ _SLURM_STATUS_MAP = {
     "TIMEOUT": "failed", "NODE_FAIL": "failed",
     "OUT_OF_MEMORY": "failed", "PREEMPTED": "failed",
 }
+
+
+def _reconcile_live_slurm_queue_for_listing(db: Session) -> int:
+    """Sync currently queued/running SLURM jobs into DB-visible active states.
+
+    This is a lightweight safety net for cases where job rows were recovered
+    from filesystem snapshots and marked terminal, while SLURM still has a
+    live job.
+    """
+    try:
+        from backend.core.ssh_manager import get_ssh_manager
+        ssh = get_ssh_manager()
+        if not ssh.is_connected:
+            if ssh.host and ssh.username:
+                try:
+                    ssh.connect()
+                except Exception:
+                    return 0
+            if not ssh.is_connected:
+                return 0
+
+        exit_code, stdout, _ = ssh.execute(
+            "squeue -u \"$USER\" --noheader -o '%i|%T|%j' 2>/dev/null",
+            timeout=12,
+        )
+        if exit_code != 0 or not stdout.strip():
+            return 0
+
+        now = datetime.utcnow()
+        updated = 0
+
+        for line in stdout.strip().splitlines():
+            parts = line.split("|")
+            if len(parts) < 3:
+                continue
+            slurm_id = parts[0].strip()
+            state_raw = parts[1].split("+")[0].strip().upper()
+            job_name = parts[2].strip()
+            mapped = _SLURM_STATUS_MAP.get(state_raw)
+            if mapped not in ("pending", "running"):
+                continue
+
+            job = (
+                db.query(Job)
+                .filter(
+                    Job.deleted == False,  # noqa: E712
+                    Job.backend_type == "slurm",
+                    Job.backend_job_id == slurm_id,
+                )
+                .first()
+            )
+
+            # Fallback: map SLURM name suffix "...-<uuid8>" to full UUID row.
+            if not job:
+                m = re.search(r"([0-9a-f]{8})$", job_name.lower())
+                if m:
+                    prefix = m.group(1)
+                    candidates = (
+                        db.query(Job)
+                        .filter(
+                            Job.deleted == False,  # noqa: E712
+                            Job.backend_type == "slurm",
+                            Job.id.like(f"{prefix}%"),
+                        )
+                        .all()
+                    )
+                    if len(candidates) == 1:
+                        job = candidates[0]
+
+            if not job:
+                continue
+
+            changed = False
+            if job.backend_job_id != slurm_id:
+                job.backend_job_id = slurm_id
+                changed = True
+            if job.status != mapped:
+                job.status = mapped
+                changed = True
+            if mapped == "running":
+                if not job.started_at:
+                    job.started_at = now
+                    changed = True
+                if job.completed_at is not None:
+                    job.completed_at = None
+                    changed = True
+                if (job.progress or 0) >= 100:
+                    job.progress = 95
+                    changed = True
+                if not job.current_phase or job.current_phase in (
+                    "Completed",
+                    "Recovered from local outputs",
+                    "Recovered from HPC outputs",
+                ):
+                    job.current_phase = "Running on HPC"
+                    changed = True
+                if job.error_message and "Recovered" in job.error_message:
+                    job.error_message = None
+                    changed = True
+                if job.exit_code == 0:
+                    job.exit_code = None
+                    changed = True
+            elif mapped == "pending":
+                if job.completed_at is not None:
+                    job.completed_at = None
+                    changed = True
+                if (job.progress or 0) >= 100:
+                    job.progress = 0
+                    changed = True
+                if not job.current_phase or job.current_phase in (
+                    "Completed",
+                    "Recovered from local outputs",
+                    "Recovered from HPC outputs",
+                ):
+                    job.current_phase = "Queued on HPC"
+                    changed = True
+
+            if changed:
+                updated += 1
+
+        if updated:
+            db.commit()
+        return updated
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return 0
 
 
 def _reconcile_active_slurm_jobs_on_startup() -> int:

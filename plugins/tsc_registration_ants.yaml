@@ -1,0 +1,116 @@
+# Plugin: TSC Registration (ANTs)
+id: tsc_registration_ants
+name: "TSC Registration (ANTs)"
+version: "1.0.0"
+type: plugin
+domain: epilepsy
+
+visibility:
+  user_selectable: false
+  ui_category: utility
+  ui_label: "TSC Registration (hidden)"
+
+description: >
+  Bias-corrects, resamples, and registers TSC MRI to MNI space for
+  segmentation-ready standardized inputs.
+
+authors:
+  - "NeuroInsight Research Team"
+
+references:
+  - "Avants BB, et al. ANTs. NeuroImage 2011."
+
+container:
+  runtime: docker
+  image: "ivansanchezfernandez/bias_correct_resample_and_register_to_mni_with_ants"
+  digest: ""
+
+inputs:
+  required:
+    - key: tsc_t2_combine_niftymic
+      type: directory
+      description: "Combined/passthrough T2 outputs from tsc_t2_combine_niftymic"
+
+input_format:
+  format_name: "Combined T2 Folder"
+  description: "Combined/passthrough T2 images for MNI registration."
+  notes:
+    - "Performs bias correction, resampling, and MNI registration."
+    - "Expected output includes MNI-warped images."
+  file_types:
+    - ".nii.gz or .nii"
+
+parameters: []
+
+resources:
+  profiles:
+    default:
+      cpus: 6
+      mem_gb: 16
+      time_hours: 3
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/tsc_registration"
+    logs_dir: "{run_root}/logs/tsc_registration"
+  stages:
+    - id: register_to_mni
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -euo pipefail
+
+        IN="/data/inputs/tsc_t2_combine_niftymic"
+        OUT="/data/outputs/native/tsc_registration"
+        BIAS="$OUT/_bias_corrected"
+        RESAMP="$OUT/_resampled"
+        TMP="$OUT/_mni_tmp"
+        TEMPLATE="/MNI_template/mni_icbm152_t1_tal_nlin_asym_09c_brain.nii.gz"
+        mkdir -p "$OUT" "$BIAS" "$RESAMP" "$TMP"
+
+        for FILE in "$IN"/*.nii "$IN"/*.nii.gz; do
+          [ -e "$FILE" ] || continue
+          namepart="$(basename "$FILE")"
+          case "$namepart" in
+            *_T1_*|*_T2_*|*_FLAIR_*) ;;
+            *) continue ;;
+          esac
+          if [[ "$namepart" == *.nii.gz ]]; then
+            filename="${namepart%%.*}"
+            extension="${namepart#*.}"
+          else
+            filename="${namepart%.*}"
+            extension="${namepart##*.}"
+          fi
+          n4="$BIAS/${filename}_bias_corrected.${extension}"
+          rs="$RESAMP/${filename}_bias_corrected_resampled.${extension}"
+          N4BiasFieldCorrection -v 1 -d 3 -s 2 -b [ 180 ] -c [ 50x50x50x50, 0.0 ] -i "$FILE" -o "$n4"
+          ResampleImage 3 "$n4" "$rs" 1x1x1
+          prefix="$TMP/${filename}_bias_corrected_resampled_MNI_"
+          antsRegistrationSyN.sh -d 3 -f "$TEMPLATE" -m "$rs" -o "$prefix"
+          cp -f "${prefix}Warped.nii.gz" "$OUT/"
+        done
+
+        echo "TSC_STAGE:REGISTRATION_DONE"
+
+native_outputs:
+  preserved: true
+  layout: "native/tsc_registration/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  extraction:
+    volumes:
+      - from: "{native_root}/*"
+        to: "{bundle.root}/volumes/tsc_registration/"
+        method: copy
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: false
+  record_inputs_hashes: true

@@ -1,0 +1,139 @@
+# Plugin: TSC Data Preparation
+id: tsc_data_preparation
+name: "TSC Data Preparation"
+version: "1.0.0"
+type: plugin
+domain: epilepsy
+
+visibility:
+  user_selectable: false
+  ui_category: utility
+  ui_label: "TSC Data Preparation (hidden)"
+
+description: >
+  Validates and organizes TSC input MRI files into a normalized subject layout
+  expected by downstream TSC workflow plugins.
+
+authors:
+  - "NeuroInsight Research Team"
+
+references:
+  - "Sanchez Fernandez I, et al. Epilepsia 2025. doi:10.1111/epi.70007"
+
+container:
+  runtime: docker
+  image: "python:3.11-slim"
+  digest: ""
+
+inputs:
+  required:
+    - key: input_dir
+      type: directory
+      description: "Directory containing T1/T2/FLAIR NIfTI files"
+  optional:
+    - key: subject_id
+      type: string
+      default: "subject"
+      description: "Subject identifier used for normalized output naming"
+
+input_format:
+  format_name: "TSC Multi-contrast MRI Folder"
+  description: "Directory containing T1w, T2, and FLAIR NIfTI files."
+  notes:
+    - "T1w and FLAIR are required."
+    - "At least one T2 image is required."
+  example_structure: |
+    subject_folder/
+      sub-01_T1w.nii.gz
+      sub-01_T2_axial.nii.gz
+      sub-01_T2_coronal.nii.gz
+      sub-01_FLAIR.nii.gz
+  file_types:
+    - ".nii.gz or .nii"
+
+parameters: []
+
+resources:
+  profiles:
+    default:
+      cpus: 1
+      mem_gb: 4
+      time_hours: 1
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/tsc_data_prep"
+    logs_dir: "{run_root}/logs/tsc_data_preparation"
+  stages:
+    - id: prepare_inputs
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -euo pipefail
+
+        SRC="/data/inputs/input_dir"
+        OUT="/data/outputs/native/tsc_data_prep/{subject_id}"
+        mkdir -p "$OUT"
+
+        if [ ! -d "$SRC" ]; then
+          echo "ERROR: input_dir not found at $SRC" >&2
+          exit 1
+        fi
+
+        T1="$(find "$SRC" -maxdepth 2 -type f \( -iname "*T1*.nii" -o -iname "*T1*.nii.gz" -o -iname "*T1w*.nii" -o -iname "*T1w*.nii.gz" \) | head -n 1 || true)"
+        FLAIR="$(find "$SRC" -maxdepth 2 -type f \( -iname "*FLAIR*.nii" -o -iname "*FLAIR*.nii.gz" -o -iname "*flair*.nii" -o -iname "*flair*.nii.gz" \) | head -n 1 || true)"
+        T2_AX="$(find "$SRC" -maxdepth 2 -type f \( -iname "*T2*ax*.nii" -o -iname "*T2*ax*.nii.gz" -o -iname "*T2*axial*.nii" -o -iname "*T2*axial*.nii.gz" \) | head -n 1 || true)"
+        T2_COR="$(find "$SRC" -maxdepth 2 -type f \( -iname "*T2*cor*.nii" -o -iname "*T2*cor*.nii.gz" -o -iname "*T2*coronal*.nii" -o -iname "*T2*coronal*.nii.gz" \) | head -n 1 || true)"
+        T2_ANY="$(find "$SRC" -maxdepth 2 -type f \( -iname "*T2*.nii" -o -iname "*T2*.nii.gz" \) | head -n 1 || true)"
+
+        if [ -z "$T1" ]; then
+          echo "ERROR: Missing required T1 input in $SRC" >&2
+          exit 1
+        fi
+        if [ -z "$FLAIR" ]; then
+          echo "ERROR: Missing required FLAIR input in $SRC" >&2
+          exit 1
+        fi
+        if [ -z "$T2_AX" ] && [ -z "$T2_COR" ] && [ -z "$T2_ANY" ]; then
+          echo "ERROR: Missing required T2 input in $SRC" >&2
+          exit 1
+        fi
+
+        # Preserve source filenames/extensions so downstream containers that
+        # key off naming tokens like "_T1_", "_T2_", "_FLAIR_" still work.
+        cp -f "$T1" "$OUT/$(basename "$T1")"
+        cp -f "$FLAIR" "$OUT/$(basename "$FLAIR")"
+
+        if [ -n "$T2_AX" ]; then
+          cp -f "$T2_AX" "$OUT/$(basename "$T2_AX")"
+        fi
+        if [ -n "$T2_COR" ]; then
+          cp -f "$T2_COR" "$OUT/$(basename "$T2_COR")"
+        fi
+        if [ -z "$T2_AX" ] && [ -z "$T2_COR" ] && [ -n "$T2_ANY" ]; then
+          cp -f "$T2_ANY" "$OUT/$(basename "$T2_ANY")"
+        fi
+
+        echo "TSC_STAGE:DATA_PREP_DONE"
+
+native_outputs:
+  preserved: true
+  layout: "native/tsc_data_prep/{subject_id}/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  extraction:
+    metadata:
+      - from: "{native_root}/{subject_id}"
+        to: "{bundle.root}/metadata/tsc_data_prep/{subject_id}"
+        method: copy
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: false
+  record_inputs_hashes: true

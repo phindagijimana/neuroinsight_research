@@ -1,0 +1,120 @@
+# Plugin: TSC Skull Stripping (SynthStrip)
+id: tsc_skull_strip_synthstrip
+name: "TSC Skull Strip (SynthStrip)"
+version: "1.0.0"
+type: plugin
+domain: epilepsy
+
+visibility:
+  user_selectable: false
+  ui_category: utility
+  ui_label: "TSC Skull Strip (hidden)"
+
+description: >
+  Runs SynthStrip-based skull stripping and mask generation for TSC workflow
+  inputs and writes normalized outputs for downstream stages.
+
+authors:
+  - "NeuroInsight Research Team"
+
+references:
+  - "Hoopes A, et al. SynthStrip. NeuroImage 2022."
+
+container:
+  runtime: docker
+  image: "freesurfer/freesurfer:7.4.1"
+  digest: "sha256:10b6468cbd9fcd2db3708f4651d59ad75d4da849a2c5d8bb6dba217f08b8c46b"
+
+inputs:
+  required:
+    - key: tsc_data_preparation
+      type: directory
+      description: "Prepared TSC input directory from tsc_data_preparation"
+  optional:
+    - key: subject_id
+      type: string
+      default: "subject"
+
+input_format:
+  format_name: "Prepared TSC Subject Folder"
+  description: "Normalized subject folder produced by tsc_data_preparation."
+  notes:
+    - "Consumes prepared T1/T2/FLAIR files."
+    - "Produces skull-stripped volumes and masks."
+  file_types:
+    - ".nii.gz or .nii"
+
+parameters: []
+
+resources:
+  profiles:
+    default:
+      cpus: 4
+      mem_gb: 8
+      time_hours: 2
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/tsc_skull_strip"
+    logs_dir: "{run_root}/logs/tsc_skull_strip"
+  stages:
+    - id: skull_strip
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -euo pipefail
+
+        IN="/data/inputs/tsc_data_preparation"
+        OUT="/data/outputs/native/tsc_skull_strip"
+        MASKS="$OUT/masks"
+        mkdir -p "$OUT" "$MASKS"
+
+        if ! command -v mri_synthstrip >/dev/null 2>&1; then
+          echo "ERROR: mri_synthstrip not found in FreeSurfer container." >&2
+          exit 1
+        fi
+
+        shopt -s nullglob
+        mapfile -t inputs < <(find "$IN" -type f \( -iname "*.nii" -o -iname "*.nii.gz" \))
+        if [ ${#inputs[@]} -eq 0 ]; then
+          echo "ERROR: No NIfTI inputs found in $IN" >&2
+          exit 1
+        fi
+
+        for FILE in "${inputs[@]}"; do
+          namepart="$(basename "$FILE")"
+          if [[ "$namepart" == *.nii.gz ]]; then
+            filename="${namepart%%.*}"
+            extension="${namepart#*.}"
+          else
+            filename="${namepart%.*}"
+            extension="${namepart##*.}"
+          fi
+          stripped_name="${filename}_skull_stripped.${extension}"
+          mask_name="${filename}_skull_stripped_mask.nii.gz"
+          mri_synthstrip -i "$FILE" -o "$OUT/$stripped_name" -m "$MASKS/$mask_name"
+        done
+
+        echo "TSC_STAGE:SKULL_STRIP_DONE"
+
+native_outputs:
+  preserved: true
+  layout: "native/tsc_skull_strip/"
+
+bundle:
+  bundle_version: 1
+  root: "{run_root}/bundle"
+  extraction:
+    volumes:
+      - from: "{native_root}/*"
+        to: "{bundle.root}/volumes/tsc_skull_strip/"
+        method: copy
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: false
+  record_inputs_hashes: true
