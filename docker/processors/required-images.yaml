@@ -1,0 +1,63 @@
+owner: phindagijimana321
+updated_for: tested_plugins_and_workflows
+# Processor manifest for Docker image mirroring
+
+plugins:
+  dcm2niix:
+    source: nipy/heudiconv:1.3.4
+    target: phindagijimana321/heudiconv:1.3.4
+  fastsurfer:
+    source: deepmi/fastsurfer:cpu-v2.4.2
+    target: phindagijimana321/fastsurfer:cpu-v2.4.2
+  fmriprep:
+    source: nipreps/fmriprep:23.2.1
+    target: phindagijimana321/fmriprep:23.2.1
+  freesurfer_autorecon_volonly:
+    source: freesurfer/freesurfer:7.4.1
+    target: phindagijimana321/freesurfer:7.4.1
+  freesurfer_longitudinal:
+    source: freesurfer/freesurfer:7.4.1
+    target: phindagijimana321/freesurfer:7.4.1
+  freesurfer_longitudinal_stats:
+    source: freesurfer/freesurfer:7.4.1
+    target: phindagijimana321/freesurfer:7.4.1
+  freesurfer_recon:
+    source: freesurfer/freesurfer:7.4.1
+    target: phindagijimana321/freesurfer:7.4.1
+  hs_postprocess:
+    source: phindagijimana321/hs-postprocess:1.0.0
+    target: phindagijimana321/hs-postprocess:1.0.0
+  meld_graph:
+    source: meldproject/meld_graph:v2.2.4
+    target: phindagijimana321/meld_graph:v2.2.4
+  qsiprep:
+    source: pennbbl/qsiprep:0.20.0
+    target: phindagijimana321/qsiprep:0.20.0
+  qsirecon:
+    source: pennlinc/qsirecon:1.1.1
+    target: phindagijimana321/qsirecon:1.1.1
+  segmentha_t1:
+    source: phindagijimana321/freesurfer-mcr:7.4.1
+    target: phindagijimana321/freesurfer-mcr:7.4.1
+  segmentha_t2:
+    source: phindagijimana321/freesurfer-mcr:7.4.1
+    target: phindagijimana321/freesurfer-mcr:7.4.1
+  xcpd:
+    source: pennlinc/xcp_d:0.6.1
+    target: phindagijimana321/xcp_d:0.6.1
+
+workflows:
+  fmri_full:
+    plugins: [fmriprep, xcpd]
+  diffusion_full:
+    plugins: [qsiprep, qsirecon]
+  cortical_lesion_detection:
+    plugins: [freesurfer_recon, meld_graph]
+  freesurfer_longitudinal_full:
+    plugins: [freesurfer_longitudinal, freesurfer_longitudinal_stats]
+  hs_detection:
+    plugins: [segmentha_t1, hs_postprocess]
+  hippo_subfields_t1:
+    plugins: [freesurfer_recon, segmentha_t1]
+  hippo_subfields_t2:
+    plugins: [freesurfer_recon, segmentha_t2]

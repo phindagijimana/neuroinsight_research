@@ -267,6 +267,12 @@ const getCategoryLabel = (category: string) => {
   }
 };
 
+const shortenDescription = (text: string, maxWords = 19): string => {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return text;
+  return `${words.slice(0, maxWords).join(' ')}...`;
+};
+
 export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   onPipelineSelect,
   selectedPipeline,
@@ -599,7 +605,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
               <Info className="h-5 w-5 text-[#003d7a] mr-3 flex-shrink-0 mt-0.5" />
               <div>
                 <h4 className="text-sm font-medium text-gray-900">Description</h4>
-                <p className="text-sm text-gray-600 mt-1">{selectedPlugin.description}</p>
+                <p className="text-sm text-gray-600 mt-1">{shortenDescription(selectedPlugin.description)}</p>
               </div>
             </div>
           </div>
@@ -636,7 +642,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
                   </div>
                   <div className="flex-1">
                     <h5 className="text-sm font-semibold text-gray-900">{plugin.name}</h5>
-                    <p className="text-xs text-gray-600 mt-1">{plugin.description}</p>
+                    <p className="text-xs text-gray-600 mt-1">{shortenDescription(plugin.description)}</p>
                   </div>
                 </div>
               ))}
@@ -645,24 +651,6 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
         </div>
       )}
 
-      {/* Reference Guide */}
-      <div className="mt-6 pt-4 border-t border-gray-200">
-        <h4 className="text-xs font-semibold text-gray-700 mb-2">Quick Reference</h4>
-        <div className="space-y-2 text-xs text-gray-600">
-          <div className="flex gap-2">
-            <span className="font-semibold text-[#003d7a] min-w-[60px]">Plugin:</span>
-            <span>Single neuroimaging tool running one container. Use for individual processing steps or full control.</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="font-semibold text-[#003d7a] min-w-[60px]">Workflow:</span>
-            <span>Sequence of plugins working together. Manages dependencies automatically. Recommended for complete analysis pipelines.</span>
-          </div>
-          <div className="flex gap-2 pt-2 border-t border-gray-100">
-            <span className="font-semibold text-gray-500 min-w-[60px]">Note:</span>
-            <span className="text-gray-500 italic">Some utility plugins are hidden but work within workflows for specialized tasks.</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

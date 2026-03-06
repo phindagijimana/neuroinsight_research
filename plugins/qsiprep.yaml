@@ -148,6 +148,14 @@ execution:
             else
               echo "- ${jf#/data/inputs/bids_dir/} :: MISSING ${missing%, }" >> "$AUDIT_FILE"
             fi
+            for key in PhaseEncodingDirection TotalReadoutTime EchoTime EffectiveEchoSpacing; do
+              if grep -q "\"$key\"" "$jf"; then
+                raw="$(grep -m1 "\"$key\"" "$jf" | sed -E "s/.*\"$key\"[[:space:]]*:[[:space:]]*(.*)[[:space:]]*$/\\1/" | sed -E "s/[[:space:]]*,[[:space:]]*$//")"
+                echo "    $key: $raw" >> "$AUDIT_FILE"
+              else
+                echo "    $key: <missing>" >> "$AUDIT_FILE"
+              fi
+            done
           done < <(find "$SUBJ_DIR" -path "*/dwi/*_dwi.json" -type f 2>/dev/null | sort)
           if [ "$DWI_JSON_COUNT" -eq 0 ]; then
             echo "WARNING: no DWI JSON sidecars found" >> "$AUDIT_FILE"

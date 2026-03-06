@@ -8,6 +8,7 @@ Hierarchy: Workspace -> Datasets -> Packages -> Files.
 
 import logging
 import os
+import socket
 import time
 import urllib.parse
 from pathlib import Path
@@ -16,6 +17,7 @@ from typing import Any, Dict, List, Optional
 import boto3
 import httpx
 from jose import jwt
+from httpx import HTTPStatusError
 
 from backend.connectors.base import (
     BasePlatformConnector,
@@ -360,17 +362,174 @@ class PennsieveConnector(BasePlatformConnector):
         dataset_id: str,
         remote_path: str = "/",
     ) -> Dict[str, Any]:
+        agent_error: Optional[Exception] = None
+        upload_mode = os.getenv("PENNSIEVE_UPLOAD_MODE", "agent_first").strip().lower()
+
+        # Primary path: agent/manifest upload.
+        if upload_mode != "direct":
+            try:
+                return self._upload_file_via_agent_manifest(local_path, dataset_id, remote_path)
+            except Exception as e:
+                agent_error = e
+                logger.warning("Pennsieve agent/manifest upload unavailable: %s", e)
+
+        # Legacy fallback path: direct API upload.
         self._ensure_token()
-        dest_id = "" if remote_path in ("/", "") else remote_path
+        payload = {"datasetId": dataset_id}
+        if remote_path not in ("/", ""):
+            payload["destinationId"] = remote_path
         with open(local_path, "rb") as f:
             resp = self._client.post(
                 f"{self._api_url}/packages/upload",
                 headers=self._auth_headers(),
-                data={"datasetId": dataset_id, "destinationId": dest_id},
+                data=payload,
                 files={"file": (Path(local_path).name, f)},
             )
-            resp.raise_for_status()
-            return resp.json()
+            try:
+                resp.raise_for_status()
+                return resp.json()
+            except HTTPStatusError as e:
+                # Pennsieve API in many workspaces no longer accepts POST on
+                # /packages/upload (returns 405 with Allow: GET, PUT, HEAD).
+                # Surface a precise message so users know this is an upstream
+                # API mode mismatch, not a bad file selection in NIR.
+                if resp.status_code == 405:
+                    allow = resp.headers.get("allow", "")
+                    if agent_error:
+                        raise RuntimeError(
+                            "Pennsieve direct API upload endpoint rejected POST "
+                            f"(HTTP 405, Allow: {allow or 'unknown'}). "
+                            "Agent/manifest fallback also failed: "
+                            f"{agent_error}"
+                        ) from e
+                    raise RuntimeError(
+                        "Pennsieve direct API upload endpoint rejected POST "
+                        f"(HTTP 405, Allow: {allow or 'unknown'}). "
+                        "This workspace requires Agent/manifest-based uploads."
+                    ) from e
+                raise
+
+    def _upload_file_via_agent_manifest(
+        self,
+        local_path: str,
+        dataset_id: str,
+        remote_path: str = "/",
+    ) -> Dict[str, Any]:
+        """Upload one file via Pennsieve Agent manifest workflow."""
+        if remote_path not in ("", "/"):
+            # Current Transfer UI targets dataset root. Folder uploads within a
+            # dataset can be added later using manifest target path semantics.
+            logger.info("Pennsieve agent upload ignores remote_path=%s for now", remote_path)
+
+        try:
+            from pennsieve2 import Pennsieve
+        except Exception as e:
+            raise RuntimeError(
+                "Pennsieve agent-mode upload requires `pennsieve2` Python package."
+            ) from e
+
+        agent_target = os.getenv("PENNSIEVE_AGENT_TARGET", "localhost:9000")
+        self._assert_agent_target_not_minio(agent_target)
+        try:
+            client = Pennsieve(connect=True, target=agent_target)
+        except SystemExit as e:
+            raise RuntimeError(
+                f"Pennsieve Agent is not reachable at {agent_target}. "
+                "Start it with: pennsieve agent"
+            ) from e
+        except Exception as e:
+            raise RuntimeError(
+                f"Could not connect to Pennsieve Agent at {agent_target}: {e}"
+            ) from e
+
+        abs_path = str(Path(local_path).resolve())
+        if not os.path.isfile(abs_path):
+            raise RuntimeError(f"Upload source is not a file: {abs_path}")
+
+        file_name = os.path.basename(abs_path)
+        base_dir = os.path.dirname(abs_path) or "."
+
+        # Agent auth/session is sourced from the local Pennsieve profile.
+        # We still set dataset explicitly per upload.
+        client.use_dataset(dataset_id)
+        create_resp = client.manifest.create(
+            base_path=base_dir,
+            target_base_path="",
+            recursive=False,
+            files=[file_name],
+        )
+        manifest_id = int(getattr(create_resp, "manifest_id", 0) or 0)
+        if manifest_id <= 0:
+            raise RuntimeError("Pennsieve Agent did not return a valid manifest ID")
+
+        try:
+            client.manifest.sync(manifest_id)
+            client.manifest.upload(manifest_id)
+
+            max_wait_s = int(os.getenv("PENNSIEVE_AGENT_UPLOAD_TIMEOUT_SEC", "1800"))
+            deadline = time.time() + max_wait_s
+            success_states = {2, 3, 4, 9}  # IMPORTED/FINALIZED/VERIFIED/UPLOADED
+            failed_states = {5, 6, 7, 8}   # FAILED/REMOVED/UNKNOWN/CHANGED
+
+            while time.time() < deadline:
+                files_resp = client.manifest.list_files(
+                    manifest_id=manifest_id,
+                    offset=0,
+                    limit=1000,
+                )
+                entries = list(getattr(files_resp, "file", []))
+                if not entries:
+                    time.sleep(1.0)
+                    continue
+
+                states = [int(getattr(item, "status", -1)) for item in entries]
+                if any(state in failed_states for state in states):
+                    raise RuntimeError(
+                        f"Pennsieve Agent reported failed manifest states: {states}"
+                    )
+                if all(state in success_states for state in states):
+                    return {
+                        "status": "uploaded_via_agent",
+                        "manifest_id": manifest_id,
+                        "dataset_id": dataset_id,
+                        "file": file_name,
+                    }
+                time.sleep(2.0)
+
+            raise RuntimeError(
+                f"Timed out waiting for Pennsieve Agent upload (manifest {manifest_id})"
+            )
+        finally:
+            try:
+                client.manifest.delete(manifest_id)
+            except Exception:
+                pass
+
+    @staticmethod
+    def _assert_agent_target_not_minio(agent_target: str) -> None:
+        """Detect common local port conflict where MinIO occupies agent port."""
+        host, sep, port_str = agent_target.partition(":")
+        if not sep:
+            host = "localhost"
+            port_str = agent_target
+        try:
+            port = int(port_str)
+        except Exception:
+            return
+
+        try:
+            with socket.create_connection((host, port), timeout=1.0) as sock:
+                sock.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                banner = sock.recv(256).decode("latin-1", errors="ignore")
+        except Exception:
+            return
+
+        if "MinIO" in banner:
+            raise RuntimeError(
+                f"PENNSIEVE_AGENT_TARGET points to MinIO at {agent_target}. "
+                "Run Pennsieve Agent on another port and set PENNSIEVE_AGENT_TARGET "
+                "(for example: 127.0.0.1:11235)."
+            )
 
     # ----------------------------------------------------------- internals
 

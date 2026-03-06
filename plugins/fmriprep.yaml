@@ -157,6 +157,14 @@ execution:
             else
               echo "- ${jf#/data/inputs/bids_dir/} :: MISSING ${missing%, }" >> "$AUDIT_FILE"
             fi
+            for key in RepetitionTime SliceTiming PhaseEncodingDirection TotalReadoutTime EchoTime TaskName; do
+              if grep -q "\"$key\"" "$jf"; then
+                raw="$(grep -m1 "\"$key\"" "$jf" | sed -E "s/.*\"$key\"[[:space:]]*:[[:space:]]*(.*)[[:space:]]*$/\\1/" | sed -E "s/[[:space:]]*,[[:space:]]*$//")"
+                echo "    $key: $raw" >> "$AUDIT_FILE"
+              else
+                echo "    $key: <missing>" >> "$AUDIT_FILE"
+              fi
+            done
           done < <(find "$SUBJ_DIR" -path "*/func/*_bold.json" -type f 2>/dev/null | sort)
           if [ "$FUNC_COUNT" -eq 0 ]; then
             echo "WARNING: no BOLD sidecars found" >> "$AUDIT_FILE"
@@ -190,6 +198,14 @@ execution:
             else
               echo "- ${jf#/data/inputs/bids_dir/} :: MISSING ${missing%, }" >> "$AUDIT_FILE"
             fi
+            for key in IntendedFor PhaseEncodingDirection TotalReadoutTime EchoTime; do
+              if grep -q "\"$key\"" "$jf"; then
+                raw="$(grep -m1 "\"$key\"" "$jf" | sed -E "s/.*\"$key\"[[:space:]]*:[[:space:]]*(.*)[[:space:]]*$/\\1/" | sed -E "s/[[:space:]]*,[[:space:]]*$//")"
+                echo "    $key: $raw" >> "$AUDIT_FILE"
+              else
+                echo "    $key: <missing>" >> "$AUDIT_FILE"
+              fi
+            done
           done < <(find "$SUBJ_DIR" -path "*/fmap/*.json" -type f 2>/dev/null | sort)
           if [ "$FMAP_COUNT" -eq 0 ]; then
             echo "none" >> "$AUDIT_FILE"

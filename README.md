@@ -141,6 +141,9 @@ For detailed SSH key setup instructions, see the [User Guide](https://github.com
 
 - [User Guide](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/USER_GUIDE.md) -- Complete setup, connections, SSH key guide, and usage instructions
 - [Troubleshooting](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/TROUBLESHOOTING.md) -- Common issues and solutions
+- [Processor Image Mirror](docker/processors/README.md) -- Required tested images and mirror script for `phindagijimana321/*`
+- [Pennsieve Registration Bundle](pennsieve/REGISTER.md) -- 14 processors + 7 workflows translation and registration runbook
+- [Pennsieve Go/No-Go Checklist](pennsieve/PLATFORM_REGISTRATION_CHECKLIST.md) -- strict phased checks for platform registration
 
 ## Citing This Software
 

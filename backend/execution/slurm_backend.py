@@ -14,6 +14,7 @@ Architecture:
 """
 import json
 import logging
+import os
 import re
 import uuid
 from datetime import datetime
@@ -1370,8 +1371,22 @@ class SLURMBackend(ExecutionBackend):
             lines.append(f'if [ -d "{meld_data_dir}/meld_params" ]; then')
             lines.append(f'  echo "Using cached MELD data from {meld_data_dir}"')
             lines.append(f'fi')
-            bind_mounts.append(f"{meld_data_dir}/meld_params:/data/meld_params:ro")
-            bind_mounts.append(f"{meld_data_dir}/models:/data/models:ro")
+            meld_params_dir = f"{meld_data_dir}/meld_params"
+            meld_models_dir = f"{meld_data_dir}/models"
+            if os.path.isdir(meld_params_dir):
+                bind_mounts.append(f"{meld_params_dir}:/data/meld_params:ro")
+            else:
+                logger.warning(
+                    "MELD params cache not found on HPC (%s); container will download params.",
+                    meld_params_dir,
+                )
+            if os.path.isdir(meld_models_dir):
+                bind_mounts.append(f"{meld_models_dir}:/data/models:ro")
+            else:
+                logger.warning(
+                    "MELD models cache not found on HPC (%s); container will download models.",
+                    meld_models_dir,
+                )
             lines.append("")
             logger.info("Added MELD work-directory bind mounts under %s/work/", job_dir)
 

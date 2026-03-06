@@ -14,6 +14,11 @@ from backend.connectors.base import BasePlatformConnector
 from backend.connectors.pennsieve import PennsieveConnector
 from backend.connectors.xnat import XNATConnector
 from backend.core.config import get_settings
+from backend.core.platform_config_store import (
+    clear_platform_config,
+    load_platform_config,
+    save_platform_config,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/platforms", tags=["platforms"])
@@ -43,7 +48,21 @@ def _get_connector(platform: str) -> BasePlatformConnector:
                 api_url=settings.xnat_api_url
             )
 
-    return _connectors[platform]
+    connector = _connectors[platform]
+
+    # Connections are in-memory per worker process; restore from persisted
+    # credentials when available so subsequent requests (e.g. transfer upload)
+    # do not depend on landing on the same worker as /connect.
+    if not connector.is_connected():
+        saved_creds = load_platform_config(platform)
+        if saved_creds:
+            try:
+                connector.connect(saved_creds)
+                logger.info("Auto-restored %s platform session from saved config", platform)
+            except Exception as e:
+                logger.warning("Could not auto-restore %s session: %s", platform, e)
+
+    return connector
 
 
 def _require_connected(connector: BasePlatformConnector) -> None:
@@ -100,6 +119,7 @@ def platform_connect(platform: str, request: ConnectRequest):
 
     try:
         result = connector.connect(creds)
+        save_platform_config(platform, creds)
         return result
     except ConnectionError as e:
         logger.warning("Platform connect - network error: %s", e)
@@ -120,6 +140,7 @@ def platform_disconnect(platform: str):
     """End session with a platform."""
     connector = _get_connector(platform)
     connector.disconnect()
+    clear_platform_config(platform)
     return {"disconnected": True, "platform": platform}
 
 

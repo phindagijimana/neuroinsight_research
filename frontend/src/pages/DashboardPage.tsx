@@ -11,13 +11,11 @@ import JobSelector from '../components/JobSelector';
 import FileBrowser from '../components/FileBrowser';
 import StatsViewer from '../components/StatsViewer';
 import QCImageGallery from '../components/QCImageGallery';
-import { TransferProgress } from '../components/TransferProgress';
 import BarChart from '../components/icons/BarChart';
 import RefreshCw from '../components/icons/RefreshCw';
 import Eye from '../components/icons/Eye';
 import Activity from '../components/icons/Activity';
 import Download from '../components/icons/Download';
-import { Upload } from 'lucide-react';
 
 interface DashboardPageProps {
   selectedJobId: string | null;
@@ -52,8 +50,6 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
   const [provenanceLoading, setProvenanceLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState<'qc' | 'files' | 'stats' | 'provenance'>('qc');
-  const [uploadTransferId, setUploadTransferId] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetchJobs();
@@ -117,33 +113,6 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
   const handleViewInViewer = () => {
     if (selectedJobId) {
       setActivePage('viewer');
-    }
-  };
-
-  const [uploadTarget, setUploadTarget] = useState<string | null>(null);
-  const [uploadDatasetId, setUploadDatasetId] = useState('');
-  const [showUploadForm, setShowUploadForm] = useState(false);
-
-  const handleUploadToPlatform = async (platform?: string) => {
-    if (!selectedJob) return;
-    const targetPlatform = platform || selectedJob.data_source_platform || uploadTarget;
-    const targetDataset = selectedJob.data_source_dataset_id || uploadDatasetId;
-    if (!targetPlatform || !targetDataset) {
-      setShowUploadForm(true);
-      return;
-    }
-    setUploading(true);
-    setShowUploadForm(false);
-    try {
-      const result = await apiService.startTransferUpload(
-        'local',
-        selectedJob.output_dir,
-        targetPlatform,
-        targetDataset,
-      );
-      setUploadTransferId(result.transfer_id);
-    } catch {
-      setUploading(false);
     }
   };
 
@@ -275,83 +244,11 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                         <Eye className="w-4 h-4" />
                         Open in Viewer
                       </button>
-                      {selectedJob.data_source_platform ? (
-                        <button
-                          onClick={() => handleUploadToPlatform()}
-                          disabled={uploading}
-                          className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition disabled:opacity-50"
-                        >
-                          <Upload className="w-4 h-4" />
-                          Upload to {selectedJob.data_source_platform === 'pennsieve' ? 'Pennsieve' : 'XNAT'}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setShowUploadForm(!showUploadForm)}
-                          disabled={uploading}
-                          className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition disabled:opacity-50"
-                        >
-                          <Upload className="w-4 h-4" />
-                          Upload to Platform
-                        </button>
-                      )}
                     </>
                   )}
                 </div>
               </div>
             </div>
-
-            {/* Upload destination picker */}
-            {showUploadForm && !uploadTransferId && (
-              <div className="bg-white rounded-lg border border-green-200 p-4 space-y-3">
-                <h4 className="text-sm font-semibold text-gray-700">Upload Results to Platform</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Platform</label>
-                    <select
-                      value={uploadTarget || ''}
-                      onChange={(e) => setUploadTarget(e.target.value || null)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    >
-                      <option value="">Select platform...</option>
-                      <option value="pennsieve">Pennsieve</option>
-                      <option value="xnat">XNAT</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      {uploadTarget === 'xnat' ? 'Experiment ID / Resource' : 'Dataset ID'}
-                    </label>
-                    <input
-                      type="text"
-                      value={uploadDatasetId}
-                      onChange={(e) => setUploadDatasetId(e.target.value)}
-                      placeholder={uploadTarget === 'xnat' ? 'XNAT_E00001/NEUROINSIGHT' : 'N:dataset:abc-123'}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setShowUploadForm(false)} className="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
-                  <button
-                    onClick={() => handleUploadToPlatform(uploadTarget || undefined)}
-                    disabled={!uploadTarget || !uploadDatasetId}
-                    className="px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                  >
-                    Start Upload
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Upload Progress */}
-            {uploadTransferId && (
-              <TransferProgress
-                transferId={uploadTransferId}
-                direction="upload"
-                onComplete={() => { setUploadTransferId(null); setUploading(false); }}
-                onCancel={() => { setUploadTransferId(null); setUploading(false); }}
-              />
-            )}
 
             {/* QC Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -1,0 +1,187 @@
+schema_version: 1
+workspace_requirement: "Pennsieve Workflow Services V2 must be enabled"
+default_compute_type: ecs
+
+processors:
+  - plugin_id: dcm2niix
+    application_name: neuroinsight-dcm2niix
+    source_url: docker://phindagijimana321/heudiconv:1.3.4
+    application_type: processor
+    compute_types: [ecs]
+    resources: { cpu: 2, memory_gb: 8 }
+    parameters: [compress, merge_2d, anonymize]
+
+  - plugin_id: fastsurfer
+    application_name: neuroinsight-fastsurfer
+    source_url: docker://phindagijimana321/fastsurfer:cpu-v2.4.2
+    application_type: processor
+    compute_types: [ecs]
+    resources: { cpu: 4, memory_gb: 16 }
+    parameters: [seg_only, use_cpu, batch_size, compute_volumes]
+
+  - plugin_id: fmriprep
+    application_name: neuroinsight-fmriprep
+    source_url: docker://phindagijimana321/fmriprep:23.2.1
+    application_type: processor
+    compute_types: [ecs]
+    resources: { cpu: 16, memory_gb: 64 }
+    parameters: [task, dummy_scans, use_aroma, ignore_fieldmaps]
+
+  - plugin_id: freesurfer_autorecon_volonly
+    application_name: neuroinsight-freesurfer-autorecon-volonly
+    source_url: docker://phindagijimana321/freesurfer:7.4.1
+    application_type: processor
+    compute_types: [ecs]
+    resources: { cpu: 8, memory_gb: 32 }
+    parameters: [threads]
+
+  - plugin_id: freesurfer_longitudinal
+    application_name: neuroinsight-freesurfer-longitudinal
+    source_url: docker://phindagijimana321/freesurfer:7.4.1
+    application_type: processor
+    compute_types: [ecs]
+    resources: { cpu: 8, memory_gb: 48 }
+    parameters: [threads, base_id, resume]
+
+  - plugin_id: freesurfer_longitudinal_stats
+    application_name: neuroinsight-freesurfer-longitudinal-stats
+    source_url: docker://phindagijimana321/freesurfer:7.4.1
+    application_type: postprocessor
+    compute_types: [ecs]
+    resources: { cpu: 4, memory_gb: 16 }
+    parameters: [base_id]
+
+  - plugin_id: freesurfer_recon
+    application_name: neuroinsight-freesurfer-recon
+    source_url: docker://phindagijimana321/freesurfer:7.4.1
+    application_type: processor
+    compute_types: [ecs]
+    resources: { cpu: 8, memory_gb: 32 }
+    parameters: [threads, hippocampal_subfields, brainstem]
+
+  - plugin_id: hs_postprocess
+    application_name: neuroinsight-hs-postprocess
+    source_url: docker://phindagijimana321/hs-postprocess:1.0.0
+    application_type: postprocessor
+    compute_types: [ecs]
+    resources: { cpu: 4, memory_gb: 16 }
+    parameters: []
+
+  - plugin_id: meld_graph
+    application_name: neuroinsight-meld-graph
+    source_url: docker://phindagijimana321/meld_graph:v2.2.4
+    application_type: processor
+    compute_types: [ecs]
+    resources: { cpu: 4, memory_gb: 48 }
+    parameters: [threshold]
+
+  - plugin_id: qsiprep
+    application_name: neuroinsight-qsiprep
+    source_url: docker://phindagijimana321/qsiprep:0.20.0
+    application_type: processor
+    compute_types: [ecs]
+    resources: { cpu: 8, memory_gb: 32 }
+    parameters: [output_resolution, denoise, unringing, hmc_model, combine_all_dwis]
+
+  - plugin_id: qsirecon
+    application_name: neuroinsight-qsirecon
+    source_url: docker://phindagijimana321/qsirecon:1.1.1
+    application_type: postprocessor
+    compute_types: [ecs]
+    resources: { cpu: 8, memory_gb: 32 }
+    parameters: [recon_spec, atlases]
+
+  - plugin_id: segmentha_t1
+    application_name: neuroinsight-segmentha-t1
+    source_url: docker://phindagijimana321/freesurfer-mcr:7.4.1
+    application_type: processor
+    compute_types: [ecs]
+    resources: { cpu: 4, memory_gb: 16 }
+    parameters: [threads]
+
+  - plugin_id: segmentha_t2
+    application_name: neuroinsight-segmentha-t2
+    source_url: docker://phindagijimana321/freesurfer-mcr:7.4.1
+    application_type: processor
+    compute_types: [ecs]
+    resources: { cpu: 4, memory_gb: 16 }
+    parameters: [threads]
+
+  - plugin_id: xcpd
+    application_name: neuroinsight-xcpd
+    source_url: docker://phindagijimana321/xcp_d:0.6.1
+    application_type: postprocessor
+    compute_types: [ecs]
+    resources: { cpu: 4, memory_gb: 16 }
+    parameters: [smoothing, fd_threshold, low_pass, atlases]
+
+workflows:
+  - workflow_id: fmri_full
+    workflow_name: neuroinsight-fmri-full
+    processors:
+      - id: fmriprep
+        plugin_id: fmriprep
+        depends_on: []
+      - id: xcpd
+        plugin_id: xcpd
+        depends_on: [fmriprep]
+
+  - workflow_id: diffusion_full
+    workflow_name: neuroinsight-diffusion-full
+    processors:
+      - id: qsiprep
+        plugin_id: qsiprep
+        depends_on: []
+      - id: qsirecon
+        plugin_id: qsirecon
+        depends_on: [qsiprep]
+
+  - workflow_id: cortical_lesion_detection
+    workflow_name: neuroinsight-cortical-lesion-detection
+    processors:
+      - id: freesurfer_recon
+        plugin_id: freesurfer_recon
+        depends_on: []
+      - id: meld_graph
+        plugin_id: meld_graph
+        depends_on: [freesurfer_recon]
+
+  - workflow_id: wf_freesurfer_longitudinal_full
+    workflow_name: neuroinsight-freesurfer-longitudinal-full
+    processors:
+      - id: freesurfer_longitudinal
+        plugin_id: freesurfer_longitudinal
+        depends_on: []
+      - id: freesurfer_longitudinal_stats
+        plugin_id: freesurfer_longitudinal_stats
+        depends_on: [freesurfer_longitudinal]
+
+  - workflow_id: wf_hs_detection_v1
+    workflow_name: neuroinsight-hs-detection
+    processors:
+      - id: freesurfer_autorecon_volonly
+        plugin_id: freesurfer_autorecon_volonly
+        depends_on: []
+      - id: hs_postprocess
+        plugin_id: hs_postprocess
+        depends_on: [freesurfer_autorecon_volonly]
+
+  - workflow_id: hippo_subfields_t1
+    workflow_name: neuroinsight-hippo-subfields-t1
+    processors:
+      - id: freesurfer_recon
+        plugin_id: freesurfer_recon
+        depends_on: []
+      - id: segmentha_t1
+        plugin_id: segmentha_t1
+        depends_on: [freesurfer_recon]
+
+  - workflow_id: hippo_subfields_t2
+    workflow_name: neuroinsight-hippo-subfields-t2
+    processors:
+      - id: freesurfer_recon
+        plugin_id: freesurfer_recon
+        depends_on: []
+      - id: segmentha_t2
+        plugin_id: segmentha_t2
+        depends_on: [freesurfer_recon]
