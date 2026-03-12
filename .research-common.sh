@@ -771,12 +771,13 @@ cmd_license() {
 cmd_stop() {
     local quiet=false
     local stop_all=false
-    local stop_infra=false
+    local stop_infra=true
+    local app_only=false
     for arg in "$@"; do
         case "$arg" in
             --quiet) quiet=true ;;
             --all|-a) stop_all=true ;;
-            infra|--infra) stop_infra=true ;;
+            app|--app|--app-only) stop_infra=false; app_only=true ;;
         esac
     done
 
@@ -827,7 +828,10 @@ cmd_stop() {
         done
         $quiet || success "Infrastructure stopped (containers removed, data volumes preserved)"
     else
-        $quiet || info "Infrastructure still running (use ${BOLD}./research stop infra${NC} to stop containers and keep data, or ${BOLD}./research stop --all${NC} to remove everything)"
+        $quiet || info "Infrastructure still running (app-only stop mode)"
+        if [ "$app_only" = true ]; then
+            $quiet || info "Use ${BOLD}./research stop${NC} to stop containers and keep data, or ${BOLD}./research stop --all${NC} to remove everything"
+        fi
     fi
 
     $quiet || echo ""
@@ -1549,8 +1553,8 @@ cmd_help() {
     echo "    install              Install deps, start infra, init DB & MinIO"
     echo "    license              Set up pipeline license files (interactive)"
     echo "    start                Start all services (infra + app)"
-    echo "    stop                 Stop app services (keeps infra running)"
-    echo "    stop infra           Stop app + infrastructure containers (keeps data volumes)"
+    echo "    stop                 Stop app + infrastructure containers (keeps data volumes)"
+    echo "    stop app             Stop app services only (keeps infra running)"
     echo "    stop --all           Stop everything (app + PostgreSQL/Redis/MinIO)"
     echo "    restart              Restart all app services"
     echo ""
@@ -1610,8 +1614,8 @@ cmd_help() {
     echo "    $cli db jobs           # See recent jobs"
     echo "    $cli pull freesurfer   # Pull FreeSurfer image"
     echo "    $cli meld-cache verify # Check MELD cache local/HPC readiness"
-    echo "    $cli stop              # Stop app services"
-    echo "    $cli stop infra        # Stop app + infra, keep DB/object data"
+    echo "    $cli stop              # Stop app + infra, keep DB/object data"
+    echo "    $cli stop app          # Stop app only, keep infra running"
     echo "    $cli infra down        # Stop infrastructure"
     echo ""
 }
