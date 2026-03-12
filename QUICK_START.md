@@ -10,8 +10,8 @@
 ./research install        # Install deps, start infra, init DB
 ./research license        # Set up FreeSurfer / MELD license files
 ./research start          # Launch the app
-./research stop           # Stop app services only (keep infra running)
-./research stop infra     # Stop app + infra containers (keep data volumes)
+./research stop           # Stop app + infra containers (keep data volumes)
+./research stop app       # Stop app services only (keep infra running)
 ./research stop --all     # Stop everything and remove infra data volumes
 ```
 
@@ -31,8 +31,8 @@ Open **http://localhost:3000**.
 ./research install        # First-time setup (deps + infra + DB)
 ./research license        # Set up pipeline license files
 ./research start          # Start the application
-./research stop           # Stop the application
-./research stop infra     # Stop app + infra, keep DB/object data
+./research stop           # Stop app + infra, keep DB/object data
+./research stop app       # Stop app only, keep infra running
 ./research stop --all     # Stop app + infra and remove infra data
 ./research status         # Check all services
 ./research logs all       # Tail all logs

@@ -27,7 +27,7 @@ cmd_start() {
     export ENVIRONMENT="production"
 
     preflight_checks
-    cmd_stop --quiet 2>/dev/null || true
+    cmd_stop --quiet app 2>/dev/null || true
     resolve_ports
 
     # ── Database migrations ──────────────────────────────────────────────
