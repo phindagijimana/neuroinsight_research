@@ -33,6 +33,9 @@ cd neuroinsight_research
 ./research install        # install deps, start infra, init DB
 ./research license        # set up FreeSurfer / MELD license files
 ./research start          # launch the app
+./research stop           # stop app services only (keep infra running)
+./research stop infra     # stop app + infra containers (keep data volumes)
+./research stop --all     # stop everything and remove infra data volumes
 ```
 
 Open **http://localhost:3000** -- that's it.

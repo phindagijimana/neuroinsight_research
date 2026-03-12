@@ -189,6 +189,9 @@ cd neuroinsight_research
 ./research install        # Install deps, start infra, init DB
 ./research license        # Set up FreeSurfer / MELD license files
 ./research start          # Launch the app (production)
+./research stop           # Stop app services only (keep infra running)
+./research stop infra     # Stop app + infra containers (keep data volumes)
+./research stop --all     # Stop everything and remove infra data volumes
 ```
 
 For development mode with hot-reload:
