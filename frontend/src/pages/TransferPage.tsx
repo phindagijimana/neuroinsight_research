@@ -67,6 +67,12 @@ function TransferPage() {
   // Connection state per pane
   const [leftConnected, setLeftConnected] = useState(false);
   const [rightConnected, setRightConnected] = useState(false);
+  const [leftUploadReady, setLeftUploadReady] = useState(true);
+  const [rightUploadReady, setRightUploadReady] = useState(true);
+  const [leftUploadError, setLeftUploadError] = useState<string | null>(null);
+  const [rightUploadError, setRightUploadError] = useState<string | null>(null);
+  const [leftAgentTarget, setLeftAgentTarget] = useState<string | null>(null);
+  const [rightAgentTarget, setRightAgentTarget] = useState<string | null>(null);
 
   // Transfer state
   const [activeTransfers, setActiveTransfers] = useState<ActiveTransfer[]>([]);
@@ -133,6 +139,22 @@ function TransferPage() {
     persistActiveTransfers(activeTransfers);
   }, [activeTransfers, persistActiveTransfers]);
 
+  useEffect(() => {
+    if (leftPlatform !== 'pennsieve') {
+      setLeftUploadReady(true);
+      setLeftUploadError(null);
+      setLeftAgentTarget(null);
+    }
+  }, [leftPlatform]);
+
+  useEffect(() => {
+    if (rightPlatform !== 'pennsieve') {
+      setRightUploadReady(true);
+      setRightUploadError(null);
+      setRightAgentTarget(null);
+    }
+  }, [rightPlatform]);
+
   const loadHistory = async () => {
     try {
       const data = await apiService.getTransferHistory();
@@ -164,6 +186,10 @@ function TransferPage() {
       return;
     }
     setError(null);
+    if (rightPlatform === 'pennsieve' && !rightUploadReady) {
+      setError(rightUploadError || 'Pennsieve Agent is not ready. Start pennsieve agent and verify profile.');
+      return;
+    }
 
     const fileIds = leftSelected.map(f => f.id || f.path || f.name);
     const srcIsExternal = isExternal(leftPlatform);
@@ -186,7 +212,16 @@ function TransferPage() {
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message || 'Failed to start transfer');
     }
-  }, [leftSelected, leftPlatform, rightPlatform, leftPath, rightPath, enqueueTransfers]);
+  }, [
+    leftSelected,
+    leftPlatform,
+    rightPlatform,
+    leftPath,
+    rightPath,
+    rightUploadReady,
+    rightUploadError,
+    enqueueTransfers,
+  ]);
 
   // Start transfer right -> left
   const transferRightToLeft = useCallback(async () => {
@@ -196,6 +231,10 @@ function TransferPage() {
       return;
     }
     setError(null);
+    if (leftPlatform === 'pennsieve' && !leftUploadReady) {
+      setError(leftUploadError || 'Pennsieve Agent is not ready. Start pennsieve agent and verify profile.');
+      return;
+    }
 
     const fileIds = rightSelected.map(f => f.id || f.path || f.name);
     const srcIsExternal = isExternal(rightPlatform);
@@ -218,7 +257,16 @@ function TransferPage() {
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message || 'Failed to start transfer');
     }
-  }, [rightSelected, leftPlatform, rightPlatform, leftPath, rightPath, enqueueTransfers]);
+  }, [
+    rightSelected,
+    leftPlatform,
+    rightPlatform,
+    leftPath,
+    rightPath,
+    leftUploadReady,
+    leftUploadError,
+    enqueueTransfers,
+  ]);
 
   const handleTransferComplete = (transferId: string) => {
     setActiveTransfers(prev => prev.filter(t => t.id !== transferId));
@@ -293,7 +341,25 @@ function TransferPage() {
               key={`left-${leftPlatform}`}
               platform={leftPlatform}
               onConnectionChange={setLeftConnected}
+              onPlatformStatusChange={(status) => {
+                setLeftUploadReady(status.uploadReady ?? status.connected);
+                setLeftUploadError(status.uploadError ?? null);
+                setLeftAgentTarget(status.agentTarget ?? null);
+              }}
             />
+            {leftPlatform === 'pennsieve' && leftConnected && (
+              <div
+                className={`mt-1 px-2 py-1 rounded text-[11px] border ${
+                  leftUploadReady
+                    ? 'bg-green-50 border-green-200 text-green-700'
+                    : 'bg-amber-50 border-amber-200 text-amber-700'
+                }`}
+              >
+                {leftUploadReady
+                  ? `Pennsieve Agent: Ready${leftAgentTarget ? ` (${leftAgentTarget})` : ''}`
+                  : `Pennsieve Agent: Not Ready${leftAgentTarget ? ` (${leftAgentTarget})` : ''}`}
+              </div>
+            )}
           </div>
           <div className="flex-1 min-h-0">
             {leftConnected ? (
@@ -316,9 +382,21 @@ function TransferPage() {
         <div className="flex flex-col items-center justify-center gap-2 px-1 py-4">
           <button
             onClick={transferLeftToRight}
-            disabled={leftSelected.length === 0 || leftPlatform === rightPlatform || !leftConnected || !rightConnected}
+            disabled={
+              leftSelected.length === 0 ||
+              leftPlatform === rightPlatform ||
+              !leftConnected ||
+              !rightConnected ||
+              (rightPlatform === 'pennsieve' && !rightUploadReady)
+            }
             className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-white hover:bg-[#003d7a] hover:border-[#003d7a] transition disabled:opacity-30 disabled:cursor-not-allowed"
-            title={!leftConnected || !rightConnected ? 'Connect both platforms first' : `Transfer ${leftSelected.length} file(s) to ${rightTab.label}`}
+            title={
+              !leftConnected || !rightConnected
+                ? 'Connect both platforms first'
+                : rightPlatform === 'pennsieve' && !rightUploadReady
+                  ? (rightUploadError || 'Pennsieve Agent is not ready for upload')
+                  : `Transfer ${leftSelected.length} file(s) to ${rightTab.label}`
+            }
           >
             <ArrowRight className="h-5 w-5" />
           </button>
@@ -333,9 +411,21 @@ function TransferPage() {
 
           <button
             onClick={transferRightToLeft}
-            disabled={rightSelected.length === 0 || leftPlatform === rightPlatform || !leftConnected || !rightConnected}
+            disabled={
+              rightSelected.length === 0 ||
+              leftPlatform === rightPlatform ||
+              !leftConnected ||
+              !rightConnected ||
+              (leftPlatform === 'pennsieve' && !leftUploadReady)
+            }
             className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-white hover:bg-[#003d7a] hover:border-[#003d7a] transition disabled:opacity-30 disabled:cursor-not-allowed"
-            title={!leftConnected || !rightConnected ? 'Connect both platforms first' : `Transfer ${rightSelected.length} file(s) to ${leftTab.label}`}
+            title={
+              !leftConnected || !rightConnected
+                ? 'Connect both platforms first'
+                : leftPlatform === 'pennsieve' && !leftUploadReady
+                  ? (leftUploadError || 'Pennsieve Agent is not ready for upload')
+                  : `Transfer ${rightSelected.length} file(s) to ${leftTab.label}`
+            }
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -371,7 +461,25 @@ function TransferPage() {
               key={`right-${rightPlatform}`}
               platform={rightPlatform}
               onConnectionChange={setRightConnected}
+              onPlatformStatusChange={(status) => {
+                setRightUploadReady(status.uploadReady ?? status.connected);
+                setRightUploadError(status.uploadError ?? null);
+                setRightAgentTarget(status.agentTarget ?? null);
+              }}
             />
+            {rightPlatform === 'pennsieve' && rightConnected && (
+              <div
+                className={`mt-1 px-2 py-1 rounded text-[11px] border ${
+                  rightUploadReady
+                    ? 'bg-green-50 border-green-200 text-green-700'
+                    : 'bg-amber-50 border-amber-200 text-amber-700'
+                }`}
+              >
+                {rightUploadReady
+                  ? `Pennsieve Agent: Ready${rightAgentTarget ? ` (${rightAgentTarget})` : ''}`
+                  : `Pennsieve Agent: Not Ready${rightAgentTarget ? ` (${rightAgentTarget})` : ''}`}
+              </div>
+            )}
           </div>
           <div className="flex-1 min-h-0">
             {rightConnected ? (

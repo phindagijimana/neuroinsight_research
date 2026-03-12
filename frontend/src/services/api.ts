@@ -765,6 +765,18 @@ export const apiService = {
     return resp.data;
   },
 
+  /** Check Pennsieve Agent readiness for uploads. */
+  async getPennsieveAgentStatus(): Promise<{
+    agent_target: string;
+    agent_reachable: boolean;
+    profile_available: boolean;
+    ready_for_upload: boolean;
+    error?: string | null;
+  }> {
+    const resp = await api.get('/api/platforms/pennsieve/agent-status');
+    return resp.data;
+  },
+
   /** List top-level projects on a platform. */
   async platformListProjects(platform: string): Promise<{ projects: any[] }> {
     const resp = await api.get(`/api/platforms/${platform}/projects`);

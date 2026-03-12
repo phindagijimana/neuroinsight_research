@@ -24,6 +24,7 @@ cmd_start() {
     header
     ensure_dirs
     rotate_runtime_logs
+    export ENVIRONMENT="production"
 
     preflight_checks
     cmd_stop --quiet 2>/dev/null || true
@@ -58,6 +59,8 @@ cmd_start() {
     if [ -f "$SCRIPT_DIR/.env" ]; then
         set -a; source "$SCRIPT_DIR/.env" 2>/dev/null || true; set +a
     fi
+    # Enforce production runtime env for backend process regardless of .env default.
+    export ENVIRONMENT="production"
 
     # ── Backend (Uvicorn — no reload, serves frontend SPA) ────────────
     step "Backend  [PROD]  (port $BACKEND_PORT)"
