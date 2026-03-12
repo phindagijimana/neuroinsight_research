@@ -30,9 +30,9 @@ references:
 
 container:
   runtime: docker
-  image: "meldproject/meld_graph:v2.2.4"
-  # HPC: pull with `apptainer pull docker://meldproject/meld_graph:v2.2.4`
-  # Result: meld_graph_v2.2.4.sif (~13 GB)
+  image: "phindagijimana321/meld_graph:v2.2.4-nir2"
+  # HPC: pull with `apptainer pull docker://phindagijimana321/meld_graph:v2.2.4-nir2`
+  # Result: meld_graph_v2.2.4-nir2.sif
 
 inputs:
   required:

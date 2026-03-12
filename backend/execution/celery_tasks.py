@@ -313,7 +313,8 @@ def pull_docker_image(self, image: str) -> dict:
         return {"status": "pulled", "image": image}
     except Exception as e:
         logger.error(f"Failed to pull image {image}: {e}")
-        return {"status": "error", "image": image, "error": str(e)}
+        # Re-raise so Celery autoretry policy is actually applied.
+        raise
 
 
 @shared_task(
@@ -641,6 +642,9 @@ def run_docker_job(self, job_id: str, spec_dict: dict) -> dict:
             )
             return {"status": "failed", "exit_code": exit_code, "output_dir": str(output_dir)}
 
+    except Reject:
+        # Explicit non-retryable failures (validation, bad spec).
+        raise
     except Exception as e:
         error_message = str(e)
         retry_num = self.request.retries
@@ -663,8 +667,8 @@ def run_docker_job(self, job_id: str, spec_dict: dict) -> dict:
                 current_phase=f"Retrying (attempt {retry_num + 2}/{max_retries + 1})",
                 error_message=f"Retry {retry_num + 1}: {error_message}",
             )
-        # Let autoretry_for handle the re-raise
-        return {"status": "failed", "exit_code": -1, "error": error_message}
+        # Let autoretry_for handle retries by re-raising.
+        raise
 
     finally:
         # Clean up container
@@ -726,8 +730,11 @@ def _run_single_container(
         container_env["MELD_LICENSE"] = "/run/secrets/meld_license.txt"
 
     is_meld = "meld_graph" in image
+    deterministic_meld_image = (
+        "phindagijimana321/meld_graph" in image and "nir2" in image
+    )
     meld_data_dir = Path(settings.data_dir) / "meld_data"
-    if is_meld:
+    if is_meld and not deterministic_meld_image:
         meld_params_dir = meld_data_dir / "meld_params"
         meld_models_dir = meld_data_dir / "models"
         meld_params_dir.mkdir(parents=True, exist_ok=True)
@@ -735,6 +742,8 @@ def _run_single_container(
         volumes[str(meld_params_dir)] = {"bind": "/data/meld_params", "mode": "rw"}
         volumes[str(meld_models_dir)] = {"bind": "/data/models", "mode": "rw"}
         logger.info("Mounted writable MELD cache dirs from %s", meld_data_dir)
+    elif is_meld and deterministic_meld_image:
+        logger.info("Using deterministic MELD image with baked cache; skipping host cache mounts")
 
     device_requests = []
     if gpu_requested:

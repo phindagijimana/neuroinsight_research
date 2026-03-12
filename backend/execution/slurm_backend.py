@@ -1492,12 +1492,29 @@ class SLURMBackend(ExecutionBackend):
                 host_path = f"{job_dir}/work/{host_sub}"
                 lines.append(f"mkdir -p {host_path}")
                 bind_mounts.append(f"{host_path}:{container_sub}:rw")
-            # On-submit auto-prepare mode:
-            # always mount writable MELD cache paths. The plugin will prepare
-            # cache data on first run when missing.
-            meld_params_dir, meld_models_dir = self._resolve_meld_cache_dirs_on_hpc()
-            bind_mounts.append(f"{meld_params_dir}:/data/meld_params:rw")
-            bind_mounts.append(f"{meld_models_dir}:/data/models:rw")
+
+            # If MELD image is deterministic (nir2 with baked cache), do not
+            # overlay /data/meld_params or /data/models from host, otherwise
+            # baked assets are shadowed.
+            deterministic_meld_image = False
+            try:
+                from backend.core.plugin_registry import get_plugin_workflow_registry
+                registry = get_plugin_workflow_registry()
+                meld_plugin = registry.get_plugin("meld_graph")
+                meld_image = (meld_plugin.container_image or "") if meld_plugin else ""
+                deterministic_meld_image = (
+                    "phindagijimana321/meld_graph" in meld_image and "nir2" in meld_image
+                )
+            except Exception as e:
+                logger.debug("Could not resolve MELD image for deterministic check: %s", e)
+
+            if not deterministic_meld_image:
+                meld_params_dir, meld_models_dir = self._resolve_meld_cache_dirs_on_hpc()
+                bind_mounts.append(f"{meld_params_dir}:/data/meld_params:rw")
+                bind_mounts.append(f"{meld_models_dir}:/data/models:rw")
+            else:
+                logger.info("Using deterministic MELD image with baked cache; skipping host cache mounts")
+
             lines.append("")
             logger.info("Added MELD work-directory bind mounts under %s/work/", job_dir)
 

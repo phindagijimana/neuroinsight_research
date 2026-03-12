@@ -143,7 +143,7 @@ const MOCK_PLUGINS: Plugin[] = [
     id: 'meld_graph',
     name: 'MELD Graph',
     version: '1.0.0',
-    container: 'meldproject/meld_graph:v2.2.4',
+    container: 'phindagijimana321/meld_graph:v2.2.4-nir2',
     description: 'Cortical dysplasia detection for epilepsy research',
     category: 'epilepsy',
     input_format_name: 'FreeSurfer SUBJECTS_DIR',

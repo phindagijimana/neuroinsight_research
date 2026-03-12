@@ -8,11 +8,14 @@ Hierarchy: Workspace -> Datasets -> Packages -> Files.
 
 import logging
 import os
+import re
+import shutil
 import socket
+import subprocess
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
 import httpx
@@ -47,6 +50,7 @@ class PennsieveConnector(BasePlatformConnector):
         self._org_id: Optional[str] = None
         self._client = httpx.Client(timeout=60.0)
         self._dataset_int_ids: Dict[str, int] = {}  # node_id -> intId mapping
+        self._agent_target: str = os.getenv("PENNSIEVE_AGENT_TARGET", "localhost:9000")
 
     # ------------------------------------------------------------------ auth
 
@@ -69,11 +73,23 @@ class PennsieveConnector(BasePlatformConnector):
             if not self._org_id:
                 self._org_id = org_obj.get("id", "")
 
+        # Best-effort: prepare/start local agent during connect so users do not
+        # need a separate manual step.
+        prepared_target, _prep_err = self._prepare_agent_target(self._agent_target)
+        self._set_agent_target(prepared_target)
+        _chosen, _auto_err = self._maybe_autostart_agent(prepared_target)
+        if _chosen:
+            self._set_agent_target(_chosen)
+
+        agent = self.agent_status()
         return {
             "connected": True,
             "user": self._user,
             "workspace": self._organization or "",
             "platform": self.platform_name,
+            "agent_target": agent.get("agent_target"),
+            "agent_ready_for_upload": agent.get("ready_for_upload", False),
+            "agent_error": agent.get("error"),
         }
 
     def disconnect(self) -> None:
@@ -85,6 +101,7 @@ class PennsieveConnector(BasePlatformConnector):
         self._organization = None
         self._org_id = None
         self._dataset_int_ids.clear()
+        self._agent_target = os.getenv("PENNSIEVE_AGENT_TARGET", "localhost:9000")
 
     def is_connected(self) -> bool:
         return self._token is not None and time.time() < self._token_expires
@@ -95,7 +112,49 @@ class PennsieveConnector(BasePlatformConnector):
             "connected": self.is_connected(),
             "user": self._user,
             "workspace": self._organization,
+            "agent_target": self._agent_target,
         }
+
+    def agent_status(self) -> Dict[str, Any]:
+        """Return Pennsieve Agent readiness for manifest uploads."""
+        agent_target, target_err = self._prepare_agent_target(self._agent_target)
+        status: Dict[str, Any] = {
+            "agent_target": agent_target,
+            "agent_reachable": False,
+            "profile_available": False,
+            "ready_for_upload": False,
+            "error": None,
+        }
+        if target_err:
+            status["error"] = target_err
+            return status
+
+        host, port = self._parse_agent_target(agent_target)
+        status["agent_reachable"] = self._is_tcp_reachable(host, port)
+        if not status["agent_reachable"]:
+            chosen_target, auto_err = self._maybe_autostart_agent(agent_target)
+            if chosen_target:
+                self._set_agent_target(chosen_target)
+                agent_target = chosen_target
+                status["agent_target"] = agent_target
+                host, port = self._parse_agent_target(agent_target)
+                status["agent_reachable"] = self._is_tcp_reachable(host, port)
+            if not status["agent_reachable"]:
+                status["error"] = auto_err or f"Could not connect to Pennsieve Agent at {agent_target}"
+                return status
+
+        # Lightweight profile check for readiness display.
+        cfg = Path.home() / ".pennsieve" / "config.ini"
+        status["profile_available"] = cfg.exists() and cfg.is_file() and cfg.stat().st_size > 0
+        if not status["profile_available"]:
+            status["error"] = (
+                "Pennsieve profile/config unavailable. Run `pennsieve config wizard` once."
+            )
+            return status
+
+        status["ready_for_upload"] = True
+
+        return status
 
     # -------------------------------------------------------------- browse
 
@@ -416,94 +475,116 @@ class PennsieveConnector(BasePlatformConnector):
         remote_path: str = "/",
     ) -> Dict[str, Any]:
         """Upload one file via Pennsieve Agent manifest workflow."""
-        if remote_path not in ("", "/"):
-            # Current Transfer UI targets dataset root. Folder uploads within a
-            # dataset can be added later using manifest target path semantics.
-            logger.info("Pennsieve agent upload ignores remote_path=%s for now", remote_path)
+        target_base_path = (remote_path or "").strip()
+        if target_base_path in ("", "/"):
+            target_base_path = ""
+        else:
+            if not target_base_path.startswith("/"):
+                target_base_path = f"/{target_base_path}"
 
-        try:
-            from pennsieve2 import Pennsieve
-        except Exception as e:
+        agent = self.agent_status()
+        agent_target = str(agent.get("agent_target") or self._agent_target)
+        if not agent.get("ready_for_upload", False):
             raise RuntimeError(
-                "Pennsieve agent-mode upload requires `pennsieve2` Python package."
-            ) from e
-
-        agent_target = os.getenv("PENNSIEVE_AGENT_TARGET", "localhost:9000")
-        self._assert_agent_target_not_minio(agent_target)
-        try:
-            client = Pennsieve(connect=True, target=agent_target)
-        except SystemExit as e:
-            raise RuntimeError(
-                f"Pennsieve Agent is not reachable at {agent_target}. "
-                "Start it with: pennsieve agent"
-            ) from e
-        except Exception as e:
-            raise RuntimeError(
-                f"Could not connect to Pennsieve Agent at {agent_target}: {e}"
-            ) from e
+                str(agent.get("error") or f"Pennsieve Agent is not ready at {agent_target}.")
+            )
 
         abs_path = str(Path(local_path).resolve())
         if not os.path.isfile(abs_path):
             raise RuntimeError(f"Upload source is not a file: {abs_path}")
 
         file_name = os.path.basename(abs_path)
-        base_dir = os.path.dirname(abs_path) or "."
+        host, port = self._parse_agent_target(agent_target)
+        if host not in {"localhost", "127.0.0.1"}:
+            raise RuntimeError(
+                f"Pennsieve CLI upload requires local agent target, got {agent_target}"
+            )
 
-        # Agent auth/session is sourced from the local Pennsieve profile.
-        # We still set dataset explicitly per upload.
-        client.use_dataset(dataset_id)
-        create_resp = client.manifest.create(
-            base_path=base_dir,
-            target_base_path="",
-            recursive=False,
-            files=[file_name],
-        )
-        manifest_id = int(getattr(create_resp, "manifest_id", 0) or 0)
-        if manifest_id <= 0:
-            raise RuntimeError("Pennsieve Agent did not return a valid manifest ID")
+        env = os.environ.copy()
+        env["PENNSIEVE_AGENT_PORT"] = str(port)
+
+        if shutil.which("pennsieve") is None:
+            raise RuntimeError("Pennsieve CLI not found on PATH.")
 
         try:
-            client.manifest.sync(manifest_id)
-            client.manifest.upload(manifest_id)
-
-            max_wait_s = int(os.getenv("PENNSIEVE_AGENT_UPLOAD_TIMEOUT_SEC", "1800"))
-            deadline = time.time() + max_wait_s
-            success_states = {2, 3, 4, 9}  # IMPORTED/FINALIZED/VERIFIED/UPLOADED
-            failed_states = {5, 6, 7, 8}   # FAILED/REMOVED/UNKNOWN/CHANGED
-
-            while time.time() < deadline:
-                files_resp = client.manifest.list_files(
-                    manifest_id=manifest_id,
-                    offset=0,
-                    limit=1000,
-                )
-                entries = list(getattr(files_resp, "file", []))
-                if not entries:
-                    time.sleep(1.0)
-                    continue
-
-                states = [int(getattr(item, "status", -1)) for item in entries]
-                if any(state in failed_states for state in states):
-                    raise RuntimeError(
-                        f"Pennsieve Agent reported failed manifest states: {states}"
-                    )
-                if all(state in success_states for state in states):
-                    return {
-                        "status": "uploaded_via_agent",
-                        "manifest_id": manifest_id,
-                        "dataset_id": dataset_id,
-                        "file": file_name,
-                    }
-                time.sleep(2.0)
-
-            raise RuntimeError(
-                f"Timed out waiting for Pennsieve Agent upload (manifest {manifest_id})"
+            subprocess.run(
+                ["pennsieve", "dataset", "use", dataset_id],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=60,
             )
+        except subprocess.CalledProcessError as e:
+            detail = (e.stderr or e.stdout or "").strip()
+            raise RuntimeError(f"Failed to select Pennsieve dataset {dataset_id}: {detail}") from e
+
+        create_cmd = ["pennsieve", "manifest", "create"]
+        if target_base_path:
+            create_cmd.extend(["--target_path", target_base_path])
+        create_cmd.append(abs_path)
+
+        try:
+            create = subprocess.run(
+                create_cmd,
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=120,
+            )
+        except subprocess.CalledProcessError as e:
+            detail = (e.stderr or e.stdout or "").strip()
+            raise RuntimeError(f"Failed to create Pennsieve manifest: {detail}") from e
+
+        output = (create.stdout or "") + "\n" + (create.stderr or "")
+        m = re.search(r"Manifest ID:\s*([0-9]+)", output)
+        if not m:
+            raise RuntimeError(f"Could not parse Pennsieve manifest ID from output: {output.strip()}")
+        manifest_id = int(m.group(1))
+
+        try:
+            subprocess.run(
+                ["pennsieve", "upload", "manifest", str(manifest_id)],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=int(os.getenv("PENNSIEVE_AGENT_UPLOAD_TIMEOUT_SEC", "1800")),
+            )
+            subprocess.run(
+                ["pennsieve", "manifest", "sync", str(manifest_id)],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=600,
+            )
+        except subprocess.CalledProcessError as e:
+            detail = (e.stderr or e.stdout or "").strip()
+            raise RuntimeError(
+                f"Pennsieve manifest upload/sync failed for {manifest_id}: {detail}"
+            ) from e
         finally:
             try:
-                client.manifest.delete(manifest_id)
+                subprocess.run(
+                    ["pennsieve", "manifest", "delete", str(manifest_id)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    env=env,
+                    timeout=30,
+                )
             except Exception:
                 pass
+
+        return {
+            "status": "uploaded_via_agent",
+            "manifest_id": manifest_id,
+            "dataset_id": dataset_id,
+            "file": file_name,
+            "agent_target": agent_target,
+        }
 
     @staticmethod
     def _assert_agent_target_not_minio(agent_target: str) -> None:
@@ -530,6 +611,164 @@ class PennsieveConnector(BasePlatformConnector):
                 "Run Pennsieve Agent on another port and set PENNSIEVE_AGENT_TARGET "
                 "(for example: 127.0.0.1:11235)."
             )
+
+    @staticmethod
+    def _maybe_autostart_agent(agent_target: str) -> Tuple[str, Optional[str]]:
+        """Best-effort local auto-start for Pennsieve Agent.
+
+        Returns (chosen_target, error_message). On success, error_message is None.
+        """
+        autostart = os.getenv("PENNSIEVE_AGENT_AUTOSTART", "1").strip().lower()
+        if autostart in {"0", "false", "no", "off"}:
+            return (
+                agent_target,
+                (
+                    f"Pennsieve Agent is not reachable at {agent_target}. "
+                    "Auto-start is disabled (PENNSIEVE_AGENT_AUTOSTART=0)."
+                ),
+            )
+
+        host, port = PennsieveConnector._parse_agent_target(agent_target)
+        if host not in {"localhost", "127.0.0.1"}:
+            return (
+                agent_target,
+                (
+                    f"Pennsieve Agent is not reachable at {agent_target}. "
+                    "Auto-start only supports local targets."
+                ),
+            )
+
+        if shutil.which("pennsieve") is None:
+            return (
+                agent_target,
+                (
+                    "Pennsieve CLI not found on PATH. Install it to enable "
+                    "automatic Pennsieve Agent startup."
+                ),
+            )
+
+        candidate_target = f"127.0.0.1:{port}"
+        if not PennsieveConnector._is_local_port_available(port):
+            free_port = PennsieveConnector._find_free_local_port(9000, 9100)
+            if free_port is None:
+                return (
+                    agent_target,
+                    "No free local port found for Pennsieve Agent in range 9000-9100.",
+                )
+            candidate_target = f"127.0.0.1:{free_port}"
+            port = free_port
+
+        env = os.environ.copy()
+        env["PENNSIEVE_AGENT_PORT"] = str(port)
+        try:
+            subprocess.Popen(
+                ["pennsieve", "agent"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+                env=env,
+            )
+        except Exception as e:
+            return (agent_target, f"Failed to auto-start Pennsieve Agent: {e}")
+
+        deadline = time.time() + 10.0
+        while time.time() < deadline:
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=1.0):
+                    return (candidate_target, None)
+            except Exception:
+                time.sleep(0.4)
+
+        return (
+            candidate_target,
+            f"Pennsieve Agent did not become ready at {candidate_target} after auto-start attempt.",
+        )
+
+    @staticmethod
+    def _parse_agent_target(agent_target: str) -> Tuple[str, int]:
+        host, sep, port_str = (agent_target or "").partition(":")
+        if not sep:
+            host = "localhost"
+            port_str = (agent_target or "").strip()
+        host = host or "localhost"
+        if not port_str:
+            port_str = "9000"
+        return host, int(port_str)
+
+    @staticmethod
+    def _is_local_port_available(port: int) -> bool:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.bind(("127.0.0.1", port))
+            return True
+        except OSError:
+            return False
+        finally:
+            sock.close()
+
+    @staticmethod
+    def _find_free_local_port(start: int, end: int) -> Optional[int]:
+        for port in range(start, end + 1):
+            if PennsieveConnector._is_local_port_available(port):
+                return port
+        return None
+
+    @staticmethod
+    def _find_reachable_agent_target(pennsieve_cls) -> Optional[str]:
+        """Find an already running local agent between ports 9000-9100."""
+        for port in range(9000, 9101):
+            target = f"127.0.0.1:{port}"
+            try:
+                if not PennsieveConnector._is_tcp_reachable("127.0.0.1", port):
+                    continue
+                PennsieveConnector._assert_agent_target_not_minio(target)
+                pennsieve_cls(connect=True, target=target)
+                return target
+            except Exception:
+                continue
+        return None
+
+    @staticmethod
+    def _is_tcp_reachable(host: str, port: int, timeout: float = 0.75) -> bool:
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except Exception:
+            return False
+
+    def _prepare_agent_target(self, current_target: str) -> Tuple[str, Optional[str]]:
+        """Normalize agent target and switch away from MinIO/invalid defaults."""
+        target = (current_target or "").strip() or os.getenv(
+            "PENNSIEVE_AGENT_TARGET", "localhost:9000"
+        )
+        try:
+            host, port = self._parse_agent_target(target)
+        except Exception:
+            return target, f"Invalid PENNSIEVE_AGENT_TARGET '{target}'"
+
+        if host not in {"localhost", "127.0.0.1"}:
+            self._set_agent_target(target)
+            return target, None
+
+        local_target = f"127.0.0.1:{port}"
+        try:
+            self._assert_agent_target_not_minio(local_target)
+            self._set_agent_target(local_target)
+            return local_target, None
+        except Exception:
+            free_port = self._find_free_local_port(9000, 9100)
+            if free_port is None:
+                return (
+                    local_target,
+                    "Could not find free agent port in range 9000-9100.",
+                )
+            chosen = f"127.0.0.1:{free_port}"
+            self._set_agent_target(chosen)
+            return chosen, None
+
+    def _set_agent_target(self, target: str) -> None:
+        self._agent_target = target
+        os.environ["PENNSIEVE_AGENT_TARGET"] = target
 
     # ----------------------------------------------------------- internals
 

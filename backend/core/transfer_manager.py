@@ -15,6 +15,7 @@ import os
 import shutil
 import tempfile
 import threading
+import urllib.parse
 import uuid
 from pathlib import Path
 from datetime import datetime
@@ -434,6 +435,35 @@ class TransferManager:
 
     # ---------------------------------------------------------- upload logic
 
+    @staticmethod
+    def _parse_dataset_target(dataset_token: str) -> tuple[str, str]:
+        """Parse dataset token as dataset_id or dataset_id?path=/folder."""
+        raw = (dataset_token or "").strip()
+        dataset_id = raw
+        remote_path = "/"
+
+        if "?path=" in raw:
+            dataset_id, encoded_path = raw.split("?path=", 1)
+            decoded = urllib.parse.unquote(encoded_path).strip()
+            if decoded:
+                remote_path = decoded if decoded.startswith("/") else f"/{decoded}"
+
+        return dataset_id, remote_path
+
+    @staticmethod
+    def _join_remote_dir(base_path: str, rel_dir: str) -> str:
+        """Join normalized platform directory paths."""
+        base = (base_path or "/").strip()
+        if not base.startswith("/"):
+            base = f"/{base}"
+        base = base.rstrip("/")
+        rel = (rel_dir or "").replace("\\", "/").strip("/")
+        if not rel:
+            return base or "/"
+        if not base:
+            return f"/{rel}"
+        return f"{base}/{rel}"
+
     def _execute_upload(self, record: TransferRecord) -> None:
         """Upload files from processing backend to platform."""
         try:
@@ -458,23 +488,27 @@ class TransferManager:
 
     def _upload_from_local(self, record: TransferRecord, connector) -> None:
         """Local filesystem -> platform."""
-        local_files: list[str] = []
+        dataset_id, remote_base_path = self._parse_dataset_target(record.dataset_id)
+        local_files: list[tuple[str, str]] = []
         if record.file_ids:
             for p in record.file_ids:
                 if os.path.isdir(p):
                     if _should_skip_work_path(p):
                         continue
+                    root_parent = os.path.dirname(p.rstrip("/")) or p
                     for root, dirs, filenames in os.walk(p):
                         dirs[:] = [d for d in dirs if d != "work"]
                         for fname in filenames:
                             fpath = os.path.join(root, fname)
                             if _should_skip_work_path(fpath):
                                 continue
-                            local_files.append(fpath)
+                            rel = os.path.relpath(fpath, root_parent)
+                            rel_dir = os.path.dirname(rel)
+                            local_files.append((fpath, rel_dir))
                 elif os.path.isfile(p):
                     if _should_skip_work_path(p):
                         continue
-                    local_files.append(p)
+                    local_files.append((p, ""))
         else:
             if os.path.isdir(record.source_path):
                 for root, dirs, filenames in os.walk(record.source_path):
@@ -483,12 +517,14 @@ class TransferManager:
                         fpath = os.path.join(root, fname)
                         if _should_skip_work_path(fpath):
                             continue
-                        local_files.append(fpath)
+                        rel = os.path.relpath(fpath, record.source_path)
+                        rel_dir = os.path.dirname(rel)
+                        local_files.append((fpath, rel_dir))
             elif os.path.isfile(record.source_path):
                 if _should_skip_work_path(record.source_path):
                     record.source_path = ""
                 else:
-                    local_files.append(record.source_path)
+                    local_files.append((record.source_path, ""))
 
         record.total_files = len(local_files)
         if record.total_files == 0:
@@ -497,11 +533,12 @@ class TransferManager:
             )
 
         failed: list[str] = []
-        for i, fpath in enumerate(local_files):
+        for i, (fpath, rel_dir) in enumerate(local_files):
             if record.cancelled:
                 return
             try:
-                connector.upload_file(fpath, record.dataset_id)
+                remote_dir = self._join_remote_dir(remote_base_path, rel_dir)
+                connector.upload_file(fpath, dataset_id, remote_path=remote_dir)
             except Exception as e:
                 logger.warning("Failed to upload %s: %s", fpath, e)
                 failed.append(f"{fpath}: {e}")
@@ -525,8 +562,9 @@ class TransferManager:
         from backend.core.ssh_manager import get_ssh_manager
 
         ssh = get_ssh_manager()
+        dataset_id, remote_base_path = self._parse_dataset_target(record.dataset_id)
 
-        upload_items: list[tuple[str, str]] = []
+        upload_items: list[tuple[str, str, str]] = []
         remote_archives_to_cleanup: list[str] = []
         if record.file_ids:
             for p in record.file_ids:
@@ -544,42 +582,37 @@ class TransferManager:
                     ptype = (stdout or "").strip() if exit_code == 0 else "missing"
 
                     if ptype == "dir":
-                        # For selected folders, upload as archive to preserve
-                        # structure and avoid thousands of tiny API calls.
-                        token = uuid.uuid4().hex[:8]
-                        base = os.path.basename(p.rstrip("/")) or "folder"
-                        parent = os.path.dirname(p.rstrip("/")) or "/"
-                        remote_archive = f"/tmp/neuroinsight_sel_{token}_{base}.tar.gz"
-                        cmd = (
-                            f'tar -C "{parent}" -czf "{remote_archive}" '
-                            f'--exclude="{base}/work" "{base}"'
-                        )
-                        arc_code, _arc_out, arc_err = ssh.execute(cmd, timeout=1800)
-                        if arc_code != 0:
-                            raise RuntimeError(
-                                f"Failed to archive selected folder {p}: {arc_err[:200]}"
-                            )
-                        upload_items.append((remote_archive, f"{base}.tar.gz"))
-                        remote_archives_to_cleanup.append(remote_archive)
+                        # Expand selected folders to files and preserve hierarchy
+                        # under the selected folder root on Pennsieve.
+                        root_parent = os.path.dirname(p.rstrip("/")) or "/"
+                        remote_files = self._collect_remote_files_recursive(ssh, p)
+                        for rf in remote_files:
+                            rel = os.path.relpath(rf, root_parent)
+                            rel_dir = os.path.dirname(rel)
+                            upload_items.append((rf, os.path.basename(rf), rel_dir))
                     elif ptype == "file":
-                        upload_items.append((p, os.path.basename(p)))
+                        upload_items.append((p, os.path.basename(p), ""))
                 except Exception as e:
                     logger.warning("Could not prepare selected path %s: %s", p, e)
         elif record.source_path:
             try:
                 output_archives = self._build_output_archives_for_upload(ssh, record.source_path)
                 if output_archives:
-                    upload_items = output_archives
+                    upload_items = [(p, name, "") for p, name in output_archives]
                     remote_archives_to_cleanup = [p for p, _ in output_archives]
                 else:
                     remote_files = self._collect_remote_files_recursive(ssh, record.source_path)
-                    upload_items = [(p, os.path.basename(p)) for p in remote_files]
+                    upload_items = []
+                    for p in remote_files:
+                        rel = os.path.relpath(p, record.source_path)
+                        rel_dir = os.path.dirname(rel)
+                        upload_items.append((p, os.path.basename(p), rel_dir))
             except Exception as e:
                 logger.debug(
                     "Could not list remote dir %s, treating as single file: %s",
                     record.source_path, e,
                 )
-                upload_items = [(record.source_path, os.path.basename(record.source_path))]
+                upload_items = [(record.source_path, os.path.basename(record.source_path), "")]
 
         record.total_files = len(upload_items)
         if record.total_files == 0:
@@ -590,7 +623,7 @@ class TransferManager:
         failed: list[str] = []
         completed_units = 0
         try:
-            for remote_path, upload_name in upload_items:
+            for remote_path, upload_name, rel_dir in upload_items:
                 if record.cancelled:
                     return
                 try:
@@ -598,8 +631,9 @@ class TransferManager:
                     with tempfile.TemporaryDirectory(prefix="neuroinsight_up_") as tmpdir:
                         local_tmp = os.path.join(tmpdir, upload_name)
                         ssh.get_file(remote_path, local_tmp)
+                        remote_dir = self._join_remote_dir(remote_base_path, rel_dir)
                         uploaded_units = self._upload_with_fallbacks(
-                            connector, local_tmp, record.dataset_id
+                            connector, local_tmp, dataset_id, remote_path=remote_dir
                         )
                         if uploaded_units > 1:
                             record.total_files += (uploaded_units - 1)
@@ -693,13 +727,17 @@ class TransferManager:
         return archives
 
     @staticmethod
-    def _upload_with_fallbacks(connector, local_path: str, dataset_id: str) -> int:
+    def _upload_with_fallbacks(
+        connector, local_path: str, dataset_id: str, remote_path: str = "/"
+    ) -> int:
         """Upload file with retries for common Pennsieve API limits.
 
         Returns number of uploaded units (1 for normal upload, N for split parts).
         """
         try:
-            TransferManager._upload_with_405_retry(connector, local_path, dataset_id)
+            TransferManager._upload_with_405_retry(
+                connector, local_path, dataset_id, remote_path=remote_path
+            )
             return 1
         except Exception as first_err:
             err_text = str(first_err)
@@ -709,7 +747,9 @@ class TransferManager:
                 parts = TransferManager._split_file(local_path, 100 * 1024 * 1024)
                 try:
                     for part in parts:
-                        TransferManager._upload_with_405_retry(connector, part, dataset_id)
+                        TransferManager._upload_with_405_retry(
+                            connector, part, dataset_id, remote_path=remote_path
+                        )
                     return len(parts)
                 finally:
                     for part in parts:
@@ -739,10 +779,12 @@ class TransferManager:
         return part_paths
 
     @staticmethod
-    def _upload_with_405_retry(connector, local_path: str, dataset_id: str) -> None:
+    def _upload_with_405_retry(
+        connector, local_path: str, dataset_id: str, remote_path: str = "/"
+    ) -> None:
         """Upload file and retry once with unique name on HTTP 405."""
         try:
-            connector.upload_file(local_path, dataset_id)
+            connector.upload_file(local_path, dataset_id, remote_path=remote_path)
             return
         except Exception as e:
             err_text = str(e)
@@ -754,7 +796,7 @@ class TransferManager:
         unique_path = os.path.join(parent, f"{stem}_{uuid.uuid4().hex[:8]}{ext}")
         shutil.copy2(local_path, unique_path)
         try:
-            connector.upload_file(unique_path, dataset_id)
+            connector.upload_file(unique_path, dataset_id, remote_path=remote_path)
         finally:
             try:
                 os.remove(unique_path)
@@ -806,6 +848,7 @@ class TransferManager:
         """Platform -> temp local -> Platform."""
         src_connector = self._get_connector(src_platform)
         dst_connector = self._get_connector(dst_platform)
+        dst_dataset_id, dst_remote_path = self._parse_dataset_target(record.dataset_id)
 
         with tempfile.TemporaryDirectory(prefix="neuroinsight_p2p_") as tmpdir:
             file_ids = record.file_ids
@@ -818,7 +861,9 @@ class TransferManager:
                     fname = self._filename_from_id(fid, i)
                     tmp_path = os.path.join(tmpdir, fname)
                     src_connector.download_file(fid, tmp_path)
-                    dst_connector.upload_file(tmp_path, record.dataset_id)
+                    dst_connector.upload_file(
+                        tmp_path, dst_dataset_id, remote_path=dst_remote_path
+                    )
                 except Exception as e:
                     logger.warning("P2P transfer file %s: %s", fid, e)
 

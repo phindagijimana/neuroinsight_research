@@ -175,7 +175,10 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
       setPlatformView('files');
       setCurrentPath(path);
       setAddressBar(`${datasetId}:${path}`);
-      onPathChange?.(datasetId);
+      const token = path === '/'
+        ? datasetId
+        : `${datasetId}?path=${encodeURIComponent(path)}`;
+      onPathChange?.(token);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to browse dataset');
     } finally {

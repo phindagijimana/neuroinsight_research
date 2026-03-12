@@ -10,6 +10,7 @@ GET  /api/transfer/history   -- recent transfers
 """
 
 import logging
+import urllib.parse
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
@@ -43,7 +44,22 @@ class MoveRequest(BaseModel):
     source_path: str       # path on source (or "" for platform file_ids)
     source_file_ids: Optional[List[str]] = None  # platform file IDs
     dest_type: str         # "local", "remote", "hpc", "pennsieve", "xnat"
-    dest_path: str         # path on destination (or dataset_id for platforms)
+    dest_path: str         # path on destination (or dataset_id[?path=/subdir] for platforms)
+
+
+def _parse_pennsieve_dest_path(dest_path: str) -> tuple[str, str]:
+    """Parse Pennsieve destination as dataset_id or dataset_id?path=/folder."""
+    raw = (dest_path or "").strip()
+    dataset_id = raw
+    remote_path = "/"
+
+    if "?path=" in raw:
+        dataset_id, encoded_path = raw.split("?path=", 1)
+        decoded = urllib.parse.unquote(encoded_path).strip()
+        if decoded:
+            remote_path = decoded if decoded.startswith("/") else f"/{decoded}"
+
+    return dataset_id, remote_path
 
 
 class TransferInfo(BaseModel):
@@ -118,11 +134,27 @@ def start_move(request: MoveRequest):
     if request.source_type == request.dest_type:
         raise HTTPException(400, "Source and destination cannot be the same")
     if request.dest_type == "pennsieve":
-        if not request.dest_path.startswith("N:dataset:"):
+        dataset_id, _remote_path = _parse_pennsieve_dest_path(request.dest_path)
+        if not dataset_id.startswith("N:dataset:"):
             raise HTTPException(
                 400,
-                "For Pennsieve destination, dest_path must be a dataset ID like N:dataset:<uuid>",
+                "For Pennsieve destination, dest_path must be N:dataset:<uuid> "
+                "or N:dataset:<uuid>?path=/folder",
             )
+        # Fail fast before async thread starts if Pennsieve upload prerequisites
+        # (agent/profile) are not ready.
+        from backend.routes.platform import _get_connector
+        connector = _get_connector("pennsieve")
+        if not connector.is_connected():
+            raise HTTPException(503, "Not connected to pennsieve. Connect first.")
+        if hasattr(connector, "agent_status"):
+            agent = connector.agent_status()
+            if not agent.get("ready_for_upload", False):
+                raise HTTPException(
+                    400,
+                    agent.get("error")
+                    or "Pennsieve Agent is not ready for upload.",
+                )
 
     from backend.core.transfer_manager import get_transfer_manager
 

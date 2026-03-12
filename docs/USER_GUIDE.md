@@ -62,7 +62,13 @@ wsl --install -d Ubuntu
 
 ## macOS Notes
 
-> **Recommendation:** For the best experience, especially with local processing, use **Linux** or **Windows with WSL2**. macOS is supported but has performance and compatibility limitations described below. If you use macOS primarily as an orchestration layer (submitting jobs to a remote server or HPC), these limitations do not apply.
+> **Recommendation:** Use **Linux** as the primary production host platform for NeuroInsight Research.
+> macOS is supported, but it is best used as an orchestration host (submitting jobs to remote servers or HPC) rather than for heavy local processing.
+
+### Production Readiness by Host OS
+
+- Linux: Recommended production host platform. Ready for production if you accept pull-on-demand behavior and maintain disk hygiene.
+- macOS: Supported for production orchestration, with remote/HPC execution strongly preferred.
 
 NeuroInsight runs on macOS for both orchestration and local processing. There are a few differences from Linux to be aware of.
 

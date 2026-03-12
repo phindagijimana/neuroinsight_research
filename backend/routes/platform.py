@@ -151,6 +151,20 @@ def platform_status(platform: str):
     return connector.status()
 
 
+@router.get("/pennsieve/agent-status")
+def pennsieve_agent_status():
+    """Check Pennsieve Agent readiness required for uploads."""
+    connector = _get_connector("pennsieve")
+    _require_connected(connector)
+    if not isinstance(connector, PennsieveConnector):
+        raise HTTPException(500, "Pennsieve connector is not available")
+    try:
+        return connector.agent_status()
+    except Exception as e:
+        logger.error("pennsieve agent-status failed: %s", e)
+        raise HTTPException(502, f"Failed to check Pennsieve Agent status: {e}")
+
+
 @router.get("/{platform}/projects")
 def platform_list_projects(platform: str):
     """List top-level projects / workspaces."""

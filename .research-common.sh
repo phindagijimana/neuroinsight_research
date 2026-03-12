@@ -859,13 +859,17 @@ cmd_status() {
         info  "Celery worker  stopped"
     fi
 
-    pid=$(read_pid frontend)
-    if [ -n "$pid" ] && is_pid_alive "$pid"; then
-        success "Frontend       PID $pid   port $FRONTEND_PORT"
-    elif port_in_use "$FRONTEND_PORT"; then
-        warn  "Frontend       port $FRONTEND_PORT in use (unknown PID)"
+    if [ "$MODE" = "production" ]; then
+        info  "Frontend       served by backend SPA on port $BACKEND_PORT"
     else
-        info  "Frontend       stopped"
+        pid=$(read_pid frontend)
+        if [ -n "$pid" ] && is_pid_alive "$pid"; then
+            success "Frontend       PID $pid   port $FRONTEND_PORT"
+        elif port_in_use "$FRONTEND_PORT"; then
+            warn  "Frontend       port $FRONTEND_PORT in use (unknown PID)"
+        else
+            info  "Frontend       stopped"
+        fi
     fi
 
     step "Infrastructure"

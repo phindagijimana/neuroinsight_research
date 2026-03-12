@@ -19,9 +19,19 @@ import type { PlatformType } from './FileBrowserPane';
 interface ConnectionPanelProps {
   platform: PlatformType;
   onConnectionChange: (connected: boolean) => void;
+  onPlatformStatusChange?: (status: {
+    connected: boolean;
+    uploadReady?: boolean;
+    uploadError?: string | null;
+    agentTarget?: string;
+  }) => void;
 }
 
-const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectionChange }) => {
+const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
+  platform,
+  onConnectionChange,
+  onPlatformStatusChange,
+}) => {
   const [connected, setConnected] = useState(false);
   const [checking, setChecking] = useState(true);
   const [expanded, setExpanded] = useState(false);
@@ -51,6 +61,7 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectio
       setConnected(true);
       setChecking(false);
       onConnectionChange(true);
+      onPlatformStatusChange?.({ connected: true, uploadReady: true });
       return;
     }
 
@@ -60,6 +71,7 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectio
         const status = await apiService.hpcStatus();
         setConnected(status.connected);
         onConnectionChange(status.connected);
+        onPlatformStatusChange?.({ connected: status.connected, uploadReady: status.connected });
         if (status.connected) {
           setConnectedInfo(`${status.username}@${status.host}`);
           if (status.host) setHost(status.host);
@@ -69,6 +81,25 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectio
         const status = await apiService.platformStatus(platform);
         setConnected(status.connected);
         onConnectionChange(status.connected);
+        if (platform === 'pennsieve' && status.connected) {
+          try {
+            const agent = await apiService.getPennsieveAgentStatus();
+            onPlatformStatusChange?.({
+              connected: true,
+              uploadReady: !!agent.ready_for_upload,
+              uploadError: agent.error || null,
+              agentTarget: agent.agent_target,
+            });
+          } catch (agentErr: any) {
+            onPlatformStatusChange?.({
+              connected: true,
+              uploadReady: false,
+              uploadError: agentErr.response?.data?.detail || agentErr.message || 'Agent status unavailable',
+            });
+          }
+        } else {
+          onPlatformStatusChange?.({ connected: status.connected, uploadReady: status.connected });
+        }
         if (status.connected) {
           setConnectedInfo(status.user ? `${status.user} @ ${status.workspace || platform}` : (status.workspace || platform));
         }
@@ -76,6 +107,7 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectio
     } catch {
       setConnected(false);
       onConnectionChange(false);
+      onPlatformStatusChange?.({ connected: false, uploadReady: false });
     } finally {
       setChecking(false);
     }
@@ -114,6 +146,21 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectio
           setConnected(true);
           setConnectedInfo(result.user || 'Pennsieve');
           onConnectionChange(true);
+          try {
+            const agent = await apiService.getPennsieveAgentStatus();
+            onPlatformStatusChange?.({
+              connected: true,
+              uploadReady: !!agent.ready_for_upload,
+              uploadError: agent.error || null,
+              agentTarget: agent.agent_target,
+            });
+          } catch (agentErr: any) {
+            onPlatformStatusChange?.({
+              connected: true,
+              uploadReady: false,
+              uploadError: agentErr.response?.data?.detail || agentErr.message || 'Agent status unavailable',
+            });
+          }
           setExpanded(false);
         } else {
           setError('Connection failed');
@@ -151,6 +198,7 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ platform, onConnectio
     setConnected(false);
     setConnectedInfo('');
     onConnectionChange(false);
+    onPlatformStatusChange?.({ connected: false, uploadReady: false });
   };
 
   const platformLabel = platform === 'remote' ? 'Remote Server' : platform === 'hpc' ? 'HPC' : platform === 'pennsieve' ? 'Pennsieve' : 'XNAT';
