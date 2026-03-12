@@ -771,10 +771,12 @@ cmd_license() {
 cmd_stop() {
     local quiet=false
     local stop_all=false
+    local stop_infra=false
     for arg in "$@"; do
         case "$arg" in
             --quiet) quiet=true ;;
             --all|-a) stop_all=true ;;
+            infra|--infra) stop_infra=true ;;
         esac
     done
 
@@ -817,8 +819,15 @@ cmd_stop() {
             docker rm -f "$name" 2>/dev/null || true
         done
         $quiet || success "Infrastructure stopped (containers + volumes removed)"
+    elif [ "$stop_infra" = true ]; then
+        $quiet || step "Stopping infrastructure (PostgreSQL, Redis, MinIO)"
+        _compose down 2>/dev/null || true
+        for name in neuroinsight-db neuroinsight-redis neuroinsight-minio; do
+            docker rm -f "$name" 2>/dev/null || true
+        done
+        $quiet || success "Infrastructure stopped (containers removed, data volumes preserved)"
     else
-        $quiet || info "Infrastructure still running (use ${BOLD}./research stop --all${NC} to stop everything)"
+        $quiet || info "Infrastructure still running (use ${BOLD}./research stop infra${NC} to stop containers and keep data, or ${BOLD}./research stop --all${NC} to remove everything)"
     fi
 
     $quiet || echo ""
@@ -1541,6 +1550,7 @@ cmd_help() {
     echo "    license              Set up pipeline license files (interactive)"
     echo "    start                Start all services (infra + app)"
     echo "    stop                 Stop app services (keeps infra running)"
+    echo "    stop infra           Stop app + infrastructure containers (keeps data volumes)"
     echo "    stop --all           Stop everything (app + PostgreSQL/Redis/MinIO)"
     echo "    restart              Restart all app services"
     echo ""
@@ -1601,6 +1611,7 @@ cmd_help() {
     echo "    $cli pull freesurfer   # Pull FreeSurfer image"
     echo "    $cli meld-cache verify # Check MELD cache local/HPC readiness"
     echo "    $cli stop              # Stop app services"
+    echo "    $cli stop infra        # Stop app + infra, keep DB/object data"
     echo "    $cli infra down        # Stop infrastructure"
     echo ""
 }
