@@ -14,6 +14,11 @@ function isReleaseArtifact(name) {
   return (
     name.endsWith(".AppImage") ||
     name.endsWith(".deb") ||
+    name.endsWith(".exe") ||
+    name.endsWith(".msi") ||
+    name.endsWith(".dmg") ||
+    name.endsWith(".pkg") ||
+    name.endsWith(".zip") ||
     name.endsWith(".yml") ||
     name.endsWith(".yaml")
   );

@@ -1,0 +1,95 @@
+name: Desktop Release (Multi-Platform)
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_to_release:
+        description: "Attach artifacts to GitHub Release when tag build runs"
+        required: false
+        default: "false"
+  push:
+    tags:
+      - "desktop-v*"
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform_name: linux
+            build_cmd: npm run dist:linux
+            artifact_glob: |
+              desktop/dist/*.AppImage
+              desktop/dist/*.deb
+              desktop/dist/*.yml
+              desktop/dist/*.yaml
+              desktop/dist/desktop-release-metadata.json
+              desktop/dist/desktop-release-sha256.txt
+          - os: windows-latest
+            platform_name: windows
+            build_cmd: npx electron-builder --win nsis --publish never
+            artifact_glob: |
+              desktop/dist/*.exe
+              desktop/dist/*.msi
+              desktop/dist/*.yml
+              desktop/dist/*.yaml
+              desktop/dist/desktop-release-metadata.json
+              desktop/dist/desktop-release-sha256.txt
+          - os: macos-latest
+            platform_name: macos
+            build_cmd: npx electron-builder --mac dmg --publish never
+            artifact_glob: |
+              desktop/dist/*.dmg
+              desktop/dist/*.pkg
+              desktop/dist/*.zip
+              desktop/dist/*.yml
+              desktop/dist/*.yaml
+              desktop/dist/desktop-release-metadata.json
+              desktop/dist/desktop-release-sha256.txt
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install desktop dependencies
+        working-directory: desktop/app
+        run: npm install --no-audit --no-fund
+
+      - name: Validate desktop sources
+        working-directory: desktop/app
+        run: npm run check
+
+      - name: Build desktop artifacts
+        working-directory: desktop/app
+        run: ${{ matrix.build_cmd }}
+
+      - name: Generate checksums and metadata
+        run: node desktop/ops/release_metadata.js desktop/dist desktop/dist
+
+      - name: Upload platform artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nir-desktop-${{ matrix.platform_name }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
+
+      - name: Attach artifacts to GitHub release
+        if: startsWith(github.ref, 'refs/tags/desktop-v') && (github.event_name == 'push' || github.event.inputs.publish_to_release == 'true')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact_glob }}
