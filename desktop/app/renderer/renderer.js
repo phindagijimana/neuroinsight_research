@@ -85,7 +85,9 @@ async function refreshStatus() {
   if (s.running) {
     statusBadge.textContent = "Running";
     statusBadge.classList.remove("off");
-    statusText.textContent = `Backend reachable on port ${s.port}`;
+    statusText.textContent = s.managed
+      ? `Desktop-managed backend reachable on port ${s.port}`
+      : `External backend reachable on port ${s.port}`;
   } else {
     statusBadge.textContent = "Stopped";
     statusBadge.classList.add("off");
