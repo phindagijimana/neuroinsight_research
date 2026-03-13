@@ -1,6 +1,6 @@
 # Desktop App Phase 1 Scaffold
 
-This folder contains a minimal Electron host for NIR Desktop Phase 1.
+This folder contains the Electron host for NIR Desktop (Phases 1-4 scaffold).
 
 ## What It Does
 
@@ -20,13 +20,16 @@ This folder contains a minimal Electron host for NIR Desktop Phase 1.
   - invalid licenses are rejected before persistence
   - header license status badge
   - namespaced vault key guidance/presets with backend enforcement
+- Phase 4 packaging scaffold:
+  - `electron-builder` config for Linux targets (AppImage, deb)
+  - packaging scripts in `package.json`
+  - release metadata + SHA256 generation via `desktop/ops/release_metadata.js`
 
 ## What It Does Not Do Yet
 
-- packaged installers/signing/update channel
-- production keychain integration
-- paid license validation
-- cross-platform adapters and diagnostics bundle
+- production code-signing certificates are not wired yet
+- auto-update channel is not wired yet
+- macOS and Windows installer pipelines are not added yet
 
 ## Run Locally
 
@@ -37,6 +40,21 @@ cd desktop/app
 npm install
 npm start
 ```
+
+## Build Linux Artifacts (Phase 4)
+
+From repo root:
+
+```bash
+./desktop/ops/package_desktop_linux.sh
+```
+
+Artifacts are emitted to `desktop/dist/`, including:
+
+- `nir-desktop-<version>-linux-<arch>.AppImage`
+- `nir-desktop-<version>-linux-<arch>.deb`
+- `desktop-release-metadata.json`
+- `desktop-release-sha256.txt`
 
 ## Persistent Desktop Files
 
