@@ -66,7 +66,24 @@ function buildMetadata(distDir, outDir) {
     .join("\n");
   fs.writeFileSync(checksumsPath, `${checksums}\n`, "utf8");
 
-  return { metadataPath, checksumsPath, artifactCount: files.length };
+  return { metadataPath, checksumsPath, artifactCount: files.length, metadata, files };
+}
+
+function writePlatformScopedCopies(outDir, platformName, metadata, files) {
+  if (!platformName) return null;
+  const safe = String(platformName).trim().toLowerCase().replace(/[^a-z0-9._-]/g, "-");
+  if (!safe) return null;
+
+  const metadataPath = path.join(outDir, `desktop-release-metadata-${safe}.json`);
+  fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), "utf8");
+
+  const checksumsPath = path.join(outDir, `desktop-release-sha256-${safe}.txt`);
+  const checksums = files
+    .map((f) => `${f.sha256}  ${f.file}`)
+    .join("\n");
+  fs.writeFileSync(checksumsPath, `${checksums}\n`, "utf8");
+
+  return { metadataPath, checksumsPath, platformName: safe };
 }
 
 function main() {
@@ -77,12 +94,24 @@ function main() {
   const outDir = process.argv[3]
     ? path.resolve(process.argv[3])
     : path.join(repoRoot, "desktop", "dist");
+  const platformName = process.argv[4] || process.env.RELEASE_PLATFORM || "";
 
   const result = buildMetadata(distDir, outDir);
+  const scoped = writePlatformScopedCopies(
+    outDir,
+    platformName,
+    result.metadata,
+    result.files
+  );
+
+  const scopedMsg = scoped
+    ? `- ${scoped.metadataPath}\n- ${scoped.checksumsPath}\n`
+    : "";
   process.stdout.write(
     `Generated metadata for ${result.artifactCount} artifact(s)\n` +
       `- ${result.metadataPath}\n` +
-      `- ${result.checksumsPath}\n`
+      `- ${result.checksumsPath}\n` +
+      scopedMsg
   );
 }
 

@@ -5,25 +5,26 @@ Use this checklist to run a controlled desktop pilot before broad release.
 ## Pilot Scope
 
 - Build: `desktop` release candidate from tagged commit
-- Target OS: Linux first (Ubuntu 22.04+)
+- Target OS: Linux, macOS, Windows (staged cohort rollout allowed)
 - Pilot cohort size: 3-10 users
 - Pilot duration: 2-4 weeks
 
 ## Entry Criteria (must pass before pilot starts)
 
-- [ ] Desktop artifact built (`.AppImage` and/or `.deb`)
-- [ ] `desktop-release-metadata.json` generated
-- [ ] `desktop-release-sha256.txt` generated
-- [ ] Installer checksum verified by at least one reviewer
+- [ ] Desktop artifacts built for each pilot target OS
+- [ ] Generic metadata/checksum generated (`desktop-release-metadata.json`, `desktop-release-sha256.txt`)
+- [ ] Platform metadata/checksum generated (`desktop-release-metadata-<platform>.json`, `desktop-release-sha256-<platform>.txt`)
+- [ ] Installer checksum verified with platform-scoped checksum file
 - [ ] License validation path tested (valid, invalid, expired)
-- [ ] Credential store tested on target Linux environment
+- [ ] Credential store tested on each pilot target OS
+- [ ] Local app lock tested (enable/unlock/lock-now/disable)
 - [ ] `./research` baseline regression spot-check passed
 
 ## Week 1 Execution Plan
 
 - [ ] Day 1: install, launch, start backend, open NIR
 - [ ] Day 2: preflight, diagnostics export, restart loop
-- [ ] Day 3: valid/invalid license checks, namespaced vault ops
+- [ ] Day 3: valid/invalid license checks, namespaced vault ops, app lock checks
 - [ ] Day 4: Pennsieve connect/browse/small-folder transfer smoke
 - [ ] Day 5: support drill, incident drill, go-live draft
 
@@ -37,6 +38,8 @@ Use this checklist to run a controlled desktop pilot before broad release.
 - [ ] Export diagnostics bundle
 - [ ] Save/load/delete namespaced secret (`pennsieve.api_key`)
 - [ ] Import license file and verify status badge
+- [ ] Enable app lock and confirm sensitive actions are gated while locked
+- [ ] Unlock app and confirm gated actions recover
 
 ## Connector and Reliability Flows
 
@@ -54,6 +57,7 @@ Use this checklist to run a controlled desktop pilot before broad release.
 - [ ] Confirm incident escalation path works (owner + cadence)
 - [ ] Confirm rollback path to previous stable desktop release
 - [ ] License renew/revoke scenario reviewed for pilot users
+- [ ] Verify diagnostics bundle includes desktop log + backend runtime log + celery runtime log
 
 ## Exit Criteria (pilot complete)
 
@@ -61,6 +65,8 @@ Use this checklist to run a controlled desktop pilot before broad release.
 - [ ] No unresolved P0/P1 defects
 - [ ] Known P2/P3 defects documented with owners and ETA
 - [ ] Go-live recommendation document completed
+- [ ] Phase 7 reliability report completed (`pilot_reliability_report.json`)
+- [ ] Phase 7 gate evaluation run (`evaluate_pilot_gate.js`)
 
 ## Pilot Evidence Log (fill during pilot)
 
@@ -71,3 +77,4 @@ Use this checklist to run a controlled desktop pilot before broad release.
 - Core flow completion rate:
 - Open defects by severity (P0/P1/P2/P3):
 - Connector notes (Pennsieve browse/transfer, HPC submit):
+- Platform notes (linux/macos/windows):
