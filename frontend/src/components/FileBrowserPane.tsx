@@ -83,6 +83,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
   const [platformDatasets, setPlatformDatasets] = useState<any[]>([]);
   const [platformView, setPlatformView] = useState<'datasets' | 'files'>('datasets');
   const [platformDatasetId, setPlatformDatasetId] = useState<string | null>(null);
+  const [platformPathStack, setPlatformPathStack] = useState<string[]>(['/']);
 
   const selectedSet = new Set(selectedFiles.map(f => f.path || f.id || f.name));
 
@@ -99,6 +100,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
       setPlatformView('datasets');
       setPlatformDatasets([]);
       setPlatformDatasetId(null);
+      setPlatformPathStack(['/']);
     }
   }, [platform]);
 
@@ -158,7 +160,11 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
     }
   };
 
-  const browsePlatformDataset = async (datasetId: string, path: string = '/') => {
+  const browsePlatformDataset = async (
+    datasetId: string,
+    path: string = '/',
+    opts: { history?: 'none' | 'push' | 'reset' } = {}
+  ) => {
     setLoading(true);
     setError(null);
     try {
@@ -175,6 +181,15 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
       setPlatformView('files');
       setCurrentPath(path);
       setAddressBar(`${datasetId}:${path}`);
+      const historyMode = opts.history ?? 'none';
+      if (historyMode === 'reset') {
+        setPlatformPathStack([path]);
+      } else if (historyMode === 'push') {
+        setPlatformPathStack(prev => {
+          if (prev.length > 0 && prev[prev.length - 1] === path) return prev;
+          return [...prev, path];
+        });
+      }
       const token = path === '/'
         ? datasetId
         : `${datasetId}?path=${encodeURIComponent(path)}`;
@@ -191,16 +206,19 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
   const navigateUp = () => {
     if (!isBackend(platform)) {
       if (platformView === 'files' && currentPath !== '/') {
-        const parts = currentPath.split('/').filter(Boolean);
-        parts.pop();
-        const newPath = '/' + parts.join('/');
-        if (platformDatasetId) browsePlatformDataset(platformDatasetId, newPath || '/');
+        const nextStack = platformPathStack.length > 1
+          ? platformPathStack.slice(0, -1)
+          : ['/'];
+        const target = nextStack[nextStack.length - 1] || '/';
+        setPlatformPathStack(nextStack);
+        if (platformDatasetId) browsePlatformDataset(platformDatasetId, target, { history: 'none' });
       } else {
         setPlatformView('datasets');
         setEntries([]);
         setPlatformDatasetId(null);
         setCurrentPath('/');
         setAddressBar('/');
+        setPlatformPathStack(['/']);
       }
       return;
     }
@@ -215,7 +233,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
       loadBackendDirectory(entry.path);
     } else if (platformDatasetId) {
       const newPath = entry.path || `/${entry.id}`;
-      browsePlatformDataset(platformDatasetId, newPath);
+      browsePlatformDataset(platformDatasetId, newPath, { history: 'push' });
     }
   };
 
@@ -233,7 +251,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
     } else if (platformView === 'datasets') {
       loadPlatformDatasets();
     } else if (platformDatasetId) {
-      browsePlatformDataset(platformDatasetId, currentPath);
+      browsePlatformDataset(platformDatasetId, currentPath, { history: 'none' });
     }
   };
 
@@ -374,7 +392,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
           {platformDatasets.map((ds: any) => (
             <button
               key={ds.id}
-              onClick={() => browsePlatformDataset(ds.id)}
+              onClick={() => browsePlatformDataset(ds.id, '/', { history: 'reset' })}
               className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-left transition border-b border-gray-50 group"
             >
               <HardDrive className="h-4 w-4 text-[#003d7a] flex-shrink-0" />
