@@ -19,6 +19,14 @@ Use this checklist to run a controlled desktop pilot before broad release.
 - [ ] Credential store tested on target Linux environment
 - [ ] `./research` baseline regression spot-check passed
 
+## Week 1 Execution Plan
+
+- [ ] Day 1: install, launch, start backend, open NIR
+- [ ] Day 2: preflight, diagnostics export, restart loop
+- [ ] Day 3: valid/invalid license checks, namespaced vault ops
+- [ ] Day 4: Pennsieve connect/browse/small-folder transfer smoke
+- [ ] Day 5: support drill, incident drill, go-live draft
+
 ## Core User Flows to Validate
 
 - [ ] Launch desktop shell
@@ -41,9 +49,11 @@ Use this checklist to run a controlled desktop pilot before broad release.
 ## Supportability and Operations
 
 - [ ] Reproduce one issue from user report using diagnostics bundle
-- [ ] Follow support runbook to resolution
-- [ ] Confirm incident escalation path works (owner + SLA)
+- [ ] Triage severity used consistently (P0/P1/P2/P3)
+- [ ] First response SLA respected for tested issues
+- [ ] Confirm incident escalation path works (owner + cadence)
 - [ ] Confirm rollback path to previous stable desktop release
+- [ ] License renew/revoke scenario reviewed for pilot users
 
 ## Exit Criteria (pilot complete)
 
@@ -51,3 +61,13 @@ Use this checklist to run a controlled desktop pilot before broad release.
 - [ ] No unresolved P0/P1 defects
 - [ ] Known P2/P3 defects documented with owners and ETA
 - [ ] Go-live recommendation document completed
+
+## Pilot Evidence Log (fill during pilot)
+
+- Build tag / commit:
+- Pilot window:
+- Test owner(s):
+- Cohort size:
+- Core flow completion rate:
+- Open defects by severity (P0/P1/P2/P3):
+- Connector notes (Pennsieve browse/transfer, HPC submit):

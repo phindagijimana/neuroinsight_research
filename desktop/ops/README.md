@@ -4,12 +4,8 @@ This directory contains packaging/release utilities for NIR Desktop.
 
 ## Phase 5 Operations Kit
 
-- `PILOT_CHECKLIST.md` - pilot scope and pass/fail checklist
-- `UAT_REPORT_TEMPLATE.md` - structured UAT reporting template
-- `SUPPORT_RUNBOOK.md` - support SOP and triage guidance
-- `INCIDENT_WORKFLOW.md` - incident declaration/escalation flow
-- `LICENSING_BILLING_PLAYBOOK.md` - licensing operations baseline
-- `GO_LIVE_RECOMMENDATION_TEMPLATE.md` - final go-live decision template
+- `PILOT_CHECKLIST.md` - single execution doc (checklist + cadence + evidence log)
+- `GO_LIVE_RECOMMENDATION_TEMPLATE.md` - single decision doc for phase exit
 - `pilot_smoke_test.sh` - quick pre-pilot validation script
 
 ## Linux Packaging
