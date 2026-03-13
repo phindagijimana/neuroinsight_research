@@ -10,6 +10,7 @@ const licenseStatusText = document.getElementById("licenseStatusText");
 const licenseBadge = document.getElementById("licenseBadge");
 const licenseText = document.getElementById("licenseText");
 const vaultStatusText = document.getElementById("vaultStatusText");
+const lockStatusText = document.getElementById("lockStatusText");
 
 const startBtn = document.getElementById("startBtn");
 const stopAppBtn = document.getElementById("stopAppBtn");
@@ -29,6 +30,12 @@ const deleteSecretBtn = document.getElementById("deleteSecretBtn");
 const secretKey = document.getElementById("secretKey");
 const secretValue = document.getElementById("secretValue");
 const secretPreset = document.getElementById("secretPreset");
+const lockRefreshBtn = document.getElementById("lockRefreshBtn");
+const lockEnableBtn = document.getElementById("lockEnableBtn");
+const lockDisableBtn = document.getElementById("lockDisableBtn");
+const lockUnlockBtn = document.getElementById("lockUnlockBtn");
+const lockNowBtn = document.getElementById("lockNowBtn");
+const lockPin = document.getElementById("lockPin");
 
 function updateLicenseBadge(label, isGood) {
   licenseBadge.textContent = label;
@@ -64,6 +71,11 @@ function setBusy(busy) {
     saveSecretBtn,
     loadSecretBtn,
     deleteSecretBtn,
+    lockRefreshBtn,
+    lockEnableBtn,
+    lockDisableBtn,
+    lockUnlockBtn,
+    lockNowBtn,
   ].forEach((b) => {
     b.disabled = busy;
   });
@@ -131,6 +143,17 @@ async function refreshVaultStatus() {
   vaultStatusText.textContent = `Backend: ${st.backend} (service: ${st.serviceName})`;
 }
 
+async function refreshLockStatus() {
+  const st = await nirDesktop.getAppLockStatus();
+  if (!st.enabled) {
+    lockStatusText.textContent = "App lock disabled.";
+    return;
+  }
+  lockStatusText.textContent = st.unlocked
+    ? "App lock enabled (currently unlocked)."
+    : "App lock enabled (currently locked).";
+}
+
 startBtn.addEventListener("click", async () => {
   setBusy(true);
   try {
@@ -196,6 +219,79 @@ refreshBtn.addEventListener("click", async () => {
     await refreshPaths();
     await refreshLicenseStatus();
     await refreshVaultStatus();
+    await refreshLockStatus();
+  } finally {
+    setBusy(false);
+  }
+});
+
+lockRefreshBtn.addEventListener("click", async () => {
+  setBusy(true);
+  try {
+    await refreshLockStatus();
+  } finally {
+    setBusy(false);
+  }
+});
+
+lockEnableBtn.addEventListener("click", async () => {
+  setBusy(true);
+  try {
+    const res = await nirDesktop.enableAppLock(lockPin.value || "");
+    if (!res.ok) {
+      printResult("Enable app lock failed", { stderr: res.error || "Unknown error." });
+      return;
+    }
+    printResult("Enable app lock", { stdout: "App lock enabled." });
+    lockPin.value = "";
+    await refreshLockStatus();
+  } finally {
+    setBusy(false);
+  }
+});
+
+lockDisableBtn.addEventListener("click", async () => {
+  setBusy(true);
+  try {
+    const res = await nirDesktop.disableAppLock(lockPin.value || "");
+    if (!res.ok) {
+      printResult("Disable app lock failed", { stderr: res.error || "Unknown error." });
+      return;
+    }
+    printResult("Disable app lock", { stdout: "App lock disabled." });
+    lockPin.value = "";
+    await refreshLockStatus();
+  } finally {
+    setBusy(false);
+  }
+});
+
+lockUnlockBtn.addEventListener("click", async () => {
+  setBusy(true);
+  try {
+    const res = await nirDesktop.unlockApp(lockPin.value || "");
+    if (!res.ok) {
+      printResult("Unlock app failed", { stderr: res.error || "Invalid PIN." });
+      return;
+    }
+    printResult("Unlock app", { stdout: "App unlocked for sensitive actions." });
+    lockPin.value = "";
+    await refreshLockStatus();
+  } finally {
+    setBusy(false);
+  }
+});
+
+lockNowBtn.addEventListener("click", async () => {
+  setBusy(true);
+  try {
+    const res = await nirDesktop.lockNow();
+    if (!res.ok) {
+      printResult("Lock now failed", { stderr: res.error || "Unknown error." });
+      return;
+    }
+    printResult("Lock now", { stdout: "App lock engaged." });
+    await refreshLockStatus();
   } finally {
     setBusy(false);
   }
@@ -371,6 +467,7 @@ Promise.all([
   refreshPaths(),
   refreshLicenseStatus(),
   refreshVaultStatus(),
+  refreshLockStatus(),
 ]).catch((e) => {
   printResult("Desktop init failed", { stderr: String(e) });
 });

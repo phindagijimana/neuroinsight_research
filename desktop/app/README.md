@@ -16,6 +16,7 @@ This folder contains the Electron host for NIR Desktop (Phases 1-4 scaffold).
 - exports a diagnostics support bundle JSON with runtime process + log snapshots
 - supports Phase 3 license import/validation (signed token model)
 - supports Phase 3 credential vault abstraction (OS keychain when available, encrypted fallback)
+- supports optional Phase 3 local app lock (PIN-based sensitive action gating)
 - Phase 3.5 hardening:
   - stricter license schema validation
   - invalid licenses are rejected before persistence

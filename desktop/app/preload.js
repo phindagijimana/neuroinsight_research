@@ -19,4 +19,9 @@ contextBridge.exposeInMainWorld("nirDesktop", {
   saveSecret: (key, value) => ipcRenderer.invoke("nir:saveSecret", key, value),
   loadSecret: (key) => ipcRenderer.invoke("nir:loadSecret", key),
   deleteSecret: (key) => ipcRenderer.invoke("nir:deleteSecret", key),
+  getAppLockStatus: () => ipcRenderer.invoke("nir:getAppLockStatus"),
+  enableAppLock: (pin) => ipcRenderer.invoke("nir:enableAppLock", pin),
+  disableAppLock: (pin) => ipcRenderer.invoke("nir:disableAppLock", pin),
+  unlockApp: (pin) => ipcRenderer.invoke("nir:unlockApp", pin),
+  lockNow: () => ipcRenderer.invoke("nir:lockNow"),
 });
