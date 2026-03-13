@@ -6,6 +6,7 @@ const preflight = require("./src/preflight");
 const diagnostics = require("./src/diagnostics");
 const licenseManager = require("./src/licenseManager");
 const credentialStore = require("./src/credentialStore");
+const appLock = require("./src/appLock");
 
 let mainWindow = null;
 
@@ -89,6 +90,15 @@ ipcMain.handle("nir:getStatus", async () => {
 });
 
 ipcMain.handle("nir:startBackend", async () => {
+  if (!appLock.isUnlockedForSensitiveActions()) {
+    return {
+      ok: false,
+      code: 423,
+      stdout: "",
+      stderr: "App lock is enabled. Unlock the app to start backend services.",
+      locked: true,
+    };
+  }
   const res = await backendManager.startBackend();
   const patch = {};
   if (res.port) patch.lastKnownPort = res.port;
@@ -114,6 +124,9 @@ ipcMain.handle("nir:stopBackendAll", async () => {
 });
 
 ipcMain.handle("nir:openAppInMainWindow", async () => {
+  if (!appLock.isUnlockedForSensitiveActions()) {
+    return { ok: false, error: "App lock is enabled. Unlock to open NIR.", locked: true };
+  }
   return openNirInMainWindow();
 });
 
@@ -156,12 +169,18 @@ ipcMain.handle("nir:getLicenseStatus", async () => {
 });
 
 ipcMain.handle("nir:importLicenseText", async (_event, text) => {
+  if (!appLock.isUnlockedForSensitiveActions()) {
+    return { ok: false, error: "App lock is enabled. Unlock to import a license.", locked: true };
+  }
   const res = licenseManager.importLicenseFromText(String(text || ""));
   desktopState.appendLog("license_import_text", { ok: res.ok, error: res.error || null });
   return res;
 });
 
 ipcMain.handle("nir:importLicenseFile", async () => {
+  if (!appLock.isUnlockedForSensitiveActions()) {
+    return { ok: false, error: "App lock is enabled. Unlock to import a license.", locked: true };
+  }
   const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
   const pick = await dialog.showOpenDialog(win, {
     properties: ["openFile"],
@@ -188,20 +207,57 @@ ipcMain.handle("nir:getCredentialStoreStatus", async () => {
 });
 
 ipcMain.handle("nir:saveSecret", async (_event, key, value) => {
+  if (!appLock.isUnlockedForSensitiveActions()) {
+    return { ok: false, backend: "app-lock", error: "App lock is enabled. Unlock to save secrets." };
+  }
   const res = credentialStore.setSecret(String(key || ""), String(value || ""));
   desktopState.appendLog("secret_save", { key: String(key || ""), ok: res.ok, backend: res.backend });
   return res;
 });
 
 ipcMain.handle("nir:loadSecret", async (_event, key) => {
+  if (!appLock.isUnlockedForSensitiveActions()) {
+    return { ok: false, backend: "app-lock", error: "App lock is enabled. Unlock to load secrets." };
+  }
   const res = credentialStore.getSecret(String(key || ""));
   desktopState.appendLog("secret_load", { key: String(key || ""), ok: res.ok, backend: res.backend });
   return res;
 });
 
 ipcMain.handle("nir:deleteSecret", async (_event, key) => {
+  if (!appLock.isUnlockedForSensitiveActions()) {
+    return { ok: false, backend: "app-lock", error: "App lock is enabled. Unlock to delete secrets." };
+  }
   const res = credentialStore.deleteSecret(String(key || ""));
   desktopState.appendLog("secret_delete", { key: String(key || ""), ok: res.ok, backend: res.backend });
+  return res;
+});
+
+ipcMain.handle("nir:getAppLockStatus", async () => {
+  return appLock.getStatus();
+});
+
+ipcMain.handle("nir:enableAppLock", async (_event, pin) => {
+  const res = appLock.enable(String(pin || ""));
+  desktopState.appendLog("app_lock_enable", { ok: res.ok, error: res.error || null });
+  return res;
+});
+
+ipcMain.handle("nir:disableAppLock", async (_event, pin) => {
+  const res = appLock.disable(String(pin || ""));
+  desktopState.appendLog("app_lock_disable", { ok: res.ok, error: res.error || null });
+  return res;
+});
+
+ipcMain.handle("nir:unlockApp", async (_event, pin) => {
+  const res = appLock.unlock(String(pin || ""));
+  desktopState.appendLog("app_lock_unlock", { ok: res.ok, error: res.error || null });
+  return res;
+});
+
+ipcMain.handle("nir:lockNow", async () => {
+  const res = appLock.lockNow();
+  desktopState.appendLog("app_lock_lock_now", { ok: res.ok });
   return res;
 });
 
@@ -211,6 +267,7 @@ app.whenReady().then(() => {
   backendManager.initDesktopRuntime(paths);
   licenseManager.initLicenseManager(paths.stateDir);
   credentialStore.initCredentialStore(paths.stateDir);
+  appLock.initAppLock(paths.stateDir);
   buildAppMenu();
   createMainWindow();
   desktopState.appendLog("app_ready");

@@ -143,6 +143,23 @@
 
       <div class="card">
         <div class="row" style="justify-content: space-between;">
+          <strong>Local App Lock (Phase 3)</strong>
+          <button id="lockRefreshBtn">Refresh Lock Status</button>
+        </div>
+        <div class="hint" id="lockStatusText">App lock status unknown.</div>
+        <div class="row" style="margin-top:8px;">
+          <input id="lockPin" type="password" placeholder="PIN (minimum 6 chars)" style="flex:1;min-width:220px;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:12px;" />
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <button id="lockEnableBtn">Enable Lock</button>
+          <button id="lockDisableBtn">Disable Lock</button>
+          <button id="lockUnlockBtn">Unlock</button>
+          <button id="lockNowBtn">Lock Now</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="justify-content: space-between;">
           <strong>Credential Vault (Phase 3)</strong>
           <button id="vaultStatusBtn">Vault Status</button>
         </div>
