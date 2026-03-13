@@ -50,6 +50,8 @@ class PennsieveConnector(BasePlatformConnector):
         self._org_id: Optional[str] = None
         self._client = httpx.Client(timeout=60.0)
         self._dataset_int_ids: Dict[str, int] = {}  # node_id -> intId mapping
+        self._dataset_packages_cache: Dict[str, Tuple[float, List[Any]]] = {}
+        self._dataset_packages_cache_ttl_sec: int = 20
         self._agent_target: str = os.getenv("PENNSIEVE_AGENT_TARGET", "localhost:9000")
 
     # ------------------------------------------------------------------ auth
@@ -101,6 +103,7 @@ class PennsieveConnector(BasePlatformConnector):
         self._organization = None
         self._org_id = None
         self._dataset_int_ids.clear()
+        self._dataset_packages_cache.clear()
         self._agent_target = os.getenv("PENNSIEVE_AGENT_TARGET", "localhost:9000")
 
     def is_connected(self) -> bool:
@@ -195,13 +198,32 @@ class PennsieveConnector(BasePlatformConnector):
 
         data = self._list_dataset_packages(dataset_id)
         packages = data.get("packages", []) if isinstance(data, dict) else data
+        # Pennsieve dataset package listings are flat and can include both
+        # folders and files from many levels. At root view we only show
+        # top-level folders (Collections) so files stay inside folders until
+        # users navigate into them.
+        if isinstance(packages, list):
+            # Keep only true top-level folders at dataset root. Pennsieve's
+            # dataset package listing is flat and can contain nested folders
+            # and files; top-level items are marked with parentId=None.
+            packages = [
+                pkg
+                for pkg in packages
+                if (pkg.get("content", {}) or {}).get("packageType") == "Collection"
+                and ((pkg.get("content", {}) or {}).get("parentId") is None)
+            ]
         return self._items_from_packages(
             packages if isinstance(packages, list) else [],
             dataset_id,
         )
 
     def _list_dataset_packages(self, dataset_id: str) -> Any:
-        """List root packages for a dataset, trying multiple ID formats."""
+        """List all dataset packages, trying multiple ID formats."""
+        now = time.time()
+        cached = self._dataset_packages_cache.get(dataset_id)
+        if cached and (now - cached[0]) <= self._dataset_packages_cache_ttl_sec:
+            return {"packages": cached[1]}
+
         attempts = []
 
         # 1) URL-encoded node ID (API spec says {id} is a string)
@@ -221,9 +243,31 @@ class PennsieveConnector(BasePlatformConnector):
         for ds_id in attempts:
             try:
                 logger.debug("Trying /datasets/%s/packages", ds_id)
-                return self._get(
-                    f"/datasets/{ds_id}/packages", params={"pageSize": 100}
-                )
+                all_packages: List[Any] = []
+                cursor: Optional[str] = None
+                seen_cursors: set[str] = set()
+                while True:
+                    params: Dict[str, Any] = {"pageSize": 100}
+                    if cursor:
+                        params["cursor"] = cursor
+                    page = self._get(f"/datasets/{ds_id}/packages", params=params)
+                    if isinstance(page, dict):
+                        page_packages = page.get("packages", [])
+                        if isinstance(page_packages, list):
+                            all_packages.extend(page_packages)
+                        next_cursor = page.get("cursor")
+                        if not isinstance(next_cursor, str) or not next_cursor:
+                            break
+                        if next_cursor in seen_cursors:
+                            break
+                        seen_cursors.add(next_cursor)
+                        cursor = next_cursor
+                        continue
+                    if isinstance(page, list):
+                        all_packages.extend(page)
+                    break
+                self._dataset_packages_cache[dataset_id] = (time.time(), all_packages)
+                return {"packages": all_packages}
             except httpx.HTTPStatusError as exc:
                 logger.debug(
                     "  -> %s %s", exc.response.status_code, ds_id
@@ -240,6 +284,8 @@ class PennsieveConnector(BasePlatformConnector):
         items: List[PlatformItem] = []
         for pkg in packages:
             content = pkg.get("content", {})
+            if str(content.get("state", "")).upper() == "DELETED":
+                continue
             pkg_type = content.get("packageType", "")
             node_id = content.get("nodeId") or content.get("id", "")
             is_dir = pkg_type == "Collection"
@@ -284,6 +330,8 @@ class PennsieveConnector(BasePlatformConnector):
 
         for child in children:
             content = child.get("content", {})
+            if str(content.get("state", "")).upper() == "DELETED":
+                continue
             pkg_type = content.get("packageType", "")
             items.append(
                 PlatformItem(
