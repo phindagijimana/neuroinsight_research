@@ -1528,11 +1528,12 @@ def _reconcile_live_slurm_queue_for_listing(db: Session) -> int:
         if updated:
             db.commit()
         return updated
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to persist SLURM startup sync updates: %s", e)
         try:
             db.rollback()
-        except Exception:
-            pass
+        except Exception as rollback_err:
+            logger.debug("Rollback failed after startup sync error: %s", rollback_err)
         return 0
 
 
@@ -1616,8 +1617,8 @@ def _poll_slurm_status_batch(slurm_job_ids: list[str]) -> dict[str, str]:
                 try:
                     ssh.connect()
                     logger.info("Auto-reconnected SSH for SLURM status polling")
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Auto-reconnect failed for SLURM status polling: %s", e)
             if not ssh.is_connected:
                 return {}
 

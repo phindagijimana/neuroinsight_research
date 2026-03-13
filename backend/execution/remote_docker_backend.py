@@ -579,8 +579,8 @@ class RemoteDockerBackend(ExecutionBackend):
                     )
                     if "alive" in out:
                         return JobStatus.RUNNING
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to probe runner process %s: %s", runner_pid, e)
             return JobStatus.UNKNOWN
 
         try:

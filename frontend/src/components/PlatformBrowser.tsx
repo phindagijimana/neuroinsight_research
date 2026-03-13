@@ -145,7 +145,6 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
   };
 
   const selectableCount = items.length;
-  const fileCount = items.filter(i => i.type === 'file').length;
   const niftiCount = items.filter(i => i.type === 'file' && isNifti(i.name)).length;
 
   return (

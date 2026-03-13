@@ -65,8 +65,8 @@ def _get_ssh():
         ssh = get_ssh_manager()
         if ssh.is_connected:
             return ssh
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Could not get global SSH manager: %s", e)
 
     # 3. Auto-reconnect from persisted config
     try:
@@ -134,9 +134,19 @@ def _restore_slurm_backend(cfg: dict) -> None:
         logger.warning("Could not restore SLURM backend: %s", e)
 
 
+def _get_output_dir(job_id: str) -> Path:
+    """Compatibility helper for tests that monkeypatch output resolution."""
+    from backend.core.config import get_settings
+
+    settings = get_settings()
+    data_candidate = Path(settings.data_dir) / "outputs" / job_id
+    if data_candidate.exists():
+        return data_candidate
+    return Path(settings.output_dir) / job_id
+
+
 def _resolve_output(job_id: str) -> _OutputLocation:
     """Resolve a job's output directory, checking local paths and the DB."""
-    from backend.core.config import get_settings
 
     # Check DB for the job's actual output_dir (SLURM jobs store the HPC path)
     db_output_dir: Optional[str] = None
@@ -172,12 +182,8 @@ def _resolve_output(job_id: str) -> _OutputLocation:
                 except Exception as e:
                     logger.debug("SSH check for %s failed: %s", db_output_dir, e)
 
-    # Fallback: local settings-based paths
-    settings = get_settings()
-    for candidate in (
-        Path(settings.data_dir) / "outputs" / job_id,
-        Path(settings.output_dir) / job_id,
-    ):
+    # Fallback: local settings-based path.
+    for candidate in (_get_output_dir(job_id),):
         if candidate.exists():
             return _OutputLocation(local_path=candidate)
 
@@ -716,7 +722,8 @@ def _load_pregenerated_csvs(loc: "_OutputLocation") -> list:
                                 rows=[[_try_float(v) for v in r] for r in rows_list[1:]],
                                 category="general",
                             ))
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed to parse remote pre-generated CSV %s: %s", fname, e)
                     continue
             if sheets:
                 return sheets
@@ -739,7 +746,8 @@ def _load_pregenerated_csvs(loc: "_OutputLocation") -> list:
                             rows=[[_try_float(v) for v in r] for r in rows_list[1:]],
                             category="general",
                         ))
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed to parse local pre-generated CSV %s: %s", csv_file, e)
                     continue
             if sheets:
                 return sheets
@@ -967,7 +975,8 @@ async def get_provenance(job_id: str):
                     content = _remote_read_text(ssh, candidate)
                     spec_data = json.loads(content)
                     break
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed to read remote job_spec candidate %s: %s", candidate, e)
                     continue
             if not spec_data:
                 logger.debug("Could not read remote job_spec.json for %s", job_id[:8])
@@ -1028,7 +1037,8 @@ async def get_provenance(job_id: str):
                     metadata_audit = _remote_read_text(ssh, candidate)
                     metadata_audit_path = rel
                     break
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed to read remote metadata audit candidate %s: %s", candidate, e)
                     continue
     elif loc.local_path:
         for rel in audit_candidates:
@@ -1038,7 +1048,8 @@ async def get_provenance(job_id: str):
                     metadata_audit = p.read_text(errors="replace")
                     metadata_audit_path = rel
                     break
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed to read local metadata audit candidate %s: %s", p, e)
                     continue
 
     return {

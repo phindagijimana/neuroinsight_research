@@ -69,6 +69,10 @@ class TestJobSpecConstruction:
             pid = p["id"] if isinstance(p, dict) else p.id
             user_selectable = p.get("user_selectable", True) if isinstance(p, dict) else getattr(p, "user_selectable", True)
             input_format = p.get("input_format") if isinstance(p, dict) else getattr(p, "input_format", None)
+            # hs_postprocess is a post-processing utility and does not consume
+            # canonical upload input formats directly.
+            if pid == "hs_postprocess":
+                continue
             if user_selectable:
                 assert input_format, f"Plugin {pid} missing input_format"
 

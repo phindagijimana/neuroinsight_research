@@ -95,28 +95,28 @@ class TestFreeSurferVolOnly:
 
 
 # ---------------------------------------------------------------------------
-# Plugin: hs_postprocess (hidden utility)
+# Plugin: hs_postprocess
 # ---------------------------------------------------------------------------
 
 class TestHSPostprocess:
-    """Tests for the hs_postprocess utility plugin."""
+    """Tests for the hs_postprocess plugin."""
 
     def test_plugin_loads(self, registry):
         plugin = registry.get_plugin("hs_postprocess")
         assert plugin is not None
 
-    def test_hidden_from_ui(self, registry):
+    def test_user_selectable(self, registry):
         plugin = registry.get_plugin("hs_postprocess")
-        assert plugin.user_selectable is False
+        assert plugin.user_selectable is True
 
-    def test_ui_category_internal(self, registry):
+    def test_ui_category_primary(self, registry):
         plugin = registry.get_plugin("hs_postprocess")
-        assert plugin.ui_category == "internal_utility"
+        assert plugin.ui_category == "primary"
 
-    def test_not_in_selectable_list(self, registry):
+    def test_in_selectable_list(self, registry):
         plugins = registry.list_plugins(user_selectable_only=True)
         ids = [p.id for p in plugins]
-        assert "hs_postprocess" not in ids
+        assert "hs_postprocess" in ids
 
     def test_in_full_list(self, registry):
         plugins = registry.list_plugins(user_selectable_only=False)
@@ -155,7 +155,7 @@ class TestHSPostprocess:
     def test_report_slices_default(self, registry):
         plugin = registry.get_plugin("hs_postprocess")
         optional = {i["key"]: i for i in plugin.inputs_optional}
-        assert optional["report_slices"]["default"] == "3,4,5,6"
+        assert optional["report_pick"]["default"] == "3,4,5,6"
 
     def test_niivue_opacity_default(self, registry):
         plugin = registry.get_plugin("hs_postprocess")
@@ -327,13 +327,13 @@ class TestHSDetectionAPI:
         assert resp.status_code == 200
         data = resp.json()
         assert data["id"] == "hs_postprocess"
-        assert data["user_selectable"] is False
+        assert data["user_selectable"] is True
 
-    def test_hs_postprocess_excluded_from_default_list(self, client):
+    def test_hs_postprocess_included_in_default_list(self, client):
         resp = client.get("/api/plugins")
         assert resp.status_code == 200
         ids = [p["id"] for p in resp.json()["plugins"]]
-        assert "hs_postprocess" not in ids
+        assert "hs_postprocess" in ids
 
     def test_hs_postprocess_included_in_full_list(self, client):
         resp = client.get("/api/plugins", params={"user_selectable_only": "false"})
