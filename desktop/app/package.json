@@ -14,7 +14,11 @@
     "check": "node --check main.js && node --check preload.js && node --check src/backendManager.js && node --check src/platformAdapter.js && node --check src/desktopState.js && node --check src/preflight.js && node --check src/diagnostics.js && node --check src/licenseManager.js && node --check src/credentialStore.js && node --check src/appLock.js && node --check renderer/renderer.js",
     "pack": "electron-builder --dir",
     "dist:linux": "electron-builder --linux AppImage deb --publish never",
-    "dist:linux:ci": "electron-builder --linux AppImage --publish never"
+    "dist:linux:ci": "electron-builder --linux AppImage deb --publish never",
+    "dist:win": "electron-builder --win nsis --publish never",
+    "dist:win:ci": "electron-builder --win nsis --publish never",
+    "dist:mac": "electron-builder --mac dmg zip --publish never",
+    "dist:mac:ci": "electron-builder --mac dmg zip --publish never"
   },
   "devDependencies": {
     "electron": "^31.0.0",
@@ -29,11 +33,13 @@
       "output": "../dist",
       "buildResources": "build"
     },
+    "icon": "assets/icon.png",
     "files": [
       "main.js",
       "preload.js",
       "renderer/**/*",
       "src/**/*",
+      "assets/**/*",
       "config/**/*",
       "package.json"
     ],
@@ -42,8 +48,23 @@
         "AppImage",
         "deb"
       ],
+      "icon": "assets/icon.png",
       "maintainer": "NeuroInsight Research Team <noreply@neuroinsight.local>",
       "category": "Science"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "assets/icon.icns",
+      "hardenedRuntime": true
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.ico"
     }
   }
 }

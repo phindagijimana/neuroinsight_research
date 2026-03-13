@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron");
 const backendManager = require("./src/backendManager");
 const desktopState = require("./src/desktopState");
@@ -68,12 +69,14 @@ function buildAppMenu() {
 }
 
 function createMainWindow() {
+  const windowIcon = path.join(__dirname, "assets", "icon.png");
   mainWindow = new BrowserWindow({
     width: 980,
     height: 720,
     minWidth: 900,
     minHeight: 640,
     title: "NIR Desktop",
+    icon: windowIcon,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -83,6 +86,46 @@ function createMainWindow() {
   });
 
   openControlCenter();
+}
+
+function getAutoLicenseCandidates() {
+  const candidates = [];
+  const seen = new Set();
+  const addFile = (p) => {
+    if (!p || typeof p !== "string") return;
+    const resolved = path.resolve(p);
+    if (seen.has(resolved)) return;
+    seen.add(resolved);
+    candidates.push(resolved);
+  };
+  const addDirCandidate = (dirPath) => {
+    if (!dirPath || typeof dirPath !== "string") return;
+    addFile(path.join(dirPath, "nir_license.txt"));
+  };
+
+  addDirCandidate(path.dirname(process.execPath));
+  addDirCandidate(process.cwd());
+  if (process.env.APPIMAGE) {
+    addDirCandidate(path.dirname(process.env.APPIMAGE));
+  }
+
+  const lowerExecPath = String(process.execPath || "").toLowerCase();
+  const appMarker = ".app/";
+  const markerIdx = lowerExecPath.lastIndexOf(appMarker);
+  if (markerIdx > 0) {
+    const bundlePath = process.execPath.slice(0, markerIdx + ".app".length);
+    addDirCandidate(bundlePath);
+    addDirCandidate(path.dirname(bundlePath));
+  }
+  return candidates;
+}
+
+function tryAutoImportNearbyLicense() {
+  const candidates = getAutoLicenseCandidates().filter((p) => fs.existsSync(p));
+  if (!candidates.length) {
+    return { ok: false, skipped: false, reason: "No nearby nir_license.txt file found." };
+  }
+  return licenseManager.tryAutoImportFromCandidates(candidates);
 }
 
 ipcMain.handle("nir:getStatus", async () => {
@@ -268,6 +311,18 @@ app.whenReady().then(() => {
   licenseManager.initLicenseManager(paths.stateDir);
   credentialStore.initCredentialStore(paths.stateDir);
   appLock.initAppLock(paths.stateDir);
+  const autoImport = tryAutoImportNearbyLicense();
+  if (autoImport.ok && !autoImport.skipped && autoImport.importedFrom) {
+    desktopState.appendLog("license_auto_import", {
+      ok: true,
+      importedFrom: autoImport.importedFrom,
+    });
+  } else if (!autoImport.ok && Array.isArray(autoImport.errors) && autoImport.errors.length) {
+    desktopState.appendLog("license_auto_import", {
+      ok: false,
+      errorCount: autoImport.errors.length,
+    });
+  }
   buildAppMenu();
   createMainWindow();
   desktopState.appendLog("app_ready");

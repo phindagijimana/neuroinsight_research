@@ -285,10 +285,53 @@ function getLicensePaths() {
   };
 }
 
+function tryAutoImportFromCandidates(candidatePaths) {
+  requireInit();
+  const status = getLicenseStatus();
+  if (status.valid) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: "Existing imported license is already valid.",
+      importedFrom: null,
+    };
+  }
+
+  const checked = [];
+  const errors = [];
+  for (const candidate of candidatePaths || []) {
+    if (!candidate || typeof candidate !== "string") continue;
+    checked.push(candidate);
+    if (!fs.existsSync(candidate)) continue;
+    const res = importLicenseFromFile(candidate);
+    if (res.ok) {
+      return {
+        ok: true,
+        skipped: false,
+        importedFrom: candidate,
+        status: res.status || null,
+      };
+    }
+    errors.push({
+      path: candidate,
+      error: res.error || "Unknown license import error.",
+    });
+  }
+
+  return {
+    ok: false,
+    skipped: false,
+    importedFrom: null,
+    checked,
+    errors,
+  };
+}
+
 module.exports = {
   initLicenseManager,
   getLicenseStatus,
   importLicenseFromText,
   importLicenseFromFile,
   getLicensePaths,
+  tryAutoImportFromCandidates,
 };

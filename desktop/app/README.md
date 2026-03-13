@@ -15,6 +15,8 @@ This folder contains the Electron host for NIR Desktop (Phases 1-4 scaffold).
 - runs desktop preflight checks (Docker/ports/disk/keychain/Python/Celery/ports)
 - exports a diagnostics support bundle JSON with runtime process + log snapshots
 - supports Phase 3 license import/validation (signed token model)
+- auto-detects `nir_license.txt` on startup when placed next to the app binary
+  (or AppImage / `.app` bundle location) and imports it when valid
 - supports Phase 3 credential vault abstraction (OS keychain when available, encrypted fallback)
 - supports optional Phase 3 local app lock (PIN-based sensitive action gating)
 - Phase 3.5 hardening:
@@ -26,12 +28,12 @@ This folder contains the Electron host for NIR Desktop (Phases 1-4 scaffold).
   - `electron-builder` config for Linux targets (AppImage, deb)
   - packaging scripts in `package.json`
   - release metadata + SHA256 generation via `desktop/ops/release_metadata.js`
+- desktop icon assets under `desktop/app/assets/` (`NIR` on navy blue)
 
 ## What It Does Not Do Yet
 
-- production code-signing certificates are not wired yet
 - auto-update channel is not wired yet
-- macOS and Windows installer pipelines are not added yet
+- trusted signing/notarization still depends on operator-provided certificates
 - fully self-contained backend packaging is not wired yet (repo checkout still required)
 
 ## Run Locally

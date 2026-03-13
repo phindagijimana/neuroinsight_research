@@ -132,6 +132,47 @@ This roadmap is organized in execution phases with clear deliverables and exit c
 - operational handoff complete
 - go-live recommendation documented
 
+## Phase 6 - Trust and Distribution Hardening
+
+## Goals
+
+- Ship trusted installers for macOS and Windows.
+- Add explicit trust verification steps to release automation.
+- Publish operator/user guidance for verification workflows.
+
+## Deliverables
+
+- desktop release workflow paths for optional signing secrets
+- macOS notarization verification and Windows signature verification in CI
+- signing setup + trust verification runbook under `desktop/ops/`
+- release notes/checksum verification guidance for operators and users
+
+## Exit Criteria
+
+- signed build path passes when required secrets are configured
+- unsigned fallback path still works for internal testing
+- platform-scoped checksum and trust verification documentation is complete
+
+## Phase 7 - Pilot Reliability Gate
+
+## Goals
+
+- Convert pilot outcomes into explicit go/no-go release decisions.
+- Enforce parity and reliability thresholds across Linux/macOS/Windows.
+- Ensure failure-recovery and support readiness before GA cutover.
+
+## Deliverables
+
+- reliability gate criteria document under `desktop/ops/`
+- pilot reliability evidence template (structured JSON)
+- automated gate evaluator script for go/conditional/no-go recommendation
+
+## Exit Criteria
+
+- pilot reliability report completed with platform evidence
+- automated gate result reviewed and captured in go-live recommendation
+- unresolved P0/P1 defects blocked from GA advancement
+
 ## Execution Rhythm
 
 - Build in 2-week sprints.

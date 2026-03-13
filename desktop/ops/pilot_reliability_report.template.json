@@ -1,0 +1,41 @@
+{
+  "build_tag": "desktop-vX.Y.Z",
+  "pilot_window": "YYYY-MM-DD to YYYY-MM-DD",
+  "cohort_size": 0,
+  "core_flow_completion_rate": 0,
+  "parity_completion_rate": 0,
+  "crash_free_launch_rate": 0,
+  "sla_adherence_rate": 0,
+  "open_defects": {
+    "p0": 0,
+    "p1": 0,
+    "p2": 0,
+    "p3": 0
+  },
+  "platforms": {
+    "linux": {
+      "evidence_present": false,
+      "diagnostics_samples": 0,
+      "failure_recovery_drill_passed": false
+    },
+    "macos": {
+      "evidence_present": false,
+      "diagnostics_samples": 0,
+      "failure_recovery_drill_passed": false
+    },
+    "windows": {
+      "evidence_present": false,
+      "diagnostics_samples": 0,
+      "failure_recovery_drill_passed": false
+    }
+  },
+  "conditional_go_notes": [
+    {
+      "issue": "",
+      "severity": "p2",
+      "owner": "",
+      "eta": "",
+      "mitigation": ""
+    }
+  ]
+}
