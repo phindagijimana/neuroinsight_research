@@ -1,8 +1,8 @@
 const fs = require("fs");
 const os = require("os");
-const path = require("path");
 const { spawnSync } = require("child_process");
 const net = require("net");
+const platformAdapter = require("./platformAdapter");
 
 function cmdExists(cmd, args = ["--version"]) {
   try {
@@ -60,6 +60,40 @@ function getDiskFreeGB() {
   }
 }
 
+function checkPythonRuntime() {
+  const pythonCmd = platformAdapter.resolvePythonCommand();
+  if (!pythonCmd) {
+    return {
+      ok: false,
+      command: null,
+      detail: "Python runtime not found (set NIR_DESKTOP_PYTHON or install python3).",
+    };
+  }
+  const parts = pythonCmd.split(/\s+/);
+  const cmd = parts[0];
+  const args = [...parts.slice(1), "--version"];
+  const res = cmdExists(cmd, args);
+  return {
+    ok: res.found && res.code === 0,
+    command: pythonCmd,
+    detail: (res.stdout || res.stderr || "").trim(),
+  };
+}
+
+function checkCeleryImport(pythonCmd) {
+  if (!pythonCmd) {
+    return { ok: false, detail: "Python runtime not available." };
+  }
+  const parts = pythonCmd.split(/\s+/);
+  const cmd = parts[0];
+  const args = [...parts.slice(1), "-c", "import celery; print(celery.__version__)"];
+  const res = cmdExists(cmd, args);
+  return {
+    ok: res.found && res.code === 0,
+    detail: res.stdout || res.stderr || "Celery import check failed",
+  };
+}
+
 function checkKeychainAvailability() {
   if (process.platform === "darwin") {
     const r = cmdExists("security", ["-h"]);
@@ -89,6 +123,8 @@ async function runPreflight() {
   const docker = cmdExists("docker", ["--version"]);
   const node = cmdExists("node", ["--version"]);
   const npm = cmdExists("npm", ["--version"]);
+  const python = checkPythonRuntime();
+  const celery = checkCeleryImport(python.command);
   const keychain = checkKeychainAvailability();
   const disk = getDiskFreeGB();
   const port3000 = await checkPortOpen(3000);
@@ -113,6 +149,15 @@ async function runPreflight() {
       ok: npm.found,
       detail: npm.stdout || npm.stderr || "npm not found",
     },
+    python: {
+      ok: python.ok,
+      command: python.command,
+      detail: python.detail,
+    },
+    celery: {
+      ok: celery.ok,
+      detail: celery.detail,
+    },
     keychain: {
       ok: keychain.available,
       backend: keychain.backend,
@@ -127,8 +172,13 @@ async function runPreflight() {
 
   const warnings = [];
   if (!checks.docker.ok) warnings.push("Docker not detected.");
+  if (!checks.python.ok) warnings.push("Python runtime not detected.");
+  if (!checks.celery.ok) warnings.push("Celery Python package import failed.");
   if (!checks.keychain.ok) warnings.push("OS keychain backend not detected.");
   if (checks.disk.ok && checks.disk.freeGB < 20) warnings.push("Low free disk space (<20GB).");
+  if (checks.ports.p3000_open && checks.ports.p3001_open) {
+    warnings.push("Both desktop candidate ports (3000 and 3001) are already in use.");
+  }
 
   return {
     ok: warnings.length === 0,

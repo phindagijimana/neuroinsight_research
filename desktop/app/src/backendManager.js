@@ -3,6 +3,7 @@ const net = require("net");
 const { spawn } = require("child_process");
 const http = require("http");
 const path = require("path");
+const platformAdapter = require("./platformAdapter");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 const candidatePorts = [3000, 3001];
@@ -13,6 +14,7 @@ let runtimeState = {
   backendPid: null,
   celeryPid: null,
   port: null,
+  pythonCmd: null,
 };
 
 function initDesktopRuntime(paths) {
@@ -48,7 +50,8 @@ function appendRuntimeLog(filePath, message) {
 
 function runShellCommand(command, cwd, timeoutMs = 600000) {
   return new Promise((resolve) => {
-    const child = spawn("bash", ["-lc", command], {
+    const shellSpec = platformAdapter.getShellSpawnSpec(command);
+    const child = spawn(shellSpec.command, shellSpec.args, {
       cwd,
       env: process.env,
     });
@@ -171,7 +174,8 @@ async function ensureFrontendBuild() {
   if (!hasPackageJson) {
     return { ok: true, skipped: true, reason: "frontend package.json missing" };
   }
-  const buildRes = await runShellCommand("npm run build", frontendDir, 900000);
+  const npmCommand = platformAdapter.resolveNpmCommand();
+  const buildRes = await runShellCommand(`${npmCommand} run build`, frontendDir, 900000);
   return { ...buildRes, skipped: false };
 }
 
@@ -186,6 +190,13 @@ function spawnManagedProcess(command, args, logFile, extraEnv = {}) {
   child.unref();
   fs.closeSync(outFd);
   return child.pid;
+}
+
+function spawnPythonModule(pythonCmd, moduleName, moduleArgs, logFile, extraEnv = {}) {
+  const cmdParts = String(pythonCmd).trim().split(/\s+/);
+  const command = cmdParts[0];
+  const prefixArgs = cmdParts.slice(1);
+  return spawnManagedProcess(command, [...prefixArgs, "-m", moduleName, ...moduleArgs], logFile, extraEnv);
 }
 
 async function waitForBackendHealth(port, timeoutMs = START_TIMEOUT_MS) {
@@ -228,8 +239,40 @@ async function getStatus() {
   };
 }
 
+function getRuntimeInfo() {
+  ensureInit();
+  return {
+    managedPids: {
+      backendPid: runtimeState.backendPid,
+      backendAlive: isPidAlive(runtimeState.backendPid),
+      celeryPid: runtimeState.celeryPid,
+      celeryAlive: isPidAlive(runtimeState.celeryPid),
+    },
+    configuredPort: runtimeState.port,
+    pythonCmd: runtimeState.pythonCmd,
+    logFiles: {
+      backend: managerPaths.backendLogFile,
+      celery: managerPaths.celeryLogFile,
+    },
+  };
+}
+
 async function startBackend() {
   ensureInit();
+  const pythonCmd = platformAdapter.resolvePythonCommand();
+  runtimeState.pythonCmd = pythonCmd;
+  if (!pythonCmd) {
+    return {
+      ok: false,
+      code: -1,
+      stdout: "",
+      stderr: "Python runtime not found. Set NIR_DESKTOP_PYTHON or install python3.",
+      running: false,
+      port: null,
+      managed: false,
+    };
+  }
+
   const existing = await detectRunningPort();
   if (existing) {
     runtimeState.port = existing;
@@ -268,9 +311,10 @@ async function startBackend() {
   }
 
   appendRuntimeLog(managerPaths.backendLogFile, `Starting backend on port ${port}`);
-  const backendPid = spawnManagedProcess(
-    "python3",
-    ["-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", String(port), "--workers", "2"],
+  const backendPid = spawnPythonModule(
+    pythonCmd,
+    "uvicorn",
+    ["backend.main:app", "--host", "0.0.0.0", "--port", String(port), "--workers", "2"],
     managerPaths.backendLogFile,
     {
       ENVIRONMENT: process.env.ENVIRONMENT || "development",
@@ -299,19 +343,10 @@ async function startBackend() {
 
   // Celery is best-effort in Phase 1 runtime decoupling.
   appendRuntimeLog(managerPaths.celeryLogFile, "Starting celery worker");
-  const celeryPid = spawnManagedProcess(
-    "python3",
-    [
-      "-m",
-      "celery",
-      "-A",
-      "backend.core.celery_app",
-      "worker",
-      "--loglevel=info",
-      "-Q",
-      "docker_jobs,celery",
-      "--hostname=nir-desktop-worker@%h",
-    ],
+  const celeryPid = spawnPythonModule(
+    pythonCmd,
+    "celery",
+    ["-A", "backend.core.celery_app", "worker", "--loglevel=info", "-Q", "docker_jobs,celery", "--hostname=nir-desktop-worker@%h"],
     managerPaths.celeryLogFile,
     {
       ENVIRONMENT: process.env.ENVIRONMENT || "development",
@@ -408,6 +443,7 @@ module.exports = {
   repoRoot,
   initDesktopRuntime,
   getStatus,
+  getRuntimeInfo,
   startBackend,
   stopBackendAppOnly,
   stopBackendAll,
