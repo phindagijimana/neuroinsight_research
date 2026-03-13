@@ -29,10 +29,6 @@ The desktop app is designed as a native shell around existing NIR components:
   - `.github/workflows/desktop_release.yml`
 - Phase 5: production-readiness and pilot ops kit added
   - `desktop/ops/PILOT_CHECKLIST.md`
-  - `desktop/ops/UAT_REPORT_TEMPLATE.md`
-  - `desktop/ops/SUPPORT_RUNBOOK.md`
-  - `desktop/ops/INCIDENT_WORKFLOW.md`
-  - `desktop/ops/LICENSING_BILLING_PLAYBOOK.md`
   - `desktop/ops/GO_LIVE_RECOMMENDATION_TEMPLATE.md`
   - `desktop/ops/pilot_smoke_test.sh`
 
