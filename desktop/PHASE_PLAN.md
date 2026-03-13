@@ -24,6 +24,15 @@ This roadmap is organized in execution phases with clear deliverables and exit c
   - `ARCHITECTURE_BASELINE.md`
   - `SUPPORT_MATRIX.md`
   - `RISK_REGISTER.md`
+- Phase 0 execution artifacts present under `desktop/ops/`:
+  - `PHASE0_BASELINE_FREEZE.md`
+  - `FULL_EXPERIENCE_PARITY_CHECKLIST.md`
+
+## Phase 0 Notes (Full-Experience Desktop Track)
+
+- Phase 0 for the full desktop migration is documentation and baseline tagging only.
+- No runtime behavior changes are made to NIR in this phase.
+- Code changes for decoupling/bundling start in Phase 1.
 
 ## Phase 1 - Desktop Scaffold and Runtime Bootstrap
 
