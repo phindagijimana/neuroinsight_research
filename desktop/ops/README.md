@@ -43,3 +43,4 @@ Use:
 These are also produced by the GitHub workflow:
 
 - `.github/workflows/desktop_release.yml`
+- `.github/workflows/desktop_release_multi.yml` (Linux + Windows + macOS, isolated desktop-only release path)
