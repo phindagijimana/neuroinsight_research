@@ -76,4 +76,9 @@ jobs:
         run: docker build -t neuroinsight-research:test .
 
       - name: Verify image
-        run: docker run --rm neuroinsight-research:test python -c "import backend.main; print('OK')"
+        run: |
+          docker run --rm \
+            --entrypoint python \
+            -e SECRET_KEY='ci_production_secret_key_please_rotate_0123456789' \
+            neuroinsight-research:test \
+            -c "import backend.main; print('OK')"
