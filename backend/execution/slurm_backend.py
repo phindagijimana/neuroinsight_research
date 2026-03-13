@@ -219,8 +219,8 @@ class SLURMBackend(ExecutionBackend):
             try:
                 self._require_meld_assets_on_hpc(params_dir, models_dir)
                 return params_dir, models_dir
-            except ExecutionError:
-                continue
+            except ExecutionError as e:
+                logger.debug("MELD cache candidate %s invalid: %s", root, e)
 
         # Auto-stage from local cache when available.
         local_root = self._find_local_meld_cache_root()
@@ -1123,7 +1123,8 @@ class SLURMBackend(ExecutionBackend):
                         if first_line:
                             logger.debug("_find_nifti_in_dir: %s matched %s in %s", key, first_line, search_dir)
                             return first_line
-                except Exception:
+                except Exception as e:
+                    logger.debug("Remote NIfTI search failed in %s for %s: %s", search_dir, key, e)
                     continue
         return None
 
@@ -1241,8 +1242,8 @@ class SLURMBackend(ExecutionBackend):
                                 resolved["subject_id"] = match.group(1)
                                 logger.info("Auto-detected subject_id from BIDS directory listing: %s", match.group(1))
                                 break
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Could not auto-detect subject_id from %s: %s", f, e)
 
         return resolved
 
@@ -1458,8 +1459,8 @@ class SLURMBackend(ExecutionBackend):
                             if exit_code == 0 and "yes" in out:
                                 mcr_path = candidate
                                 break
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug("MCR candidate check failed for %s: %s", candidate, e)
                 if mcr_path:
                     bind_mounts.append(f"{mcr_path}:/usr/local/freesurfer/MCRv97:ro")
                     logger.info("MCR bind mount (host override): %s", mcr_path)

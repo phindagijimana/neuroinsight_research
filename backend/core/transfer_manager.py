@@ -299,8 +299,8 @@ class TransferManager:
             name = info.get("filename", "")
             if name:
                 return name
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not resolve filename for %s: %s", file_id, e)
         return self._filename_from_id(file_id, index)
 
     def _download_to_local(self, record: TransferRecord, connector) -> None:
@@ -345,8 +345,8 @@ class TransferManager:
 
         try:
             ssh.execute(f'mkdir -p "{record.target_path}"')
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not create remote target path %s: %s", record.target_path, e)
 
         expanded = getattr(record, "_expanded_names", None)
 
@@ -367,8 +367,8 @@ class TransferManager:
                 if remote_parent != record.target_path:
                     try:
                         ssh.execute(f'mkdir -p "{remote_parent}"')
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Could not create remote parent %s: %s", remote_parent, e)
 
                 downloaded = False
 
@@ -657,8 +657,8 @@ class TransferManager:
             for archive_path in remote_archives_to_cleanup:
                 try:
                     ssh.execute(f'rm -f "{archive_path}"', timeout=60)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Could not clean up remote archive %s: %s", archive_path, e)
 
     @staticmethod
     def _collect_remote_files_recursive(ssh, root_path: str) -> list[str]:
@@ -755,8 +755,8 @@ class TransferManager:
                     for part in parts:
                         try:
                             os.remove(part)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug("Could not remove split temp part %s: %s", part, e)
 
             raise
 
@@ -800,8 +800,8 @@ class TransferManager:
         finally:
             try:
                 os.remove(unique_path)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Could not remove unique temp upload file %s: %s", unique_path, e)
 
     # -------------------------------------------------- generic move logic
 
