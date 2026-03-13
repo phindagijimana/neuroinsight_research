@@ -1,0 +1,56 @@
+name: Desktop Release (Linux)
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  build-linux-desktop:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install desktop dependencies
+        working-directory: desktop/app
+        run: npm install --no-audit --no-fund
+
+      - name: Validate desktop sources
+        working-directory: desktop/app
+        run: npm run check
+
+      - name: Build Linux artifact
+        working-directory: desktop/app
+        run: npm run dist:linux:ci
+
+      - name: Generate checksums and metadata
+        run: node desktop/ops/release_metadata.js desktop/dist desktop/dist
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nir-desktop-linux
+          path: |
+            desktop/dist/*.AppImage
+            desktop/dist/*.yml
+            desktop/dist/desktop-release-metadata.json
+            desktop/dist/desktop-release-sha256.txt
+          if-no-files-found: error
+
+      - name: Attach artifacts to GitHub release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            desktop/dist/*.AppImage
+            desktop/dist/*.yml
+            desktop/dist/desktop-release-metadata.json
+            desktop/dist/desktop-release-sha256.txt

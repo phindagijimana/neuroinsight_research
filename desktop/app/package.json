@@ -2,13 +2,48 @@
   "name": "nir-desktop-app",
   "version": "0.1.0",
   "private": true,
-  "description": "Phase 1 scaffold for NIR Desktop (Electron shell)",
+  "description": "NIR Desktop Electron shell",
+  "homepage": "https://github.com/phindagijimana/neuroinsight_research",
+  "author": {
+    "name": "NeuroInsight Research Team",
+    "email": "noreply@neuroinsight.local"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "check": "node --check main.js && node --check preload.js && node --check src/backendManager.js"
+    "check": "node --check main.js && node --check preload.js && node --check src/backendManager.js && node --check src/desktopState.js && node --check src/preflight.js && node --check src/diagnostics.js && node --check src/licenseManager.js && node --check src/credentialStore.js && node --check renderer/renderer.js",
+    "pack": "electron-builder --dir",
+    "dist:linux": "electron-builder --linux AppImage deb --publish never",
+    "dist:linux:ci": "electron-builder --linux AppImage --publish never"
   },
   "devDependencies": {
-    "electron": "^31.0.0"
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.neuroinsight.desktop",
+    "productName": "NeuroInsight Research Desktop",
+    "asar": true,
+    "artifactName": "nir-desktop-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "../dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "src/**/*",
+      "config/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "maintainer": "NeuroInsight Research Team <noreply@neuroinsight.local>",
+      "category": "Science"
+    }
   }
 }

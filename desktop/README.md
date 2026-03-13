@@ -20,6 +20,13 @@ The desktop app is designed as a native shell around existing NIR components:
 
 - Phase 0: completed (baseline docs under `desktop/architecture/`)
 - Phase 1: scaffold created under `desktop/app/`
+- Phase 2: preflight and diagnostics scaffold added
+- Phase 3/3.5: license and vault hardening scaffold added
+- Phase 4: Linux-first packaging/release scaffold added
+  - `desktop/app/package.json` build targets/scripts
+  - `desktop/ops/package_desktop_linux.sh`
+  - `desktop/ops/release_metadata.js`
+  - `.github/workflows/desktop_release.yml`
 
 ## Guardrails
 
