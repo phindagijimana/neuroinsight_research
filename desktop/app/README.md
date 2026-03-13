@@ -6,9 +6,10 @@ This folder contains the Electron host for NIR Desktop (Phases 1-4 scaffold).
 
 - opens a native desktop shell window
 - checks if NIR backend is running (`/health` on `3000`/`3001`)
-- starts backend using existing CLI: `./research start`
-- stops app services: `./research stop app`
-- stops app + infrastructure safely: `./research stop`
+- starts backend directly from desktop process manager (uvicorn)
+- starts celery worker directly from desktop process manager (best effort)
+- stops desktop-managed backend service
+- stops desktop-managed backend + celery worker
 - opens the running NIR UI in the same desktop window
 - persists desktop settings and logs under Electron user data path
 - runs desktop preflight checks (Docker/ports/disk/keychain availability)
@@ -80,5 +81,5 @@ See `desktop/app/config/license_public_key.pem.example`.
 
 ## Safety Note
 
-This scaffold reuses existing NIR runtime commands and does not modify current
-CLI-hosted workflows. It is additive and isolated to `desktop/app`.
+This scaffold is additive and isolated to `desktop/app`. It does not modify the
+core NIR backend/frontend codepaths used by existing workflows.

@@ -208,6 +208,7 @@ ipcMain.handle("nir:deleteSecret", async (_event, key) => {
 app.whenReady().then(() => {
   desktopState.initState(app.getPath("userData"));
   const paths = desktopState.getPaths();
+  backendManager.initDesktopRuntime(paths);
   licenseManager.initLicenseManager(paths.stateDir);
   credentialStore.initCredentialStore(paths.stateDir);
   buildAppMenu();
