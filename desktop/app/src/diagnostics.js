@@ -14,12 +14,25 @@ function safeRead(filePath) {
   }
 }
 
+function tailLines(text, maxLines = 200) {
+  if (!text) return null;
+  return text.split("\n").slice(-maxLines).join("\n");
+}
+
 async function exportDiagnosticsBundle() {
   const paths = desktopState.getPaths();
   const status = await backendManager.getStatus();
+  let runtime = null;
+  try {
+    runtime = backendManager.getRuntimeInfo();
+  } catch (_e) {
+    runtime = null;
+  }
   const checks = await preflight.runPreflight();
   const settings = desktopState.readSettings();
   const desktopLog = safeRead(paths.logFile);
+  const backendRuntimeLog = runtime ? safeRead(runtime.logFiles.backend) : null;
+  const celeryRuntimeLog = runtime ? safeRead(runtime.logFiles.celery) : null;
 
   const payload = {
     generatedAt: new Date().toISOString(),
@@ -32,11 +45,14 @@ async function exportDiagnosticsBundle() {
     nirDesktop: {
       settings,
       status,
+      runtime,
       preflight: checks,
       paths,
     },
     logs: {
-      desktopLog: desktopLog ? desktopLog.split("\n").slice(-200).join("\n") : null,
+      desktopLog: tailLines(desktopLog, 400),
+      backendRuntimeLog: tailLines(backendRuntimeLog, 400),
+      celeryRuntimeLog: tailLines(celeryRuntimeLog, 400),
     },
   };
 

@@ -12,8 +12,8 @@ This folder contains the Electron host for NIR Desktop (Phases 1-4 scaffold).
 - stops desktop-managed backend + celery worker
 - opens the running NIR UI in the same desktop window
 - persists desktop settings and logs under Electron user data path
-- runs desktop preflight checks (Docker/ports/disk/keychain availability)
-- exports a diagnostics support bundle JSON
+- runs desktop preflight checks (Docker/ports/disk/keychain/Python/Celery/ports)
+- exports a diagnostics support bundle JSON with runtime process + log snapshots
 - supports Phase 3 license import/validation (signed token model)
 - supports Phase 3 credential vault abstraction (OS keychain when available, encrypted fallback)
 - Phase 3.5 hardening:
@@ -31,6 +31,7 @@ This folder contains the Electron host for NIR Desktop (Phases 1-4 scaffold).
 - production code-signing certificates are not wired yet
 - auto-update channel is not wired yet
 - macOS and Windows installer pipelines are not added yet
+- fully self-contained backend packaging is not wired yet (repo checkout still required)
 
 ## Run Locally
 
