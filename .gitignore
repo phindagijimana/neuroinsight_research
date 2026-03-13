@@ -32,6 +32,7 @@ logs/
 data/
 uploads/
 outputs/
+transfer/
 freesurfer_subjects/
 singularity_cache/
 
