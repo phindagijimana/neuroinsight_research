@@ -1301,7 +1301,12 @@ def list_jobs(status: Optional[str] = None, limit: int = 100, db: Session = Depe
         query = query.filter(Job.status == status)
     query = query.order_by(Job.submitted_at.desc()).limit(limit)
     jobs = query.all()
-    return {"jobs": [job.to_dict() for job in jobs]}
+    payload = []
+    for job in jobs:
+        item = job.to_dict()
+        item["progress"] = quantize_progress(item.get("progress", 0))
+        payload.append(item)
+    return {"jobs": payload}
 
 
 @app.get("/api/jobs/progress")
@@ -1927,7 +1932,9 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
         except Exception as e:
             logger.debug("Could not refresh live progress for job %s: %s", job_id[:8], e)
 
-    return job.to_dict()
+    payload = job.to_dict()
+    payload["progress"] = quantize_progress(payload.get("progress", 0))
+    return payload
 
 
 @app.post("/api/jobs/{job_id}/cancel")
