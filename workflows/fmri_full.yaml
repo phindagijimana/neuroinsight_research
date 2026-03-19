@@ -24,6 +24,10 @@ inputs:
   optional:
     - key: fs_license
       type: path
+    - key: fs_subjects_dir
+      type: directory
+      default: ""
+      description: "Path to existing FreeSurfer SUBJECTS_DIR (reused by fMRIPrep when provided)"
     - key: output_spaces
       type: string
       default: "MNI152NLin2009cAsym"
@@ -59,6 +63,7 @@ steps:
       bids_dir: "{inputs.bids_dir}"
       subject_id: "{inputs.subject_id}"
       fs_license: "{inputs.fs_license}"
+      fs_subjects_dir: "{inputs.fs_subjects_dir}"
       output_spaces: "{inputs.output_spaces}"
 
   - id: xcpd

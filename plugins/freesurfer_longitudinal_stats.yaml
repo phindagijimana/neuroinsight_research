@@ -60,7 +60,7 @@ parameters:
   - name: base_id
     type: string
     default: "base_template"
-    description: "Identifier for the unbiased base template"
+    description: "Identifier for the unbiased base template (auto-detected from LONG dirs when left as default)"
 
 resources:
   profiles:
@@ -82,7 +82,40 @@ execution:
     mkdir -p /data/outputs/logs/freesurfer_longitudinal_stats
     echo "=== Extracting longitudinal stats ==="
     echo "SUBJECTS_DIR: $SUBJECTS_DIR"
-    echo "BASE_ID: $BASE_ID"
+    echo "Requested BASE_ID: $BASE_ID"
+
+    # Keep stats extraction aligned with longitudinal stage default behavior.
+    # If base_id is left as workflow default, detect the actual base from LONG dirs.
+    if [ -z "$BASE_ID" ] || [ "$BASE_ID" = "base_template" ]; then
+      BASE_CANDIDATES=()
+      for d in "$SUBJECTS_DIR"/*.long.*; do
+        [ -d "$d" ] || continue
+        name="$(basename "$d")"
+        candidate="${name#*.long.}"
+        [ "$candidate" = "$name" ] && continue
+        seen=false
+        for existing in "${BASE_CANDIDATES[@]+"${BASE_CANDIDATES[@]}"}"; do
+          [ "$existing" = "$candidate" ] && seen=true
+        done
+        $seen || BASE_CANDIDATES+=("$candidate")
+      done
+
+      if [ ${#BASE_CANDIDATES[@]} -eq 1 ]; then
+        BASE_ID="${BASE_CANDIDATES[0]}"
+        echo "Auto-detected BASE_ID from LONG dirs: $BASE_ID"
+      elif [ ${#BASE_CANDIDATES[@]} -gt 1 ]; then
+        echo "ERROR: Multiple base IDs found in LONG dirs: ${BASE_CANDIDATES[*]}"
+        echo "Please set base_id explicitly for deterministic stats extraction."
+        exit 1
+      else
+        echo "ERROR: Could not auto-detect base_id (no LONG dirs found)."
+        exit 1
+      fi
+    else
+      echo "Using provided BASE_ID: $BASE_ID"
+    fi
+
+    echo "Resolved BASE_ID: $BASE_ID"
     LONG_DIRS=()
     for d in "$SUBJECTS_DIR"/*.long."$BASE_ID"; do
       [ -d "$d" ] || continue
