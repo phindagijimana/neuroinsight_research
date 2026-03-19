@@ -24,6 +24,7 @@ from backend.core.config import get_settings
 from backend.core.database import init_db, get_db
 from backend.core.pipelines import get_pipeline_registry
 from backend.core.plugin_registry import get_plugin_workflow_registry
+from backend.core.progress_utils import quantize_progress
 from backend.core.execution import JobSpec, ResourceSpec, ExecutionError
 from backend.execution import get_backend
 from backend.models.job import Job, JobStatusEnum
@@ -1333,7 +1334,7 @@ def get_jobs_progress(db: Session = Depends(get_db)):
     results = []
     for j in active_jobs:
         status = j.status
-        progress = j.progress or 0
+        progress = quantize_progress(j.progress or 0)
         phase = j.current_phase
 
         if j.backend_type == "slurm" and j.backend_job_id:
@@ -1391,7 +1392,7 @@ def get_jobs_progress(db: Session = Depends(get_db)):
         results.append({
             "id": j.id,
             "status": status,
-            "progress": progress,
+            "progress": quantize_progress(progress),
             "current_phase": phase,
         })
 
@@ -1661,6 +1662,7 @@ def _poll_slurm_status(slurm_job_id: str) -> str | None:
 import time as _time
 import re as _re
 
+# Per-job progress cache/state keyed by job.id to keep concurrent jobs isolated.
 _slurm_progress_cache: dict[str, tuple[float, int, str]] = {}
 _slurm_progress_state: dict[str, dict] = {}
 _SLURM_PROGRESS_POLL_INTERVAL = 30  # seconds between log reads per job
@@ -1884,6 +1886,7 @@ def _poll_slurm_progress(job: "Job") -> tuple[int, str] | None:
             best_progress = int(step_offset_pct + (step_progress * step_pct_range / 100))
             best_progress = min(best_progress, 99)
 
+        best_progress = quantize_progress(best_progress)
         if cached:
             best_progress = max(best_progress, cached[1])
 
@@ -1915,8 +1918,9 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
         try:
             backend = get_backend()
             info = backend.get_job_info(job_id)
-            if info.progress and info.progress > (job.progress or 0):
-                job.progress = info.progress
+            info_progress = quantize_progress(info.progress or 0)
+            if info_progress > (job.progress or 0):
+                job.progress = info_progress
             if info.current_phase:
                 job.current_phase = info.current_phase
             db.commit()
