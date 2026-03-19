@@ -32,6 +32,7 @@ from backend.core.execution import (
     JobLogs,
     ResourceSpec,
 )
+from backend.core.progress_utils import quantize_progress
 from backend.core.ssh_manager import (
     SSHManager,
     SSHConnectionError,
@@ -1826,7 +1827,7 @@ class SLURMBackend(ExecutionBackend):
                             best_progress = pct
                             best_label = label
 
-            return (best_progress, best_label)
+            return (quantize_progress(best_progress), best_label)
 
         except Exception as e:
             logger.debug(f"Could not parse progress from log for job {job_id[:8]}: {e}")
