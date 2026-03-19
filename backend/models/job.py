@@ -175,6 +175,8 @@ class Job(Base):
         params = self.parameters or {}
         if params.get("_workflow_steps"):
             return "workflow"
+        if params.get("_workflow_id"):
+            return "workflow"
         if params.get("execution_mode"):
             return params["execution_mode"]
         return "plugin"

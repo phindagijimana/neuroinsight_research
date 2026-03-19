@@ -100,8 +100,10 @@ WORKFLOW_STEPS: dict[str, list[str]] = {
     "freesurfer longitudinal full": ["freesurfer_longitudinal"],
     "freesurfer_longitudinal_full": ["freesurfer_longitudinal"],
     "fmri full": ["fmriprep", "xcpd"],
+    "fmri full pipeline": ["fmriprep", "xcpd"],
     "fmri_full": ["fmriprep", "xcpd"],
     "diffusion full": ["qsiprep", "qsirecon"],
+    "diffusion full pipeline": ["qsiprep", "qsirecon"],
     "diffusion_full": ["qsiprep", "qsirecon"],
     "tuberous sclerosis detection": ["tsc_segmentation_tsccnn3d"],
     "tuberous_sclerosis_detection": ["tsc_segmentation_tsccnn3d"],
@@ -196,6 +198,78 @@ def _parse_tsv_text(text: str) -> tuple[list[str], list[list[Any]]]:
                     row.append(v)
         rows.append(row)
     return headers, rows
+
+
+def _extract_timepoint_id_from_stats_path(rel_path: str) -> str:
+    """Extract a stable timepoint id from a FreeSurfer stats path."""
+    parts = PurePosixPath(rel_path).parts
+    for part in parts:
+        if ".long." in part:
+            return part.split(".long.", 1)[0]
+
+    # Typical fallback: <tp_id>/stats/<file>.stats
+    if len(parts) >= 3 and parts[-2].lower() == "stats":
+        return parts[-3]
+    if len(parts) >= 2:
+        return parts[-2]
+    return PurePosixPath(rel_path).stem
+
+
+def _session_to_days(session_value: str) -> float | None:
+    """Convert a session token (e.g. 2WK, 6MO) to approximate days."""
+    token = session_value.strip().lower()
+    if token in ("baseline", "bl", "ses-baseline"):
+        return 0.0
+    m = re.match(r"^(\d+(?:\.\d+)?)([a-z]+)$", token)
+    if not m:
+        return None
+    val = float(m.group(1))
+    unit = m.group(2)
+    if unit in ("d", "day", "days"):
+        return val
+    if unit in ("w", "wk", "wks", "week", "weeks"):
+        return val * 7.0
+    if unit in ("mo", "mos", "month", "months"):
+        return val * 30.4375
+    if unit in ("y", "yr", "yrs", "year", "years"):
+        return val * 365.25
+    return None
+
+
+def _normalize_timepoint_label(tp_id: str) -> str:
+    """Generate a readable timepoint label from a tp id."""
+    m = re.search(r"(ses-[^_]+)", tp_id, flags=re.IGNORECASE)
+    if not m:
+        return tp_id
+
+    raw = m.group(1)
+    value = raw[4:]
+    days = _session_to_days(value)
+    if days is None:
+        return value
+
+    # Emit compact labels consistent with user-facing expectations.
+    if days < 30:
+        weeks = round(days / 7.0)
+        return f"{weeks}weeks"
+    if days < 365:
+        months = round(days / 30.4375)
+        return f"{months}months"
+    years = round(days / 365.25, 1)
+    if abs(years - int(years)) < 1e-9:
+        years = int(years)
+    return f"{years}years"
+
+
+def _timepoint_sort_key(tp_id: str) -> tuple[int, float, str]:
+    """Sort key for chronological timepoint ordering when possible."""
+    m = re.search(r"(ses-[^_]+)", tp_id, flags=re.IGNORECASE)
+    if m:
+        days = _session_to_days(m.group(1)[4:])
+        if days is not None:
+            return (0, days, tp_id)
+    # Unknown session semantics -> deterministic lexical fallback.
+    return (1, math.inf, tp_id)
 
 
 # --------------------------------------------------------------------------- #
@@ -522,15 +596,9 @@ def convert_freesurfer_longitudinal(fp: FileProvider) -> list[CSVSheet]:
 
     contents = fp.batch_read(tp_aseg_files)
 
-    # --- longitudinal_subcortical_volumes.csv ---
-    combined_headers: list[str] = []
-    combined_rows: list[list[Any]] = []
-    baseline_vols: dict[str, float] = {}
-
-    for i, aseg_path in enumerate(sorted(tp_aseg_files)):
-        parts = PurePosixPath(aseg_path).parts
-        tp_id = parts[0] if len(parts) > 2 else f"timepoint_{i + 1}"
-
+    # Collect parsed aseg rows per timepoint.
+    aseg_entries: list[dict[str, Any]] = []
+    for aseg_path in sorted(tp_aseg_files):
         text = contents.get(aseg_path, "")
         if not text:
             continue
@@ -538,119 +606,304 @@ def convert_freesurfer_longitudinal(fp: FileProvider) -> list[CSVSheet]:
         if not headers or not table_rows:
             continue
 
-        if not combined_headers:
-            combined_headers = ["Timepoint"] + headers
-
+        h_map = {h.lower(): idx for idx, h in enumerate(headers)}
+        name_col_idx = h_map.get("structname", h_map.get("structurename", 0))
         vol_col_idx = None
-        name_col_idx = 0
         for ci, h in enumerate(headers):
             if h.lower() in ("volume_mm3", "volume"):
                 vol_col_idx = ci
                 break
 
-        for row in table_rows:
-            combined_rows.append([tp_id] + row)
-            if i == 0 and vol_col_idx is not None:
-                name = str(row[name_col_idx])
+        tp_id = _extract_timepoint_id_from_stats_path(aseg_path)
+        tp_label = _normalize_timepoint_label(tp_id)
+        volume_by_structure: dict[str, float] = {}
+        structure_order: list[str] = []
+        if vol_col_idx is not None:
+            for row in table_rows:
+                if name_col_idx >= len(row) or vol_col_idx >= len(row):
+                    continue
+                sname = str(row[name_col_idx])
                 try:
-                    baseline_vols[name] = float(row[vol_col_idx])
-                except (ValueError, IndexError):
-                    pass
+                    volume_by_structure[sname] = float(row[vol_col_idx])
+                    structure_order.append(sname)
+                except (ValueError, TypeError):
+                    continue
 
+        aseg_entries.append({
+            "path": aseg_path,
+            "tp_id": tp_id,
+            "tp_label": tp_label,
+            "headers": headers,
+            "rows": table_rows,
+            "volume_by_structure": volume_by_structure,
+            "structure_order": structure_order,
+            "sort_key": _timepoint_sort_key(tp_id),
+        })
+
+    aseg_entries.sort(key=lambda e: e["sort_key"])
+
+    # --- longitudinal_subcortical_volumes_long.csv (long format) ---
+    combined_headers: list[str] = []
+    combined_rows: list[list[Any]] = []
+    if aseg_entries:
+        for entry in aseg_entries:
+            headers = entry["headers"]
+            rows = entry["rows"]
+            if not combined_headers:
+                combined_headers = ["Timepoint", "TimepointID"] + headers
+            for row in rows:
+                combined_rows.append([entry["tp_label"], entry["tp_id"]] + row)
     if combined_rows:
         sheets.append(CSVSheet(
-            name="Longitudinal Subcortical Volumes",
-            filename="longitudinal_subcortical_volumes.csv",
-            description="Subcortical volumes across timepoints",
+            name="Longitudinal Subcortical Volumes (Long)",
+            filename="longitudinal_subcortical_volumes_long.csv",
+            description="Subcortical volumes across timepoints (long format)",
             headers=combined_headers,
             rows=combined_rows,
             category="longitudinal",
         ))
 
+    # --- longitudinal_subcortical_volumes.csv (structures as columns, primary) ---
+    if aseg_entries:
+        all_structures: list[str] = []
+        seen_structures: set[str] = set()
+        for entry in aseg_entries:
+            for sname in entry["structure_order"]:
+                if sname not in seen_structures:
+                    all_structures.append(sname)
+                    seen_structures.add(sname)
+
+        if all_structures:
+            wide_rows: list[list[Any]] = []
+            for entry in aseg_entries:
+                vmap = entry["volume_by_structure"]
+                wide_rows.append(
+                    [entry["tp_label"], entry["tp_id"]]
+                    + [vmap.get(s, "") for s in all_structures]
+                )
+            sheets.append(CSVSheet(
+                name="Longitudinal Subcortical Volumes",
+                filename="longitudinal_subcortical_volumes.csv",
+                description="Subcortical volumes with structures as columns and timepoints as rows",
+                headers=["Timepoint", "TimepointID"] + all_structures,
+                rows=wide_rows,
+                category="longitudinal",
+            ))
+
     # --- longitudinal_change_summary.csv ---
-    if baseline_vols and len(tp_aseg_files) > 1:
-        last_text = contents.get(sorted(tp_aseg_files)[-1], "")
-        if last_text:
-            _, headers, last_rows = _parse_stats_text(last_text)
-            vol_col_idx = None
-            for ci, h in enumerate(headers):
-                if h.lower() in ("volume_mm3", "volume"):
-                    vol_col_idx = ci
-                    break
-            if vol_col_idx is not None:
-                change_rows: list[list[Any]] = []
-                for row in last_rows:
-                    name = str(row[0])
-                    if name in baseline_vols and baseline_vols[name] > 0:
-                        try:
-                            latest = float(row[vol_col_idx])
-                            pct = ((latest - baseline_vols[name]) / baseline_vols[name]) * 100
-                            change_rows.append([
-                                name,
-                                round(baseline_vols[name], 2),
-                                round(latest, 2),
-                                round(latest - baseline_vols[name], 2),
-                                round(pct, 3),
-                            ])
-                        except (ValueError, TypeError):
-                            continue
-                if change_rows:
-                    sheets.append(CSVSheet(
-                        name="Longitudinal Change Summary",
-                        filename="longitudinal_change_summary.csv",
-                        description="Percent volume change from baseline to latest timepoint",
-                        headers=["Structure", "Baseline_mm3", "Latest_mm3", "Change_mm3", "Pct_Change"],
-                        rows=change_rows,
-                        category="longitudinal",
-                    ))
+    if len(aseg_entries) > 1:
+        baseline_map = aseg_entries[0]["volume_by_structure"]
+        latest_map = aseg_entries[-1]["volume_by_structure"]
+        if baseline_map and latest_map:
+            change_rows: list[list[Any]] = []
+            for sname, baseline in baseline_map.items():
+                if sname not in latest_map or baseline <= 0:
+                    continue
+                latest = latest_map[sname]
+                pct = ((latest - baseline) / baseline) * 100.0
+                change_rows.append([
+                    sname,
+                    aseg_entries[0]["tp_label"],
+                    aseg_entries[-1]["tp_label"],
+                    round(baseline, 2),
+                    round(latest, 2),
+                    round(latest - baseline, 2),
+                    round(pct, 3),
+                ])
+            if change_rows:
+                sheets.append(CSVSheet(
+                    name="Longitudinal Change Summary",
+                    filename="longitudinal_change_summary.csv",
+                    description="Percent volume change from earliest to latest timepoint",
+                    headers=[
+                        "Structure", "Baseline_Timepoint", "Latest_Timepoint",
+                        "Baseline_mm3", "Latest_mm3", "Change_mm3", "Pct_Change",
+                    ],
+                    rows=change_rows,
+                    category="longitudinal",
+                ))
 
     # --- longitudinal cortical thickness ---
     tp_aparc_files = [
         f for f in all_files
-        if f.lower().endswith(("lh.aparc.stats", "rh.aparc.stats"))
+        if ".long." in f.lower() and f.lower().endswith(("lh.aparc.stats", "rh.aparc.stats"))
     ]
+    if not tp_aparc_files:
+        tp_aparc_files = [
+            f for f in all_files
+            if f.lower().endswith(("lh.aparc.stats", "rh.aparc.stats"))
+        ]
     if tp_aparc_files:
-        lh_files = sorted(f for f in tp_aparc_files if "lh.aparc" in f.lower())
-        rh_files = sorted(f for f in tp_aparc_files if "rh.aparc" in f.lower())
         aparc_contents = fp.batch_read(tp_aparc_files)
 
-        thick_headers = ["Timepoint", "Region", "Hemisphere", "ThickAvg_mm", "SurfArea_mm2", "GrayVol_mm3"]
+        thick_headers = [
+            "Timepoint", "TimepointID", "Region", "Hemisphere",
+            "ThickAvg_mm", "SurfArea_mm2", "GrayVol_mm3",
+        ]
         thick_rows: list[list[Any]] = []
+        hemi_thick_values: dict[str, dict[str, dict[str, Any]]] = {"lh": {}, "rh": {}}
+        hemi_area_values: dict[str, dict[str, dict[str, Any]]] = {"lh": {}, "rh": {}}
+        hemi_gray_values: dict[str, dict[str, dict[str, Any]]] = {"lh": {}, "rh": {}}
+        hemi_region_order: dict[str, list[str]] = {"lh": [], "rh": []}
+        hemi_region_seen: dict[str, set[str]] = {"lh": set(), "rh": set()}
 
-        for hemi_label, file_list in [("lh", lh_files), ("rh", rh_files)]:
-            for i, fpath in enumerate(file_list):
-                parts = PurePosixPath(fpath).parts
-                tp_id = parts[0] if len(parts) > 2 else f"timepoint_{i + 1}"
-                text = aparc_contents.get(fpath, "")
-                if not text:
+        for fpath in sorted(tp_aparc_files):
+            fname = PurePosixPath(fpath).name.lower()
+            if fname.startswith("lh.aparc"):
+                hemi_label = "lh"
+            elif fname.startswith("rh.aparc"):
+                hemi_label = "rh"
+            else:
+                continue
+
+            text = aparc_contents.get(fpath, "")
+            if not text:
+                continue
+            _, headers, rows = _parse_stats_text(text)
+            if not headers or not rows:
+                continue
+
+            tp_id = _extract_timepoint_id_from_stats_path(fpath)
+            tp_label = _normalize_timepoint_label(tp_id)
+            h_map = {h.lower(): idx for idx, h in enumerate(headers)}
+            name_idx = h_map.get("structurename", h_map.get("structname", 0))
+            thick_idx = h_map.get("thickavg")
+            area_idx = h_map.get("surfarea")
+            vol_idx = h_map.get("grayvol")
+            if tp_id not in hemi_thick_values[hemi_label]:
+                hemi_thick_values[hemi_label][tp_id] = {}
+            if tp_id not in hemi_area_values[hemi_label]:
+                hemi_area_values[hemi_label][tp_id] = {}
+            if tp_id not in hemi_gray_values[hemi_label]:
+                hemi_gray_values[hemi_label][tp_id] = {}
+
+            for row in rows:
+                region = row[name_idx] if name_idx < len(row) else ""
+                if not region:
                     continue
-                _, headers, rows = _parse_stats_text(text)
-                if not headers or not rows:
-                    continue
+                if region not in hemi_region_seen[hemi_label]:
+                    hemi_region_order[hemi_label].append(str(region))
+                    hemi_region_seen[hemi_label].add(str(region))
 
-                h_map = {h.lower(): idx for idx, h in enumerate(headers)}
-                name_idx = h_map.get("structurename", h_map.get("structname", 0))
-                thick_idx = h_map.get("thickavg")
-                area_idx = h_map.get("surfarea")
-                vol_idx = h_map.get("grayvol")
-
-                for row in rows:
-                    thick_rows.append([
-                        tp_id,
-                        row[name_idx] if name_idx < len(row) else "",
-                        hemi_label,
-                        row[thick_idx] if thick_idx is not None and thick_idx < len(row) else "",
-                        row[area_idx] if area_idx is not None and area_idx < len(row) else "",
-                        row[vol_idx] if vol_idx is not None and vol_idx < len(row) else "",
-                    ])
+                thick_val = row[thick_idx] if thick_idx is not None and thick_idx < len(row) else ""
+                area_val = row[area_idx] if area_idx is not None and area_idx < len(row) else ""
+                vol_val = row[vol_idx] if vol_idx is not None and vol_idx < len(row) else ""
+                thick_rows.append([
+                    tp_label,
+                    tp_id,
+                    region,
+                    hemi_label,
+                    thick_val,
+                    area_val,
+                    vol_val,
+                ])
+                region_key = str(region)
+                hemi_thick_values[hemi_label][tp_id][region_key] = thick_val
+                hemi_area_values[hemi_label][tp_id][region_key] = area_val
+                hemi_gray_values[hemi_label][tp_id][region_key] = vol_val
 
         if thick_rows:
             sheets.append(CSVSheet(
-                name="Longitudinal Cortical Thickness",
-                filename="longitudinal_cortical_thickness.csv",
-                description="Cortical thickness and volume across timepoints",
+                name="Longitudinal Cortical Thickness (Long)",
+                filename="longitudinal_cortical_thickness_long.csv",
+                description="Cortical thickness and volume across timepoints and hemispheres",
                 headers=thick_headers,
                 rows=thick_rows,
+                category="longitudinal",
+            ))
+
+        tp_ids_for_wide = sorted(
+            set(list(hemi_thick_values["lh"].keys()) + list(hemi_thick_values["rh"].keys())),
+            key=_timepoint_sort_key,
+        )
+
+        # --- combined wide cortical thickness table (regions as columns, primary) ---
+        combined_cols: list[str] = []
+        for hemi in ("lh", "rh"):
+            for region in hemi_region_order[hemi]:
+                combined_cols.append(f"{hemi}_{region}")
+        if combined_cols and tp_ids_for_wide:
+            combined_rows: list[list[Any]] = []
+            for tp_id in tp_ids_for_wide:
+                row_vals = []
+                for hemi in ("lh", "rh"):
+                    vals = hemi_thick_values[hemi].get(tp_id, {})
+                    for region in hemi_region_order[hemi]:
+                        row_vals.append(vals.get(region, ""))
+                combined_rows.append([_normalize_timepoint_label(tp_id), tp_id] + row_vals)
+            sheets.append(CSVSheet(
+                name="Longitudinal Cortical Thickness",
+                filename="longitudinal_cortical_thickness.csv",
+                description="Cortical thickness with brain regions as columns (LH/RH prefixed)",
+                headers=["Timepoint", "TimepointID"] + combined_cols,
+                rows=combined_rows,
+                category="longitudinal",
+            ))
+
+        # --- combined wide cortical gray volume table ---
+        if combined_cols and tp_ids_for_wide:
+            gray_rows: list[list[Any]] = []
+            for tp_id in tp_ids_for_wide:
+                row_vals = []
+                for hemi in ("lh", "rh"):
+                    vals = hemi_gray_values[hemi].get(tp_id, {})
+                    for region in hemi_region_order[hemi]:
+                        row_vals.append(vals.get(region, ""))
+                gray_rows.append([_normalize_timepoint_label(tp_id), tp_id] + row_vals)
+            sheets.append(CSVSheet(
+                name="Longitudinal Cortical Gray Volume",
+                filename="longitudinal_cortical_grayvol_wide.csv",
+                description="Cortical gray volume with brain regions as columns (LH/RH prefixed)",
+                headers=["Timepoint", "TimepointID"] + combined_cols,
+                rows=gray_rows,
+                category="longitudinal",
+            ))
+
+        # --- combined wide cortical surface area table ---
+        if combined_cols and tp_ids_for_wide:
+            area_rows: list[list[Any]] = []
+            for tp_id in tp_ids_for_wide:
+                row_vals = []
+                for hemi in ("lh", "rh"):
+                    vals = hemi_area_values[hemi].get(tp_id, {})
+                    for region in hemi_region_order[hemi]:
+                        row_vals.append(vals.get(region, ""))
+                area_rows.append([_normalize_timepoint_label(tp_id), tp_id] + row_vals)
+            sheets.append(CSVSheet(
+                name="Longitudinal Cortical Surface Area",
+                filename="longitudinal_cortical_surfarea_wide.csv",
+                description="Cortical surface area with brain regions as columns (LH/RH prefixed)",
+                headers=["Timepoint", "TimepointID"] + combined_cols,
+                rows=area_rows,
+                category="longitudinal",
+            ))
+
+        # --- QC table to explain missing hemispheres/timepoints ---
+        qc_rows: list[list[Any]] = []
+        for tp_id in tp_ids_for_wide:
+            lh_count = len(hemi_thick_values["lh"].get(tp_id, {}))
+            rh_count = len(hemi_thick_values["rh"].get(tp_id, {}))
+            missing = "none"
+            if lh_count == 0 and rh_count > 0:
+                missing = "lh"
+            elif rh_count == 0 and lh_count > 0:
+                missing = "rh"
+            elif lh_count == 0 and rh_count == 0:
+                missing = "lh,rh"
+            qc_rows.append([
+                _normalize_timepoint_label(tp_id),
+                tp_id,
+                lh_count,
+                rh_count,
+                missing,
+            ])
+        if qc_rows:
+            sheets.append(CSVSheet(
+                name="Longitudinal Hemisphere QC",
+                filename="longitudinal_hemisphere_qc.csv",
+                description="Counts per hemisphere/timepoint to flag missing cortical stats",
+                headers=["Timepoint", "TimepointID", "LH_Region_Count", "RH_Region_Count", "Missing_Hemisphere"],
+                rows=qc_rows,
                 category="longitudinal",
             ))
 
@@ -922,9 +1175,12 @@ def convert_fmriprep(fp: FileProvider) -> list[CSVSheet]:
         "csf", "white_matter", "global_signal",
     ]
 
-    # --- fmriprep_motion_summary.csv (1 row per run) ---
+    # --- fmriprep_motion_summary.csv (long; 1 row per run) ---
     motion_rows: list[list[Any]] = []
     confound_summary_data: dict[str, list[float]] = {}
+    confound_run_data: dict[str, dict[str, list[float]]] = {}
+    confound_std_data: dict[str, dict[str, float]] = {}
+    run_labels: list[str] = []
 
     for run_idx, cf_path in enumerate(sorted(confound_files)):
         text = contents.get(cf_path, "")
@@ -932,6 +1188,7 @@ def convert_fmriprep(fp: FileProvider) -> list[CSVSheet]:
             continue
 
         run_name = _extract_run_label(cf_path, run_idx)
+        run_labels.append(run_name)
         headers, rows = _parse_tsv_text(text)
         if not headers or not rows:
             continue
@@ -961,6 +1218,8 @@ def convert_fmriprep(fp: FileProvider) -> list[CSVSheet]:
             vals = _extract_column(rows, idx)
             if vals:
                 confound_summary_data.setdefault(confound, []).extend(vals)
+                confound_run_data.setdefault(run_name, {})[confound] = vals
+                confound_std_data.setdefault(run_name, {})[confound] = _safe_std(vals) or 0.0
 
     if motion_rows:
         sheets.append(CSVSheet(
@@ -972,6 +1231,32 @@ def convert_fmriprep(fp: FileProvider) -> list[CSVSheet]:
             rows=motion_rows,
             category="quality",
         ))
+
+        # fMRIPrep motion wide: one row with run-metric columns.
+        motion_cols: list[str] = []
+        for run_name in run_labels:
+            motion_cols.extend([
+                f"{run_name}_FD_mean",
+                f"{run_name}_FD_max",
+                f"{run_name}_FD_median",
+                f"{run_name}_DVARS_mean",
+                f"{run_name}_DVARS_max",
+                f"{run_name}_Pct_Outlier_Volumes",
+                f"{run_name}_N_Volumes",
+            ])
+        if motion_cols:
+            motion_lookup = {r[0]: r[1:] for r in motion_rows}
+            row_vals: list[Any] = []
+            for run_name in run_labels:
+                row_vals.extend(motion_lookup.get(run_name, [""] * 7))
+            sheets.append(CSVSheet(
+                name="fMRIPrep Motion Wide",
+                filename="fmriprep_motion_wide.csv",
+                description="Single-row wide motion table with run-specific metric columns",
+                headers=["Entity"] + motion_cols,
+                rows=[["all_runs"] + row_vals],
+                category="quality",
+            ))
 
     # --- fmriprep_confounds_summary.csv ---
     if confound_summary_data:
@@ -990,6 +1275,38 @@ def convert_fmriprep(fp: FileProvider) -> list[CSVSheet]:
             rows=summary_rows,
             category="quality",
         ))
+
+    # --- fmriprep_confounds_mean_wide.csv ---
+    if confound_run_data:
+        all_confounds = [
+            c for c in KEY_CONFOUNDS
+            if any(c in m for m in confound_run_data.values())
+        ]
+        mean_headers = ["Run"] + all_confounds
+        mean_rows: list[list[Any]] = []
+        std_rows: list[list[Any]] = []
+        for run_name in run_labels:
+            means = confound_run_data.get(run_name, {})
+            stds = confound_std_data.get(run_name, {})
+            mean_rows.append([run_name] + [_r(_safe_mean(means.get(c, []))) for c in all_confounds])
+            std_rows.append([run_name] + [_r(stds.get(c)) for c in all_confounds])
+        if mean_rows:
+            sheets.append(CSVSheet(
+                name="fMRIPrep Confounds Mean Wide",
+                filename="fmriprep_confounds_mean_wide.csv",
+                description="Per-run wide table with confound means as columns",
+                headers=mean_headers,
+                rows=mean_rows,
+                category="quality",
+            ))
+            sheets.append(CSVSheet(
+                name="fMRIPrep Confounds Std Wide",
+                filename="fmriprep_confounds_std_wide.csv",
+                description="Per-run wide table with confound standard deviations as columns",
+                headers=mean_headers,
+                rows=std_rows,
+                category="quality",
+            ))
 
     return sheets
 
@@ -1046,7 +1363,7 @@ def convert_xcpd(fp: FileProvider) -> list[CSVSheet]:
                     if vals:
                         mean_v = _safe_mean(vals)
                         std_v = _safe_std(vals)
-                        snr = (mean_v / std_v) if std_v > 0 else 0
+                        snr = (mean_v / std_v) if (mean_v is not None and std_v is not None and std_v > 0) else 0
                         summary_rows.append([
                             roi_name,
                             _r(mean_v), _r(std_v),
@@ -1060,6 +1377,18 @@ def convert_xcpd(fp: FileProvider) -> list[CSVSheet]:
                         description="Per-ROI BOLD signal summary statistics",
                         headers=["ROI", "Mean", "Std", "Min", "Max", "SNR"],
                         rows=summary_rows,
+                        category="connectivity",
+                    ))
+
+                    # Wide table: one row, ROI columns with mean signal.
+                    roi_cols = [r[0] for r in summary_rows]
+                    roi_vals = [r[1] for r in summary_rows]
+                    sheets.append(CSVSheet(
+                        name="Parcellated Timeseries Mean Wide",
+                        filename="parcellated_timeseries_mean_wide.csv",
+                        description="Single-row wide table with ROI mean BOLD values as columns",
+                        headers=["Entity"] + roi_cols,
+                        rows=[["all_volumes"] + roi_vals],
                         category="connectivity",
                     ))
 
@@ -1273,6 +1602,180 @@ def _safe_std(vals: list[float]) -> float | None:
     return math.sqrt(sum((v - m) ** 2 for v in vals) / (len(vals) - 1))
 
 
+def _is_numberish(v: Any) -> bool:
+    if v is None or v == "":
+        return False
+    try:
+        float(v)
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
+def _slug_token(s: str) -> str:
+    tok = re.sub(r"[^a-zA-Z0-9]+", "_", str(s)).strip("_").lower()
+    return tok or "value"
+
+
+def _normalize_timepointish_value(value: Any) -> Any:
+    """Normalize session/timepoint-like values to readable labels when possible."""
+    if value in ("", None):
+        return value
+    text = str(value).strip()
+    if not text:
+        return text
+    if "ses-" in text.lower():
+        return _normalize_timepoint_label(text)
+    return value
+
+
+def _augment_with_wide_views(sheets: list[CSVSheet]) -> list[CSVSheet]:
+    """Auto-generate additional wide tables for common long/table patterns.
+
+    Keeps original sheets unchanged and appends generated wide companions.
+    """
+    if not sheets:
+        return sheets
+
+    existing = {s.filename for s in sheets}
+    generated: list[CSVSheet] = []
+
+    for sheet in sheets:
+        # Skip if already wide or too large to safely pivot.
+        if "wide" in sheet.filename.lower() or len(sheet.rows) > 20000:
+            continue
+        if not sheet.headers or not sheet.rows:
+            continue
+
+        hmap = {h.lower(): i for i, h in enumerate(sheet.headers)}
+
+        # Pattern A: longitudinal/entity long tables with a key dimension
+        # -> per-metric wide tables (rows by timepoint/entity, columns by structure/region).
+        row_key_idx = hmap.get("timepoint")
+        if row_key_idx is None:
+            row_key_idx = hmap.get("session")
+        if row_key_idx is None and "timepointid" in hmap:
+            # Derive readable row keys from stable timepoint IDs when explicit labels are absent.
+            row_key_idx = hmap["timepointid"]
+        if row_key_idx is None:
+            row_key_idx = hmap.get("run")
+        key_name_idx = None
+        for cand in ("structname", "structurename", "region", "structure", "roi", "metric", "measure"):
+            if cand in hmap:
+                key_name_idx = hmap[cand]
+                break
+        hemi_idx = hmap.get("hemisphere")
+        aux_key_idx = hmap.get("timepointid", hmap.get("sessionid", hmap.get("runid")))
+
+        if row_key_idx is not None and key_name_idx is not None:
+            metric_idxs = [
+                i for i, h in enumerate(sheet.headers)
+                if i not in {row_key_idx, key_name_idx, hemi_idx, aux_key_idx}
+                and any(_is_numberish(r[i]) for r in sheet.rows if i < len(r))
+            ]
+            if metric_idxs:
+                row_order: list[tuple[Any, Any]] = []
+                row_seen: set[tuple[Any, Any]] = set()
+                col_order: list[str] = []
+                col_seen: set[str] = set()
+                metric_maps: dict[int, dict[tuple[Any, Any], dict[str, Any]]] = {mi: {} for mi in metric_idxs}
+
+                for r in sheet.rows:
+                    if row_key_idx >= len(r) or key_name_idx >= len(r):
+                        continue
+                    row_key = r[row_key_idx]
+                    aux_key = r[aux_key_idx] if aux_key_idx is not None and aux_key_idx < len(r) else ""
+                    if isinstance(sheet.headers[row_key_idx], str) and sheet.headers[row_key_idx].lower() in {
+                        "timepoint", "timepointid", "session", "sessionid"
+                    }:
+                        row_key = _normalize_timepointish_value(row_key)
+                    if aux_key_idx is not None and isinstance(sheet.headers[aux_key_idx], str) and sheet.headers[aux_key_idx].lower() in {
+                        "timepoint", "timepointid", "session", "sessionid"
+                    }:
+                        aux_key = _normalize_timepointish_value(aux_key)
+                    row_id = (row_key, aux_key)
+                    if row_id not in row_seen:
+                        row_order.append(row_id)
+                        row_seen.add(row_id)
+
+                    base_col = str(r[key_name_idx])
+                    if hemi_idx is not None and hemi_idx < len(r) and r[hemi_idx] not in ("", None):
+                        base_col = f"{r[hemi_idx]}_{base_col}"
+                    if base_col not in col_seen:
+                        col_order.append(base_col)
+                        col_seen.add(base_col)
+
+                    for mi in metric_idxs:
+                        if mi < len(r):
+                            metric_maps[mi].setdefault(row_id, {})[base_col] = r[mi]
+
+                for mi in metric_idxs:
+                    metric_name = sheet.headers[mi]
+                    fname = f"{sheet.filename.rsplit('.', 1)[0]}_{_slug_token(metric_name)}_wide.csv"
+                    if fname in existing:
+                        continue
+                    headers = [sheet.headers[row_key_idx]]
+                    if aux_key_idx is not None:
+                        headers.append(sheet.headers[aux_key_idx])
+                    headers.extend(col_order)
+
+                    rows: list[list[Any]] = []
+                    for row_id in row_order:
+                        rvals = [row_id[0]]
+                        if aux_key_idx is not None:
+                            rvals.append(row_id[1])
+                        val_map = metric_maps[mi].get(row_id, {})
+                        rvals.extend([val_map.get(c, "") for c in col_order])
+                        rows.append(rvals)
+
+                    if rows and col_order:
+                        generated.append(CSVSheet(
+                            name=f"{sheet.name} ({metric_name} Wide)",
+                            filename=fname,
+                            description=f"Auto-generated wide table for metric '{metric_name}'",
+                            headers=headers,
+                            rows=rows,
+                            category=sheet.category,
+                        ))
+                        existing.add(fname)
+
+        # Pattern B: key-value summaries -> single-row wide.
+        first_idx = 0
+        second_idx = 1 if len(sheet.headers) > 1 else None
+        first_name = sheet.headers[first_idx].lower()
+        if (
+            second_idx is not None
+            and first_name in {"metric", "measure", "confound", "structure", "roi", "subfield"}
+            and any(_is_numberish(r[second_idx]) for r in sheet.rows if second_idx < len(r))
+        ):
+            fname = f"{sheet.filename.rsplit('.', 1)[0]}_wide.csv"
+            if fname not in existing:
+                cols: list[str] = []
+                vals: list[Any] = []
+                seen: set[str] = set()
+                for r in sheet.rows:
+                    if len(r) <= second_idx:
+                        continue
+                    key = str(r[first_idx])
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    cols.append(key)
+                    vals.append(r[second_idx])
+                if cols:
+                    generated.append(CSVSheet(
+                        name=f"{sheet.name} (Wide)",
+                        filename=fname,
+                        description="Auto-generated key/value wide table",
+                        headers=["Entity"] + cols,
+                        rows=[["summary"] + vals],
+                        category=sheet.category,
+                    ))
+                    existing.add(fname)
+
+    return sheets + generated
+
+
 # --------------------------------------------------------------------------- #
 #  Main entry point                                                            #
 # --------------------------------------------------------------------------- #
@@ -1322,7 +1825,7 @@ def generate_stats_csvs(
                             seen_filenames.add(s.filename)
                 except Exception as e:
                     logger.warning("Converter %s failed: %s", step_id, e)
-        return sheets
+        return _augment_with_wide_views(sheets)
 
     # Single plugin
     converter_id = get_converter_id(pipeline_name)
@@ -1346,4 +1849,4 @@ def generate_stats_csvs(
                 except Exception:
                     continue
 
-    return sheets
+    return _augment_with_wide_views(sheets)

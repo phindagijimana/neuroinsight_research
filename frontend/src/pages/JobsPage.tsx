@@ -311,7 +311,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-gray-900">
-                              {job.pipeline_name}
+                              {job.display_name || job.pipeline_name}
                             </span>
                             <span className="text-xs px-2 py-0.5 rounded bg-navy-50 text-[#003d7a] border border-navy-200">
                               {job.execution_mode === 'workflow' ? 'Workflow' : 'Plugin'}

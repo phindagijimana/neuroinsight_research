@@ -211,7 +211,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                    {selectedJob.pipeline_name}
+                    {selectedJob.display_name || selectedJob.pipeline_name}
                   </h2>
                   <p className="text-gray-600">
                     Job ID: {selectedJob.id} &middot;{' '}
@@ -276,7 +276,9 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
               </div>
               <div className="bg-white rounded-lg border border-gray-200 p-4">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Pipeline</p>
-                <p className="text-lg font-bold text-[#003d7a] truncate">{selectedJob.pipeline_name}</p>
+                <p className="text-lg font-bold text-[#003d7a] truncate">
+                  {selectedJob.display_name || selectedJob.pipeline_name}
+                </p>
               </div>
             </div>
 

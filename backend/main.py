@@ -8,16 +8,17 @@ import os
 import re
 import shlex
 import shutil
+import csv
 import uuid
 from contextlib import asynccontextmanager
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import datetime
 
 from backend.core.config import get_settings
@@ -988,6 +989,11 @@ def submit_workflow_batch(workflow_id: str, request: WorkflowBatchSubmitRequest,
 
     normalized_base_params = _normalize_submission_parameters_for_plugins(step_plugin_ids, dict(request.parameters))
 
+    # Submit one job per subject, grouped under one batch directory.
+    batch_id = str(uuid.uuid4())
+    batch_root = Path(settings.data_dir) / "outputs" / "batches" / batch_id
+    batch_root.mkdir(parents=True, exist_ok=True)
+
     # Submit one job per subject
     submitted = []
     errors = []
@@ -996,13 +1002,14 @@ def submit_workflow_batch(workflow_id: str, request: WorkflowBatchSubmitRequest,
     for sid in subject_ids:
         try:
             job_id = str(uuid.uuid4())
-            output_dir = str(Path(settings.data_dir) / "outputs" / job_id)
+            output_dir = str(batch_root / job_id / "outputs")
 
             params = dict(normalized_base_params)
             params["subject_id"] = sid
             params["_plugin_id"] = step_plugin_ids[0] if len(step_plugin_ids) == 1 else ""
             params["_workflow_steps"] = step_plugin_ids
             params["_workflow_id"] = workflow_id
+            params["_batch_id"] = batch_id
 
             spec = JobSpec(
                 pipeline_name=workflow.name,
@@ -1027,12 +1034,14 @@ def submit_workflow_batch(workflow_id: str, request: WorkflowBatchSubmitRequest,
                 except Exception:
                     db.rollback()
 
-            submitted.append({"job_id": job_id, "subject_id": sid})
+            submitted.append({"job_id": job_id, "subject_id": sid, "output_dir": output_dir})
         except Exception as e:
             errors.append({"subject_id": sid, "error": str(e)})
             logger.error("Batch submit failed for subject %s: %s", sid, e)
 
     return {
+        "batch_id": batch_id,
+        "batch_output_dir": str(batch_root),
         "workflow": workflow_id,
         "bids_dir": bids_dir,
         "total_subjects": len(subject_ids),
@@ -1143,9 +1152,13 @@ def submit_batch_job(request: BatchSubmitRequest, db: Session = Depends(get_db))
     job_ids = []
     backend = get_backend()
 
+    batch_id = str(uuid.uuid4())
+    batch_root = Path(settings.data_dir) / "outputs" / "batches" / batch_id
+    batch_root.mkdir(parents=True, exist_ok=True)
+
     for input_file in input_files:
         job_id = str(uuid.uuid4())
-        output_dir = str(Path(settings.data_dir) / "outputs" / job_id)
+        output_dir = str(batch_root / job_id / "outputs")
 
         resources = ResourceSpec(
             memory_gb=pipeline.resources.memory_gb,
@@ -1159,7 +1172,7 @@ def submit_batch_job(request: BatchSubmitRequest, db: Session = Depends(get_db))
             container_image=pipeline.container_image,
             input_files=[input_file],
             output_dir=output_dir,
-            parameters=request.parameters,
+            parameters={**request.parameters, "_batch_id": batch_id},
             resources=resources,
             pipeline_version=pipeline.version,
         )
@@ -1168,10 +1181,163 @@ def submit_batch_job(request: BatchSubmitRequest, db: Session = Depends(get_db))
         job_ids.append(job_id)
 
     return {
+        "batch_id": batch_id,
+        "batch_output_dir": str(batch_root),
         "job_ids": job_ids,
         "total_jobs": len(job_ids),
         "pipeline_name": request.pipeline_name,
         "file_pattern": request.file_pattern,
+    }
+
+
+def _is_wide_csv_name(filename: str) -> bool:
+    lower = filename.lower()
+    if "wide" in lower:
+        return True
+    return lower in {
+        "longitudinal_subcortical_volumes.csv",
+        "longitudinal_cortical_thickness.csv",
+    }
+
+
+def _read_local_csv(path: Path) -> tuple[list[str], list[list[str]]]:
+    with open(path, newline="", encoding="utf-8") as f:
+        reader = csv.reader(f)
+        rows = list(reader)
+    if not rows:
+        return [], []
+    return rows[0], rows[1:]
+
+
+def _read_remote_csv(ssh, remote_path: str) -> tuple[list[str], list[list[str]]]:
+    content = ssh.read_file(remote_path)
+    rows = list(csv.reader(content.splitlines()))
+    if not rows:
+        return [], []
+    return rows[0], rows[1:]
+
+
+@app.post("/api/jobs/batches/{batch_id}/aggregate-wide")
+def aggregate_batch_wide_results(batch_id: str, db: Session = Depends(get_db)):
+    """Aggregate wide CSVs from completed jobs in a batch into common files."""
+    from backend.routes.results import _resolve_output, _get_ssh
+
+    jobs = db.query(Job).filter(Job.deleted == False).all()
+    batch_jobs = [
+        j for j in jobs
+        if isinstance(j.parameters, dict) and j.parameters.get("_batch_id") == batch_id
+    ]
+    if not batch_jobs:
+        raise HTTPException(status_code=404, detail=f"No jobs found for batch_id '{batch_id}'")
+
+    completed_jobs = [j for j in batch_jobs if j.status == JobStatusEnum.COMPLETED.value]
+    if not completed_jobs:
+        raise HTTPException(status_code=400, detail="No completed jobs in this batch yet")
+
+    ssh = _get_ssh()
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    skipped_jobs: list[str] = []
+
+    for job in completed_jobs:
+        loc = _resolve_output(job.id)
+        if not loc.exists:
+            skipped_jobs.append(job.id)
+            continue
+
+        subject_id = ""
+        if isinstance(job.parameters, dict):
+            subject_id = job.parameters.get("subject_id", "")
+        if not subject_id and isinstance(job.input_files, list) and job.input_files:
+            subject_id = Path(str(job.input_files[0])).name
+
+        try:
+            if loc.is_remote:
+                if not ssh:
+                    skipped_jobs.append(job.id)
+                    continue
+                csv_dir = f"{loc.remote_path}/bundle/csv"
+                exit_code, stdout, _ = ssh.execute(f"ls {csv_dir!r}/*.csv 2>/dev/null", timeout=20)
+                if exit_code != 0 or not stdout.strip():
+                    skipped_jobs.append(job.id)
+                    continue
+                for remote_csv in [l.strip() for l in stdout.strip().splitlines() if l.strip()]:
+                    filename = PurePosixPath(remote_csv).name
+                    if not _is_wide_csv_name(filename):
+                        continue
+                    headers, rows = _read_remote_csv(ssh, remote_csv)
+                    if not headers or not rows:
+                        continue
+                    grouped.setdefault(filename, []).append({
+                        "job_id": job.id, "subject_id": subject_id, "headers": headers, "rows": rows,
+                    })
+            else:
+                csv_dir = loc.local_path / "bundle" / "csv"
+                if not csv_dir.is_dir():
+                    skipped_jobs.append(job.id)
+                    continue
+                found = False
+                for csv_file in sorted(csv_dir.glob("*.csv")):
+                    filename = csv_file.name
+                    if not _is_wide_csv_name(filename):
+                        continue
+                    headers, rows = _read_local_csv(csv_file)
+                    if not headers or not rows:
+                        continue
+                    grouped.setdefault(filename, []).append({
+                        "job_id": job.id, "subject_id": subject_id, "headers": headers, "rows": rows,
+                    })
+                    found = True
+                if not found:
+                    skipped_jobs.append(job.id)
+        except Exception as e:
+            logger.debug("Batch aggregation read failed for job %s: %s", job.id[:8], e)
+            skipped_jobs.append(job.id)
+
+    if not grouped:
+        raise HTTPException(status_code=404, detail="No wide CSV files found to aggregate")
+
+    out_dir = Path(settings.data_dir) / "outputs" / "batches" / batch_id / "aggregate" / "csv"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    written = []
+    for filename, items in grouped.items():
+        union_headers: list[str] = []
+        seen: set[str] = set()
+        for item in items:
+            for h in item["headers"]:
+                if h not in seen:
+                    seen.add(h)
+                    union_headers.append(h)
+
+        out_headers = ["JobID", "SubjectID"] + union_headers
+        out_rows: list[list[str]] = []
+        for item in items:
+            for row in item["rows"]:
+                row_map = {h: (row[i] if i < len(row) else "") for i, h in enumerate(item["headers"])}
+                out_rows.append(
+                    [item["job_id"], item["subject_id"]] + [str(row_map.get(h, "")) for h in union_headers]
+                )
+
+        out_name = f"batch_{batch_id}_{filename}"
+        out_path = out_dir / out_name
+        with open(out_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(out_headers)
+            writer.writerows(out_rows)
+        written.append({
+            "filename": out_name,
+            "rows": len(out_rows),
+            "columns": len(out_headers),
+            "path": str(out_path),
+        })
+
+    return {
+        "batch_id": batch_id,
+        "completed_jobs": len(completed_jobs),
+        "aggregated_files": len(written),
+        "files": written,
+        "aggregate_dir": str(out_dir),
+        "skipped_jobs": skipped_jobs,
     }
 
 
@@ -1305,6 +1471,7 @@ def list_jobs(status: Optional[str] = None, limit: int = 100, db: Session = Depe
     for job in jobs:
         item = job.to_dict()
         item["progress"] = quantize_progress(item.get("progress", 0))
+        item.update(_build_job_display_fields(job))
         payload.append(item)
     return {"jobs": payload}
 
@@ -1675,6 +1842,47 @@ _WORKFLOW_MILESTONE_LOOKAHEAD = 4
 _PLUGIN_MILESTONE_LOOKAHEAD = 3
 
 
+def _humanize_identifier(value: str) -> str:
+    return re.sub(r"[_-]+", " ", (value or "").strip()).strip().title()
+
+
+def _build_job_display_fields(job: "Job") -> dict:
+    """Build UI-friendly workflow/plugin labels for consistent page naming."""
+    payload_name = (job.pipeline_name or "").strip()
+    params = job.parameters if isinstance(job.parameters, dict) else {}
+    execution_mode = job.execution_mode
+    workflow_id = str(params.get("_workflow_id") or "").strip()
+    steps = params.get("_workflow_steps")
+    workflow_plugin_count = len(steps) if isinstance(steps, list) else 0
+
+    if execution_mode != "workflow":
+        return {
+            "display_name": payload_name,
+            "workflow_plugin_count": 0,
+            "workflow_id": "",
+        }
+
+    workflow_name = ""
+    if workflow_id:
+        try:
+            wf = get_plugin_workflow_registry().get_workflow(workflow_id)
+            if wf and getattr(wf, "name", ""):
+                workflow_name = wf.name
+        except Exception as e:
+            logger.debug("Workflow lookup failed for %s: %s", workflow_id, e)
+
+    base = workflow_name or payload_name or _humanize_identifier(workflow_id) or "Workflow"
+    if workflow_plugin_count > 0:
+        suffix = f"{workflow_plugin_count} plugin{'s' if workflow_plugin_count != 1 else ''}"
+        base = f"{base} ({suffix})"
+
+    return {
+        "display_name": base,
+        "workflow_plugin_count": workflow_plugin_count,
+        "workflow_id": workflow_id,
+    }
+
+
 def _get_remote_file_size(ssh, remote_path: str) -> int:
     """Return remote file size in bytes (0 if missing/unreadable)."""
     qpath = shlex.quote(remote_path)
@@ -1934,6 +2142,7 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
 
     payload = job.to_dict()
     payload["progress"] = quantize_progress(payload.get("progress", 0))
+    payload.update(_build_job_display_fields(job))
     return payload
 
 
