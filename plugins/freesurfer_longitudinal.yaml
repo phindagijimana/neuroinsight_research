@@ -75,7 +75,7 @@ parameters:
   - name: base_id
     type: string
     default: "base_template"
-    description: "Identifier for the unbiased base template"
+    description: "Identifier for the unbiased base template (auto-derived from subject when left as default)"
   - name: resume
     type: bool
     default: true
@@ -225,6 +225,24 @@ execution:
       exit 1
     fi
     echo "Total timepoints: ${#TP_IDS[@]}"
+
+    # Auto-derive base ID from subject for deterministic, user-friendly naming.
+    # Applies only when the workflow default is used.
+    if [ -z "$BASE_ID" ] || [ "$BASE_ID" = "base_template" ]; then
+      first_tp="${TP_IDS[0]}"
+      subject_id=""
+      if echo "$first_tp" | grep -Eq '^sub-[^_]+'; then
+        subject_id=$(echo "$first_tp" | sed -E 's/^(sub-[^_]+).*/\1/')
+      fi
+      if [ -n "$subject_id" ]; then
+        BASE_ID="${subject_id}_base"
+      else
+        BASE_ID="base_template"
+      fi
+      echo "Auto-derived BASE_ID: $BASE_ID"
+    else
+      echo "Using provided BASE_ID: $BASE_ID"
+    fi
 
     # STAGE 1: CROSS-SECTIONAL recon-all per timepoint
     echo "=== STAGE 1: Cross-sectional processing ==="
