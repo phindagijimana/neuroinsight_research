@@ -193,11 +193,17 @@ export interface Job {
   /** Pipeline name that was executed (legacy - use workflow_id or plugin_id) */
   pipeline_name: string;
 
+  /** UI-friendly display name (workflow-aware), provided by backend when available */
+  display_name?: string;
+
   /** Pipeline version at time of execution */
   pipeline_version?: string;
 
   /** Workflow ID (if using workflow mode) */
   workflow_id?: string;
+
+  /** Number of plugins in workflow (workflow jobs only) */
+  workflow_plugin_count?: number;
 
   /** Plugin ID (if using single plugin mode) */
   plugin_id?: string;

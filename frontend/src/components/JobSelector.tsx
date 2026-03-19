@@ -45,7 +45,7 @@ export const JobSelector: React.FC<JobSelectorProps> = ({
         <option value="">-- Select a completed job --</option>
         {completedJobs.map((job) => (
           <option key={job.id} value={job.id}>
-            {job.id} - {job.pipeline_name} [{job.execution_mode === 'plugin' ? 'Plugin' : 'Workflow'}] ({new Date(job.completed_at || job.submitted_at).toLocaleDateString()})
+            {job.id} - {job.display_name || job.pipeline_name} [{job.execution_mode === 'plugin' ? 'Plugin' : 'Workflow'}] ({new Date(job.completed_at || job.submitted_at).toLocaleDateString()})
           </option>
         ))}
       </select>
