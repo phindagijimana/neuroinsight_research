@@ -50,7 +50,7 @@ function buildMetadata(distDir, outDir) {
     `local-${new Date().toISOString().slice(0, 10)}`;
 
   const metadata = {
-    product: "NeuroInsight Research Desktop",
+    product: "NeuroInsight Research",
     channel: "stable",
     version: releaseTag,
     generated_at: new Date().toISOString(),
