@@ -3,171 +3,333 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NIR Desktop</title>
+    <title>Control Center — NeuroInsight Research</title>
     <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
       body {
-        margin: 0;
         font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-        background: #f5f8fc;
+        background: #f1f5f9;
         color: #0f172a;
+        font-size: 14px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
       }
-      .wrap {
-        max-width: 860px;
+
+      /* ── Layout ─────────────────────────────────────────── */
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 24px;
+        background: #fff;
+        border-bottom: 1px solid #e2e8f0;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .brand { display: flex; align-items: baseline; gap: 10px; }
+      .brand-name { font-size: 15px; font-weight: 600; color: #0f172a; }
+      .brand-name em { color: #0b4ea2; font-style: normal; }
+      .brand-tag {
+        font-size: 11px;
+        font-weight: 500;
+        color: #94a3b8;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .header-pills { display: flex; gap: 6px; align-items: center; }
+
+      main {
+        max-width: 560px;
         margin: 24px auto;
-        padding: 0 16px;
+        padding: 0 16px 48px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
       }
+
+      /* ── Cards ──────────────────────────────────────────── */
       .card {
         background: #fff;
         border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 16px;
-        margin-bottom: 14px;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,.04);
       }
-      .title {
-        margin: 0 0 4px 0;
-        font-size: 22px;
-      }
-      .sub {
-        margin: 0;
-        color: #475569;
-        font-size: 13px;
-      }
-      .row {
+
+      /* ── Status block ───────────────────────────────────── */
+      .status-block {
         display: flex;
         align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+      }
+      .status-left { display: flex; align-items: center; gap: 12px; }
+      .status-dot {
+        width: 12px; height: 12px; border-radius: 50%;
+        background: #cbd5e1; flex-shrink: 0;
+        box-shadow: 0 0 0 3px rgba(203,213,225,.3);
+        transition: background .3s, box-shadow .3s;
+      }
+      .status-dot.on {
+        background: #16a34a;
+        box-shadow: 0 0 0 3px rgba(22,163,74,.15);
+      }
+      .status-dot.off {
+        background: #dc2626;
+        box-shadow: 0 0 0 3px rgba(220,38,38,.12);
+      }
+      .status-label { font-size: 15px; font-weight: 600; }
+      .status-sub { font-size: 12px; color: #64748b; margin-top: 1px; }
+
+      /* ── Buttons ────────────────────────────────────────── */
+      .btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        gap: 6px; border-radius: 8px; font-size: 13px; font-weight: 500;
+        padding: 8px 14px; cursor: pointer; transition: background .15s, opacity .15s;
+        border: 1px solid transparent; white-space: nowrap;
+      }
+      .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+      .btn-primary {
+        background: #0b4ea2; color: #fff;
+        border-color: #0b4ea2; width: 100%;
+        padding: 11px 14px; font-size: 14px;
+        border-radius: 9px; margin-bottom: 14px;
+      }
+      .btn-primary:hover:not(:disabled) { background: #0a45909; }
+
+      .btn-secondary {
+        background: #fff; color: #374151;
+        border-color: #d1d5db;
+      }
+      .btn-secondary:hover:not(:disabled) { background: #f9fafb; }
+
+      .btn-ghost {
+        background: transparent; color: #64748b;
+        border-color: transparent; font-size: 12px; padding: 4px 8px;
+      }
+      .btn-ghost:hover:not(:disabled) { color: #0f172a; }
+
+      .btn-danger { color: #b91c1c; border-color: #fecaca; }
+      .btn-danger:hover:not(:disabled) { background: #fef2f2; }
+
+      .btn-row {
+        display: flex; gap: 8px; flex-wrap: wrap;
+      }
+
+      /* ── Pills (header) ─────────────────────────────────── */
+      .pill {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 11px; font-weight: 500;
+        padding: 3px 9px; border-radius: 9999px;
+        background: #f1f5f9; color: #64748b;
+        border: 1px solid #e2e8f0;
+        transition: all .2s;
+      }
+      .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: #cbd5e1; }
+      .pill.ok { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+      .pill.ok .dot { background: #16a34a; }
+      .pill.warn { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+      .pill.warn .dot { background: #f59e0b; }
+      .pill.bad { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+      .pill.bad .dot { background: #dc2626; }
+
+      /* ── Preflight output ───────────────────────────────── */
+      .preflight-wrap {
+        margin-top: 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11.5px;
+        color: #334155;
+        max-height: 200px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        display: none;
+      }
+      .preflight-wrap.visible { display: block; }
+
+      /* ── Collapsible sections ───────────────────────────── */
+      details.card { padding: 0; overflow: hidden; }
+      details.card summary {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 16px 20px; cursor: pointer;
+        font-size: 13px; font-weight: 600; color: #374151;
+        list-style: none; user-select: none;
+        -webkit-user-select: none;
+      }
+      details.card summary::-webkit-details-marker { display: none; }
+      details.card summary::after {
+        content: "›";
+        font-size: 18px; color: #94a3b8;
+        transition: transform .2s;
+        line-height: 1;
+      }
+      details.card[open] summary::after { transform: rotate(90deg); }
+      details.card summary:hover { background: #f8fafc; }
+      .detail-body {
+        padding: 0 20px 20px;
+        display: flex;
+        flex-direction: column;
         gap: 10px;
-        flex-wrap: wrap;
+        border-top: 1px solid #f1f5f9;
       }
-      .badge {
-        display: inline-block;
-        padding: 4px 8px;
-        border-radius: 9999px;
-        background: #dbeafe;
-        color: #1e3a8a;
-        font-size: 12px;
+      .detail-label {
+        font-size: 12px; font-weight: 500; color: #64748b;
+        text-transform: uppercase; letter-spacing: 0.05em;
+        margin-top: 4px;
       }
-      .badge.off {
-        background: #fee2e2;
-        color: #991b1b;
-      }
-      button {
-        border: 1px solid #cbd5e1;
+
+      /* ── Inputs ─────────────────────────────────────────── */
+      input[type="text"], input[type="password"], select, textarea {
+        width: 100%;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 13px;
+        font-family: inherit;
+        color: #0f172a;
         background: #fff;
-        border-radius: 8px;
-        padding: 8px 12px;
-        cursor: pointer;
+        outline: none;
+        transition: border-color .15s;
       }
-      button.primary {
-        background: #0b4ea2;
-        border-color: #0b4ea2;
-        color: #fff;
-      }
-      button:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
-      pre {
-        background: #0f172a;
-        color: #e2e8f0;
-        border-radius: 8px;
-        padding: 12px;
-        max-height: 280px;
-        overflow: auto;
+      input:focus, select:focus, textarea:focus { border-color: #0b4ea2; }
+      textarea {
+        min-height: 80px; resize: vertical;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-size: 12px;
       }
-      .hint {
-        font-size: 12px;
-        color: #475569;
+
+      /* ── Status toast ───────────────────────────────────── */
+      #statusToast {
+        font-size: 12px; color: #475569;
+        padding: 10px 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        display: none;
       }
+      #statusToast.visible { display: block; }
+      #statusToast.ok { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+      #statusToast.err { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+
+      /* ── Footer ─────────────────────────────────────────── */
+      footer {
+        font-size: 11px; color: #94a3b8;
+        text-align: center; margin-top: 4px;
+        padding: 0 4px;
+        line-height: 1.6;
+      }
+
+      /* ── Summary badge ──────────────────────────────────── */
+      .summary-badge {
+        font-size: 11px; font-weight: 500;
+        padding: 2px 8px; border-radius: 9999px;
+        background: #f1f5f9; color: #64748b;
+        border: 1px solid #e2e8f0;
+        margin-left: 8px;
+      }
+      .summary-badge.ok { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+      .summary-badge.bad { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
     </style>
   </head>
   <body>
-    <div class="wrap">
-      <div class="card">
-        <div class="row" style="justify-content: space-between;">
-          <h1 class="title">NIR Desktop - Phase 1 Runtime Decoupling</h1>
-          <span id="licenseBadge" class="badge off">License: Unknown</span>
-        </div>
-        <p class="sub">Desktop-managed runtime shell that launches backend services directly and opens the same NIR UI experience.</p>
+    <header>
+      <div class="brand">
+        <span class="brand-name">NeuroInsight <em>Research</em></span>
+        <span class="brand-tag">Control Center</span>
       </div>
+      <div class="header-pills">
+        <span class="pill" id="licensePill"><span class="dot"></span><span id="licensePillText">License</span></span>
+        <span class="pill" id="lockPill"><span class="dot"></span><span id="lockPillText">Lock</span></span>
+      </div>
+    </header>
 
+    <main>
+
+      <!-- Backend -->
       <div class="card">
-        <div class="row" style="justify-content: space-between;">
-          <div>
-            <strong>Backend status:</strong>
-            <span id="statusBadge" class="badge off">Unknown</span>
+        <div class="status-block">
+          <div class="status-left">
+            <span class="status-dot" id="statusDot"></span>
+            <div>
+              <div class="status-label" id="statusLabel">Checking…</div>
+              <div class="status-sub" id="statusText"></div>
+            </div>
           </div>
-          <div class="hint" id="statusText">Checking...</div>
+          <button class="btn btn-ghost" id="refreshBtn">Refresh</button>
         </div>
-        <div class="row" style="margin-top: 12px;">
-          <button class="primary" id="startBtn">Start Backend</button>
-          <button id="stopAppBtn">Stop App Services</button>
-          <button id="stopAllBtn">Stop (App + Infra)</button>
-          <button id="openBtn">Open NIR (Same Window)</button>
-          <button id="refreshBtn">Refresh Status</button>
-        </div>
-        <div class="row" style="margin-top: 10px;">
-          <label class="hint" style="display:flex;align-items:center;gap:6px;">
-            <input type="checkbox" id="autoOpenChk" />
-            Auto-open NIR when desktop starts
-          </label>
-          <button id="controlBtn">Open Control Center</button>
+
+        <button class="btn btn-primary" id="openBtn">Open NeuroInsight Research</button>
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="startBtn">Start</button>
+          <button class="btn btn-secondary" id="stopAppBtn">Stop Services</button>
+          <button class="btn btn-secondary btn-danger" id="stopAllBtn">Stop All</button>
         </div>
       </div>
 
+      <!-- Status toast -->
+      <div id="statusToast"></div>
+
+      <!-- Diagnostics -->
       <div class="card">
-        <div class="row" style="justify-content: space-between;">
-          <strong>Compatibility checks</strong>
-          <div class="row">
-            <button id="preflightBtn">Run Preflight</button>
-            <button id="diagBtn">Export Diagnostics</button>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="preflightBtn">Run Preflight</button>
+          <button class="btn btn-secondary" id="diagBtn">Export Diagnostics</button>
+        </div>
+        <div class="preflight-wrap" id="preflightOut"></div>
+      </div>
+
+      <!-- License -->
+      <details class="card">
+        <summary>
+          <span>License <span class="summary-badge" id="licenseBadge">Unknown</span></span>
+        </summary>
+        <div class="detail-body">
+          <div class="status-sub" id="licenseStatusText">No license imported.</div>
+          <div class="btn-row">
+            <button class="btn btn-secondary" id="licenseImportFileBtn">Import File</button>
+            <button class="btn btn-ghost" id="licenseRefreshBtn">Refresh</button>
+          </div>
+          <div class="detail-label">Or paste license JSON</div>
+          <textarea id="licenseText" placeholder='{"payload": {...}, "signature": "..."}'></textarea>
+          <div class="btn-row">
+            <button class="btn btn-secondary" id="licenseImportTextBtn">Import Text</button>
           </div>
         </div>
-        <pre id="preflightOut">Preflight not run yet.</pre>
-      </div>
+      </details>
 
-      <div class="card">
-        <div class="row" style="justify-content: space-between;">
-          <strong>License (Phase 3)</strong>
-          <div class="row">
-            <button id="licenseRefreshBtn">Refresh License</button>
-            <button id="licenseImportFileBtn">Import License File</button>
+      <!-- App Lock -->
+      <details class="card">
+        <summary>
+          <span>App Lock <span class="summary-badge" id="lockBadge">Disabled</span></span>
+        </summary>
+        <div class="detail-body">
+          <div class="status-sub" id="lockStatusText">App lock is disabled.</div>
+          <input id="lockPin" type="password" placeholder="PIN (minimum 6 characters)" />
+          <div class="btn-row">
+            <button class="btn btn-secondary" id="lockEnableBtn">Enable</button>
+            <button class="btn btn-secondary" id="lockDisableBtn">Disable</button>
+            <button class="btn btn-secondary" id="lockUnlockBtn">Unlock</button>
+            <button class="btn btn-secondary btn-danger" id="lockNowBtn">Lock Now</button>
           </div>
         </div>
-        <div class="hint" id="licenseStatusText">No license status yet.</div>
-        <textarea id="licenseText" style="width:100%;min-height:90px;margin-top:8px;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-family:ui-monospace,monospace;font-size:12px;" placeholder='Paste license JSON {"payload":...,"signature":"..."}'></textarea>
-        <div class="row" style="margin-top:8px;">
-          <button id="licenseImportTextBtn">Import License Text</button>
-        </div>
-      </div>
+      </details>
 
-      <div class="card">
-        <div class="row" style="justify-content: space-between;">
-          <strong>Local App Lock (Phase 3)</strong>
-          <button id="lockRefreshBtn">Refresh Lock Status</button>
-        </div>
-        <div class="hint" id="lockStatusText">App lock status unknown.</div>
-        <div class="row" style="margin-top:8px;">
-          <input id="lockPin" type="password" placeholder="PIN (minimum 6 chars)" style="flex:1;min-width:220px;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:12px;" />
-        </div>
-        <div class="row" style="margin-top:8px;">
-          <button id="lockEnableBtn">Enable Lock</button>
-          <button id="lockDisableBtn">Disable Lock</button>
-          <button id="lockUnlockBtn">Unlock</button>
-          <button id="lockNowBtn">Lock Now</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="row" style="justify-content: space-between;">
-          <strong>Credential Vault (Phase 3)</strong>
-          <button id="vaultStatusBtn">Vault Status</button>
-        </div>
-        <div class="hint" id="vaultStatusText">Vault status unknown.</div>
-        <div class="row" style="margin-top:8px;">
-          <label class="hint">Preset</label>
-          <select id="secretPreset" style="min-width:280px;border:1px solid #cbd5e1;border-radius:8px;padding:6px;font-size:12px;">
-            <option value="">Choose preset key...</option>
+      <!-- Credential Vault -->
+      <details class="card">
+        <summary>
+          <span>Credential Vault <span class="summary-badge" id="vaultBadge">…</span></span>
+        </summary>
+        <div class="detail-body">
+          <div class="status-sub" id="vaultStatusText">Vault status unknown.</div>
+          <select id="secretPreset">
+            <option value="">Preset key…</option>
             <option value="pennsieve.api_key">pennsieve.api_key</option>
             <option value="pennsieve.api_secret">pennsieve.api_secret</option>
             <option value="hpc.username">hpc.username</option>
@@ -175,28 +337,25 @@
             <option value="xnat.username">xnat.username</option>
             <option value="xnat.password">xnat.password</option>
           </select>
+          <input id="secretKey" type="text" placeholder="Key (e.g. pennsieve.api_key)" />
+          <input id="secretValue" type="password" placeholder="Value" />
+          <div class="btn-row">
+            <button class="btn btn-secondary" id="saveSecretBtn">Save</button>
+            <button class="btn btn-secondary" id="loadSecretBtn">Load</button>
+            <button class="btn btn-secondary btn-danger" id="deleteSecretBtn">Delete</button>
+          </div>
         </div>
-        <div class="row" style="margin-top:8px;">
-          <input id="secretKey" type="text" placeholder="secret key (e.g. pennsieve.api_key)" style="flex:1;min-width:220px;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:12px;" />
-          <input id="secretValue" type="password" placeholder="secret value" style="flex:1;min-width:220px;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:12px;" />
-        </div>
-        <div class="row" style="margin-top:8px;">
-          <button id="saveSecretBtn">Save Secret</button>
-          <button id="loadSecretBtn">Load Secret</button>
-          <button id="deleteSecretBtn">Delete Secret</button>
-        </div>
-      </div>
+      </details>
 
-      <div class="card">
-        <strong>Command output</strong>
-        <pre id="logOut">No command output yet.</pre>
-      </div>
+      <footer id="pathsText"></footer>
+    </main>
 
-      <div class="card">
-        <strong>Desktop storage</strong>
-        <div class="hint" id="pathsText">Loading desktop paths...</div>
-      </div>
-    </div>
+    <!-- Hidden stubs for renderer.js backward compat -->
+    <div id="logOut" style="display:none"></div>
+    <button id="controlBtn" style="display:none"></button>
+    <button id="lockRefreshBtn" style="display:none"></button>
+    <button id="vaultStatusBtn" style="display:none"></button>
+
     <script src="./renderer.js"></script>
   </body>
 </html>
