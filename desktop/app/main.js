@@ -247,6 +247,39 @@ ipcMain.handle("nir:exportDiagnostics", async () => {
   return diagnostics.exportDiagnosticsBundle();
 });
 
+ipcMain.handle("nir:getPipelineLicenseStatus", async () => {
+  const fsPath = path.join(backendManager.repoRoot, "license.txt");
+  const meldPath = path.join(backendManager.repoRoot, "meld_license.txt");
+  return {
+    freesurfer: { present: fs.existsSync(fsPath), path: fsPath },
+    meld: { present: fs.existsSync(meldPath), path: meldPath },
+  };
+});
+
+ipcMain.handle("nir:importPipelineLicense", async (_event, type) => {
+  if (!appLock.isUnlockedForSensitiveActions()) {
+    return { ok: false, error: "App lock is enabled. Unlock to import licenses.", locked: true };
+  }
+  const configs = {
+    freesurfer: { title: "Select FreeSurfer License", dest: "license.txt", filters: [{ name: "License", extensions: ["txt", "*"] }] },
+    meld: { title: "Select MELD Graph License", dest: "meld_license.txt", filters: [{ name: "License", extensions: ["txt", "*"] }] },
+  };
+  const cfg = configs[type];
+  if (!cfg) return { ok: false, error: `Unknown license type: ${type}` };
+  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+  const pick = await dialog.showOpenDialog(win, { properties: ["openFile"], title: cfg.title, filters: cfg.filters });
+  if (pick.canceled || !pick.filePaths?.length) return { ok: false, error: "No file selected." };
+  const dest = path.join(backendManager.repoRoot, cfg.dest);
+  try {
+    fs.copyFileSync(pick.filePaths[0], dest);
+    desktopState.appendLog("pipeline_license_import", { type, dest, ok: true });
+    return { ok: true, dest };
+  } catch (e) {
+    desktopState.appendLog("pipeline_license_import", { type, ok: false, error: e.message });
+    return { ok: false, error: e.message };
+  }
+});
+
 ipcMain.handle("nir:getLicenseStatus", async () => {
   return licenseManager.getLicenseStatus();
 });

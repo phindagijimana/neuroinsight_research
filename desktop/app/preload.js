@@ -25,4 +25,6 @@ contextBridge.exposeInMainWorld("nirDesktop", {
   unlockApp: (pin) => ipcRenderer.invoke("nir:unlockApp", pin),
   lockNow: () => ipcRenderer.invoke("nir:lockNow"),
   onSetupProgress: (cb) => ipcRenderer.on("nir:setupProgress", (_e, msg) => cb(msg)),
+  getPipelineLicenseStatus: () => ipcRenderer.invoke("nir:getPipelineLicenseStatus"),
+  importPipelineLicense: (type) => ipcRenderer.invoke("nir:importPipelineLicense", type),
 });

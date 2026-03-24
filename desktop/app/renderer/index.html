@@ -225,6 +225,23 @@
         line-height: 1.6;
       }
 
+      /* ── Pipeline license rows ──────────────────────────── */
+      .pipeline-lic-row {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 12px; padding: 10px 0;
+        border-bottom: 1px solid #f1f5f9;
+      }
+      .pipeline-lic-row:last-child { border-bottom: none; }
+      .pipeline-lic-info { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; }
+      .pipeline-lic-dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: #cbd5e1; flex-shrink: 0; margin-top: 4px;
+        transition: background .2s;
+      }
+      .pipeline-lic-dot.ok { background: #16a34a; }
+      .pipeline-lic-dot.missing { background: #f59e0b; }
+      a { color: #0b4ea2; }
+
       /* ── Summary badge ──────────────────────────────────── */
       .summary-badge {
         font-size: 11px; font-weight: 500;
@@ -285,10 +302,47 @@
         <div class="preflight-wrap" id="preflightOut"></div>
       </div>
 
-      <!-- License -->
+      <!-- Pipeline Licenses -->
       <details class="card">
         <summary>
-          <span>License <span class="summary-badge" id="licenseBadge">Unknown</span></span>
+          <span>Pipeline Licenses <span class="summary-badge" id="pipelineLicenseBadge">Checking…</span></span>
+        </summary>
+        <div class="detail-body">
+          <p style="font-size:12px;color:#64748b;line-height:1.6;">
+            Required to run neuroimaging pipelines (FreeSurfer, FastSurfer, fMRIPrep, MELD Graph, etc.).
+            Both are <strong>free</strong> — click the links below to register and download.
+          </p>
+
+          <div class="pipeline-lic-row">
+            <div class="pipeline-lic-info">
+              <span class="pipeline-lic-dot" id="fsLicDot"></span>
+              <div>
+                <div style="font-size:13px;font-weight:600;">FreeSurfer License</div>
+                <div style="font-size:11px;color:#64748b;" id="fsLicDetail">Checking…</div>
+                <a href="https://surfer.nmr.mgh.harvard.edu/registration.html" style="font-size:11px;color:#0b4ea2;">Get free license →</a>
+              </div>
+            </div>
+            <button class="btn btn-secondary" id="importFsLicBtn" style="flex-shrink:0;">Import</button>
+          </div>
+
+          <div class="pipeline-lic-row">
+            <div class="pipeline-lic-info">
+              <span class="pipeline-lic-dot" id="meldLicDot"></span>
+              <div>
+                <div style="font-size:13px;font-weight:600;">MELD Graph License</div>
+                <div style="font-size:11px;color:#64748b;" id="meldLicDetail">Checking…</div>
+                <a href="https://forms.gle/meld-graph" style="font-size:11px;color:#0b4ea2;">Get free license →</a>
+              </div>
+            </div>
+            <button class="btn btn-secondary" id="importMeldLicBtn" style="flex-shrink:0;">Import</button>
+          </div>
+        </div>
+      </details>
+
+      <!-- NIR Application License -->
+      <details class="card">
+        <summary>
+          <span>Application License <span class="summary-badge" id="licenseBadge">Unknown</span></span>
         </summary>
         <div class="detail-body">
           <div class="status-sub" id="licenseStatusText">No license imported.</div>
@@ -351,6 +405,7 @@
     </main>
 
     <!-- Hidden stubs for renderer.js backward compat -->
+    <button id="pipelineLicRefreshBtn" style="display:none"></button>
     <div id="logOut" style="display:none"></div>
     <button id="controlBtn" style="display:none"></button>
     <button id="lockRefreshBtn" style="display:none"></button>

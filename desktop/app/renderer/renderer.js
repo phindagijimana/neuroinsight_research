@@ -28,6 +28,17 @@ const secretPreset    = document.getElementById("secretPreset");
 const preflightOut    = document.getElementById("preflightOut");
 const pathsText       = document.getElementById("pathsText");
 
+const pipelineLicenseBadge = document.getElementById("pipelineLicenseBadge");
+const fsLicDot        = document.getElementById("fsLicDot");
+const fsLicDetail     = document.getElementById("fsLicDetail");
+const meldLicDot      = document.getElementById("meldLicDot");
+const meldLicDetail   = document.getElementById("meldLicDetail");
+const importFsLicBtn  = document.getElementById("importFsLicBtn");
+const importMeldLicBtn= document.getElementById("importMeldLicBtn");
+
+const importFsLicBtnEl   = importFsLicBtn;
+const importMeldLicBtnEl = importMeldLicBtn;
+
 const openBtn             = document.getElementById("openBtn");
 const startBtn            = document.getElementById("startBtn");
 const stopAppBtn          = document.getElementById("stopAppBtn");
@@ -72,6 +83,7 @@ function printResult(title, result) {
 const allBtns = [
   openBtn, startBtn, stopAppBtn, stopAllBtn, refreshBtn,
   preflightBtn, diagBtn, licenseRefreshBtn, licenseImportFileBtn, licenseImportTextBtn,
+  importFsLicBtn, importMeldLicBtn,
   lockEnableBtn, lockDisableBtn, lockUnlockBtn, lockNowBtn,
   saveSecretBtn, loadSecretBtn, deleteSecretBtn,
 ].filter(Boolean);
@@ -165,6 +177,23 @@ async function refreshVaultStatus() {
   vaultStatusText.textContent = `Backend: ${st.backend} (service: ${st.serviceName})`;
 }
 
+async function refreshPipelineLicenses() {
+  const st = await nirDesktop.getPipelineLicenseStatus();
+  const fsOk = st.freesurfer.present;
+  const meldOk = st.meld.present;
+
+  fsLicDot.className = "pipeline-lic-dot" + (fsOk ? " ok" : " missing");
+  fsLicDetail.textContent = fsOk ? `Found: ${st.freesurfer.path}` : "Not found — import required to run FreeSurfer pipelines.";
+
+  meldLicDot.className = "pipeline-lic-dot" + (meldOk ? " ok" : " missing");
+  meldLicDetail.textContent = meldOk ? `Found: ${st.meld.path}` : "Not found — import required to run MELD Graph pipeline.";
+
+  const both = fsOk && meldOk;
+  const none = !fsOk && !meldOk;
+  pipelineLicenseBadge.textContent = both ? "Both present" : none ? "None imported" : "Partial";
+  pipelineLicenseBadge.className = "summary-badge" + (both ? " ok" : none ? " bad" : " warn");
+}
+
 async function refreshPaths() {
   const paths = await nirDesktop.getDesktopPaths();
   if (pathsText) {
@@ -213,7 +242,7 @@ refreshBtn.addEventListener("click", async () => {
   setBusy(true);
   try {
     await Promise.all([
-      refreshStatus(), refreshLicenseStatus(),
+      refreshStatus(), refreshLicenseStatus(), refreshPipelineLicenses(),
       refreshLockStatus(), refreshVaultStatus(), refreshPaths(),
     ]);
   } finally { setBusy(false); }
@@ -224,17 +253,23 @@ preflightBtn.addEventListener("click", async () => {
   preflightOut.textContent = "Running checks…";
   preflightOut.classList.add("visible");
   try {
-    const r = await nirDesktop.runPreflight();
+    const [r, pl] = await Promise.all([
+      nirDesktop.runPreflight(),
+      nirDesktop.getPipelineLicenseStatus(),
+    ]);
     const c = r.checks || {};
     const tick = (ok) => ok ? "✓" : "✗";
     const lines = [
-      `Platform   ${c.platform ? `${c.platform.os} ${c.platform.arch}` : "unknown"}`,
-      `Docker     ${tick(c.docker?.ok)}  ${c.docker?.detail || ""}`,
-      `Python     ${tick(c.python?.ok)}  ${c.python?.detail || "not found"}`,
-      `Celery     ${tick(c.celery?.ok)}  ${c.celery?.detail || ""}`,
-      `Keychain   ${tick(c.keychain?.ok)}  ${c.keychain?.backend || ""}`,
-      `Disk       ${c.disk?.ok ? `${c.disk.freeGB} GB free of ${c.disk.totalGB} GB` : c.disk?.error || "unknown"}`,
-      `Port 3000  ${c.ports?.p3000_open ? "in use" : "available"}`,
+      `Platform       ${c.platform ? `${c.platform.os} ${c.platform.arch}` : "unknown"}`,
+      `Docker         ${tick(c.docker?.ok)}  ${c.docker?.detail || ""}`,
+      `Python         ${tick(c.python?.ok)}  ${c.python?.detail || "not found"}`,
+      `Celery         ${tick(c.celery?.ok)}  ${c.celery?.detail || ""}`,
+      `Keychain       ${tick(c.keychain?.ok)}  ${c.keychain?.backend || ""}`,
+      `Disk           ${c.disk?.ok ? `${c.disk.freeGB} GB free of ${c.disk.totalGB} GB` : c.disk?.error || "unknown"}`,
+      `Port 3000      ${c.ports?.p3000_open ? "in use" : "available"}`,
+      ``,
+      `FreeSurfer lic ${tick(pl?.freesurfer?.present)}  ${pl?.freesurfer?.present ? "Found" : "Missing — import in Pipeline Licenses"}`,
+      `MELD lic       ${tick(pl?.meld?.present)}  ${pl?.meld?.present ? "Found" : "Missing — import in Pipeline Licenses"}`,
     ];
     if (r.warnings && r.warnings.length) {
       lines.push("", "Warnings:");
@@ -261,6 +296,26 @@ diagBtn.addEventListener("click", async () => {
     }
   } catch (e) {
     showToast(String(e), "err");
+  } finally { setBusy(false); }
+});
+
+importFsLicBtn && importFsLicBtn.addEventListener("click", async () => {
+  setBusy(true);
+  try {
+    const res = await nirDesktop.importPipelineLicense("freesurfer");
+    if (!res.ok) { showToast(res.error || "Import failed.", "err"); return; }
+    showToast("FreeSurfer license imported.", "ok");
+    await refreshPipelineLicenses();
+  } finally { setBusy(false); }
+});
+
+importMeldLicBtn && importMeldLicBtn.addEventListener("click", async () => {
+  setBusy(true);
+  try {
+    const res = await nirDesktop.importPipelineLicense("meld");
+    if (!res.ok) { showToast(res.error || "Import failed.", "err"); return; }
+    showToast("MELD Graph license imported.", "ok");
+    await refreshPipelineLicenses();
   } finally { setBusy(false); }
 });
 
@@ -381,6 +436,7 @@ secretPreset.addEventListener("change", () => {
 Promise.all([
   refreshStatus(),
   refreshLicenseStatus(),
+  refreshPipelineLicenses(),
   refreshLockStatus(),
   refreshVaultStatus(),
   refreshPaths(),
