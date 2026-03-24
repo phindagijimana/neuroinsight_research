@@ -344,6 +344,7 @@ app.whenReady().then(() => {
   desktopState.initState(app.getPath("userData"));
   const paths = desktopState.getPaths();
   backendManager.initDesktopRuntime(paths);
+  setupManager.initSetupManager(paths);
   licenseManager.initLicenseManager(paths.stateDir);
   credentialStore.initCredentialStore(paths.stateDir);
   appLock.initAppLock(paths.stateDir);

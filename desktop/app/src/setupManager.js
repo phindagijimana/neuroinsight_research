@@ -1,15 +1,62 @@
 const path = require("path");
 const fs = require("fs");
 const net = require("net");
+const https = require("https");
+const http = require("http");
 const crypto = require("crypto");
 const { spawnSync, spawn } = require("child_process");
 const platformAdapter = require("./platformAdapter");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 
+// ---------------------------------------------------------------------------
+// Bundled Python constants (python-build-standalone)
+// ---------------------------------------------------------------------------
+const PYTHON_VERSION = "3.11.10";
+const PYTHON_RELEASE = "20241016";
+
+let managerPaths = null;
+
+function initSetupManager(paths) {
+  managerPaths = paths;
+}
+
 function isWindows() {
   return process.platform === "win32";
 }
+
+function getPythonDownloadUrl() {
+  const base = `https://github.com/indygreg/python-build-standalone/releases/download/${PYTHON_RELEASE}`;
+  const ver = `cpython-${PYTHON_VERSION}+${PYTHON_RELEASE}`;
+  const { platform, arch } = process;
+  if (platform === "darwin") {
+    const a = arch === "arm64" ? "aarch64" : "x86_64";
+    return `${base}/${ver}-${a}-apple-darwin-install_only.tar.gz`;
+  }
+  if (platform === "linux") {
+    return `${base}/${ver}-x86_64-unknown-linux-gnu-install_only.tar.gz`;
+  }
+  if (platform === "win32") {
+    return `${base}/${ver}-x86_64-pc-windows-msvc-shared-install_only.tar.gz`;
+  }
+  return null;
+}
+
+function bundledPythonPath() {
+  if (!managerPaths) return null;
+  return isWindows()
+    ? path.join(managerPaths.stateDir, "python", "python.exe")
+    : path.join(managerPaths.stateDir, "python", "bin", "python3");
+}
+
+function bundledPythonExists() {
+  const p = bundledPythonPath();
+  return p ? fs.existsSync(p) : false;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function venvPythonPath() {
   return isWindows()
@@ -35,10 +82,7 @@ function waitForPort(port, timeoutMs = 30000) {
     const tryConnect = () => {
       const sock = new net.Socket();
       sock.setTimeout(1000);
-      sock.connect(port, "127.0.0.1", () => {
-        sock.destroy();
-        resolve(true);
-      });
+      sock.connect(port, "127.0.0.1", () => { sock.destroy(); resolve(true); });
       sock.on("error", () => {
         sock.destroy();
         if (Date.now() - start > timeoutMs) { resolve(false); return; }
@@ -61,19 +105,12 @@ function runSync(cmd, args, cwd) {
     encoding: "utf8",
     timeout: 10000,
   });
-  return {
-    ok: res.status === 0 && !res.error,
-    stdout: res.stdout || "",
-    stderr: res.stderr || "",
-  };
+  return { ok: res.status === 0 && !res.error, stdout: res.stdout || "", stderr: res.stderr || "" };
 }
 
 function runAsync(cmd, args, cwd, timeoutMs = 600000) {
   return new Promise((resolve) => {
-    const child = spawn(cmd, args, {
-      cwd: cwd || repoRoot,
-      env: process.env,
-    });
+    const child = spawn(cmd, args, { cwd: cwd || repoRoot, env: process.env });
     let stdout = "";
     let stderr = "";
     let finished = false;
@@ -89,29 +126,103 @@ function runAsync(cmd, args, cwd, timeoutMs = 600000) {
   });
 }
 
+function downloadFile(url, dest, onPercent) {
+  return new Promise((resolve, reject) => {
+    const doRequest = (reqUrl, redirects = 0) => {
+      if (redirects > 5) { reject(new Error("Too many redirects")); return; }
+      const mod = reqUrl.startsWith("https") ? https : http;
+      mod.get(reqUrl, { timeout: 30000 }, (res) => {
+        if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) {
+          res.resume();
+          doRequest(res.headers.location, redirects + 1);
+          return;
+        }
+        if (res.statusCode !== 200) {
+          res.resume();
+          reject(new Error(`HTTP ${res.statusCode} downloading Python`));
+          return;
+        }
+        const total = parseInt(res.headers["content-length"] || "0");
+        let received = 0;
+        const file = fs.createWriteStream(dest);
+        res.on("data", (chunk) => {
+          received += chunk.length;
+          if (total && onPercent) onPercent(Math.round((received / total) * 100));
+        });
+        res.pipe(file);
+        file.on("finish", () => { file.close(() => resolve()); });
+        file.on("error", (e) => { fs.unlink(dest, () => {}); reject(e); });
+        res.on("error", (e) => { fs.unlink(dest, () => {}); reject(e); });
+      }).on("error", reject).on("timeout", () => reject(new Error("Download timed out")));
+    };
+    doRequest(url);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Setup steps
 // ---------------------------------------------------------------------------
 
-async function stepCheckPython(onProgress) {
-  onProgress({ step: "python", label: "Checking Python 3.10+", status: "running" });
-  const pyCmd = platformAdapter.resolvePythonCommand();
-  if (!pyCmd) {
-    onProgress({ step: "python", label: "Python not found — install Python 3.10+ from python.org", status: "error" });
-    return { ok: false, error: "Python not found. Install Python 3.10+ from python.org and relaunch." };
-  }
-  const parts = pyCmd.split(" ");
-  const res = runSync(parts[0], [...parts.slice(1), "--version"]);
-  const match = (res.stdout + res.stderr).match(/Python (\d+)\.(\d+)/);
-  if (match) {
-    const [major, minor] = [parseInt(match[1]), parseInt(match[2])];
-    if (major < 3 || (major === 3 && minor < 10)) {
-      onProgress({ step: "python", label: `Python ${match[0]} is too old — 3.10+ required`, status: "error" });
-      return { ok: false, error: `Python ${match[0]} found but 3.10+ is required.` };
+async function stepEnsurePython(onProgress) {
+  // 1. Check if system Python 3.10+ is available
+  onProgress({ step: "python", label: "Checking for Python 3.10+…", status: "running" });
+  const sysCmd = platformAdapter.resolvePythonCommand();
+  if (sysCmd) {
+    const parts = sysCmd.split(" ");
+    const res = runSync(parts[0], [...parts.slice(1), "--version"]);
+    const match = (res.stdout + res.stderr).match(/Python (\d+)\.(\d+)/);
+    if (match) {
+      const [major, minor] = [parseInt(match[1]), parseInt(match[2])];
+      if (major > 3 || (major === 3 && minor >= 10)) {
+        onProgress({ step: "python", label: `Python ${match[0]} found`, status: "done" });
+        return { ok: true, pythonCmd: sysCmd };
+      }
     }
   }
-  onProgress({ step: "python", label: "Python ready", status: "done" });
-  return { ok: true, pythonCmd: pyCmd };
+
+  // 2. Check if we already have a bundled Python downloaded
+  if (bundledPythonExists()) {
+    onProgress({ step: "python", label: "Using bundled Python 3.11", status: "done" });
+    return { ok: true, pythonCmd: bundledPythonPath() };
+  }
+
+  // 3. Auto-download python-build-standalone
+  const url = getPythonDownloadUrl();
+  if (!url) {
+    onProgress({ step: "python", label: "Unsupported platform — install Python 3.10+ manually", status: "error" });
+    return { ok: false, error: "Cannot auto-install Python on this platform." };
+  }
+
+  onProgress({ step: "python", label: "Downloading Python 3.11 (first launch only)…", status: "running", detail: "0%" });
+  const tmpFile = path.join(managerPaths.stateDir, "python-download.tar.gz");
+  const extractDir = managerPaths.stateDir;
+
+  try {
+    await downloadFile(url, tmpFile, (pct) => {
+      onProgress({ step: "python", label: `Downloading Python 3.11…`, status: "running", detail: `${pct}%` });
+    });
+  } catch (e) {
+    onProgress({ step: "python", label: "Python download failed — check internet connection", status: "error" });
+    try { fs.unlinkSync(tmpFile); } catch (_) {}
+    return { ok: false, error: e.message };
+  }
+
+  onProgress({ step: "python", label: "Extracting Python 3.11…", status: "running" });
+  const extractRes = await runAsync("tar", ["xzf", tmpFile, "-C", extractDir]);
+  try { fs.unlinkSync(tmpFile); } catch (_) {}
+
+  if (!extractRes.ok || !bundledPythonExists()) {
+    onProgress({ step: "python", label: "Failed to extract Python", status: "error" });
+    return { ok: false, error: extractRes.stderr || "Extraction failed." };
+  }
+
+  // Make executable on Unix
+  if (!isWindows()) {
+    try { fs.chmodSync(bundledPythonPath(), 0o755); } catch (_) {}
+  }
+
+  onProgress({ step: "python", label: "Python 3.11 ready", status: "done" });
+  return { ok: true, pythonCmd: bundledPythonPath() };
 }
 
 async function stepCreateVenv(pythonCmd, onProgress) {
@@ -120,9 +231,8 @@ async function stepCreateVenv(pythonCmd, onProgress) {
     return { ok: true };
   }
   onProgress({ step: "venv", label: "Creating Python environment…", status: "running" });
-  const parts = pythonCmd.split(" ");
-  const venvDir = path.join(repoRoot, "venv");
-  const res = runSync(parts[0], [...parts.slice(1), "-m", "venv", venvDir]);
+  const parts = String(pythonCmd).split(" ");
+  const res = runSync(parts[0], [...parts.slice(1), "-m", "venv", path.join(repoRoot, "venv")]);
   if (!res.ok) {
     onProgress({ step: "venv", label: "Failed to create Python environment", status: "error" });
     return { ok: false, error: res.stderr || "venv creation failed." };
@@ -138,8 +248,7 @@ async function stepInstallDeps(onProgress) {
     onProgress({ step: "deps", label: "No requirements.txt — skipped", status: "skipped" });
     return { ok: true };
   }
-  const venvPy = venvPythonPath();
-  const res = await runAsync(venvPy, ["-m", "pip", "install", "-r", reqFile, "-q", "--disable-pip-version-check"]);
+  const res = await runAsync(venvPythonPath(), ["-m", "pip", "install", "-r", reqFile, "-q", "--disable-pip-version-check"]);
   if (!res.ok) {
     onProgress({ step: "deps", label: "Dependency install failed — check network", status: "error" });
     return { ok: false, error: res.stderr };
@@ -207,12 +316,11 @@ async function stepStartInfrastructure(onProgress) {
 
 async function stepRunMigrations(onProgress) {
   onProgress({ step: "migrations", label: "Applying database migrations…", status: "running" });
-  const venvPy = venvPythonPath();
-  if (!fs.existsSync(venvPy)) {
+  if (!fs.existsSync(venvPythonPath())) {
     onProgress({ step: "migrations", label: "Migrations skipped — no venv", status: "skipped" });
     return { ok: true };
   }
-  const res = await runAsync(venvPy, ["-m", "alembic", "upgrade", "head"]);
+  const res = await runAsync(venvPythonPath(), ["-m", "alembic", "upgrade", "head"]);
   if (!res.ok) {
     onProgress({ step: "migrations", label: "Migration warning (non-fatal) — continuing", status: "skipped" });
     return { ok: true };
@@ -228,13 +336,16 @@ async function stepRunMigrations(onProgress) {
 async function runSetup(onProgress) {
   const progress = onProgress || (() => {});
 
-  const pyRes = await stepCheckPython(progress);
+  const pyRes = await stepEnsurePython(progress);
   if (!pyRes.ok) return pyRes;
+
+  // Point subsequent steps and backendManager at the resolved Python
+  process.env.NIR_DESKTOP_PYTHON = pyRes.pythonCmd;
 
   const venvRes = await stepCreateVenv(pyRes.pythonCmd, progress);
   if (!venvRes.ok) return venvRes;
 
-  // Point backendManager at the venv Python from here on
+  // Switch to venv Python for deps and backend
   process.env.NIR_DESKTOP_PYTHON = venvPythonPath();
 
   const depsRes = await stepInstallDeps(progress);
@@ -251,4 +362,4 @@ async function runSetup(onProgress) {
   return { ok: true };
 }
 
-module.exports = { runSetup, venvPythonPath, venvExists };
+module.exports = { initSetupManager, runSetup, venvPythonPath, venvExists };
