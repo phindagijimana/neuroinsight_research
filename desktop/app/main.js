@@ -68,14 +68,37 @@ function buildAppMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+function openLoadingScreen() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.loadFile(path.join(__dirname, "renderer", "loading.html"));
+  mainWindow.setTitle("NeuroInsight Research");
+}
+
+async function autoStartAndOpen() {
+  if (!appLock.isUnlockedForSensitiveActions()) {
+    openControlCenter();
+    return;
+  }
+  const res = await backendManager.startBackend();
+  const patch = {};
+  if (res.port) patch.lastKnownPort = res.port;
+  desktopState.updateSettings(patch);
+  desktopState.appendLog("auto_start_backend", { ok: res.ok, port: res.port || null });
+  if (res.ok && res.port) {
+    await openNirInMainWindow();
+  } else {
+    openControlCenter();
+  }
+}
+
 function createMainWindow() {
   const windowIcon = path.join(__dirname, "assets", "icon.png");
   mainWindow = new BrowserWindow({
-    width: 980,
-    height: 720,
+    width: 1280,
+    height: 800,
     minWidth: 900,
     minHeight: 640,
-    title: "NIR Desktop",
+    title: "NeuroInsight Research",
     icon: windowIcon,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -85,7 +108,7 @@ function createMainWindow() {
     },
   });
 
-  openControlCenter();
+  openLoadingScreen();
 }
 
 function getAutoLicenseCandidates() {
@@ -327,12 +350,9 @@ app.whenReady().then(() => {
   createMainWindow();
   desktopState.appendLog("app_ready");
 
-  const settings = desktopState.readSettings();
-  if (settings.autoOpenOnStart) {
-    openNirInMainWindow().catch((_e) => {
-      // keep control center if backend is unavailable
-    });
-  }
+  autoStartAndOpen().catch((_e) => {
+    openControlCenter();
+  });
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
