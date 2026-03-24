@@ -221,15 +221,32 @@ refreshBtn.addEventListener("click", async () => {
 
 preflightBtn.addEventListener("click", async () => {
   setBusy(true);
-  preflightOut.textContent = "Running…";
+  preflightOut.textContent = "Running checks…";
   preflightOut.classList.add("visible");
   try {
-    const result = await nirDesktop.runPreflight();
-    preflightOut.textContent = JSON.stringify(result, null, 2);
-    showToast(result.ok ? "Preflight passed." : "Preflight completed with warnings.", result.ok ? "ok" : "neutral");
+    const r = await nirDesktop.runPreflight();
+    const c = r.checks || {};
+    const tick = (ok) => ok ? "✓" : "✗";
+    const lines = [
+      `Platform   ${c.platform ? `${c.platform.os} ${c.platform.arch}` : "unknown"}`,
+      `Docker     ${tick(c.docker?.ok)}  ${c.docker?.detail || ""}`,
+      `Python     ${tick(c.python?.ok)}  ${c.python?.detail || "not found"}`,
+      `Celery     ${tick(c.celery?.ok)}  ${c.celery?.detail || ""}`,
+      `Keychain   ${tick(c.keychain?.ok)}  ${c.keychain?.backend || ""}`,
+      `Disk       ${c.disk?.ok ? `${c.disk.freeGB} GB free of ${c.disk.totalGB} GB` : c.disk?.error || "unknown"}`,
+      `Port 3000  ${c.ports?.p3000_open ? "in use" : "available"}`,
+    ];
+    if (r.warnings && r.warnings.length) {
+      lines.push("", "Warnings:");
+      r.warnings.forEach((w) => lines.push(`  ⚠ ${w}`));
+    } else {
+      lines.push("", "All checks passed.");
+    }
+    preflightOut.textContent = lines.join("\n");
+    showToast(r.ok ? "Preflight passed." : `${r.warnings.length} warning(s).`, r.ok ? "ok" : "neutral");
   } catch (e) {
-    preflightOut.textContent = String(e);
-    showToast("Preflight failed.", "err");
+    preflightOut.textContent = `Error: ${String(e)}`;
+    showToast("Preflight error.", "err");
   } finally { setBusy(false); }
 });
 
