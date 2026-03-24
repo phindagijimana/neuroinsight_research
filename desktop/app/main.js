@@ -2,6 +2,7 @@ const path = require("path");
 const fs = require("fs");
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron");
 const backendManager = require("./src/backendManager");
+const setupManager = require("./src/setupManager");
 const desktopState = require("./src/desktopState");
 const preflight = require("./src/preflight");
 const diagnostics = require("./src/diagnostics");
@@ -74,8 +75,20 @@ function openLoadingScreen() {
   mainWindow.setTitle("NeuroInsight Research");
 }
 
+function sendProgress(msg) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("nir:setupProgress", msg);
+  }
+}
+
 async function autoStartAndOpen() {
   if (!appLock.isUnlockedForSensitiveActions()) {
+    openControlCenter();
+    return;
+  }
+  const setupRes = await setupManager.runSetup(sendProgress);
+  desktopState.appendLog("auto_setup", { ok: setupRes.ok, error: setupRes.error || null });
+  if (!setupRes.ok) {
     openControlCenter();
     return;
   }
@@ -350,8 +363,10 @@ app.whenReady().then(() => {
   createMainWindow();
   desktopState.appendLog("app_ready");
 
-  autoStartAndOpen().catch((_e) => {
-    openControlCenter();
+  mainWindow.webContents.once("did-finish-load", () => {
+    autoStartAndOpen().catch((_e) => {
+      openControlCenter();
+    });
   });
 
   app.on("activate", () => {

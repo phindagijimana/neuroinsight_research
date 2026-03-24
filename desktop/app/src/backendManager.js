@@ -6,7 +6,7 @@ const path = require("path");
 const platformAdapter = require("./platformAdapter");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
-const candidatePorts = [3000, 3001];
+const candidatePorts = Array.from({ length: 51 }, (_, i) => 3000 + i); // 3000–3050
 const START_TIMEOUT_MS = 45000;
 
 let managerPaths = null;

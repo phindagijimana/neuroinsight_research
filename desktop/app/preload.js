@@ -24,4 +24,5 @@ contextBridge.exposeInMainWorld("nirDesktop", {
   disableAppLock: (pin) => ipcRenderer.invoke("nir:disableAppLock", pin),
   unlockApp: (pin) => ipcRenderer.invoke("nir:unlockApp", pin),
   lockNow: () => ipcRenderer.invoke("nir:lockNow"),
+  onSetupProgress: (cb) => ipcRenderer.on("nir:setupProgress", (_e, msg) => cb(msg)),
 });
