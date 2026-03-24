@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuroInsight Research</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        height: 100%;
+        background: #0b1929;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        color: #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      .container {
+        text-align: center;
+        padding: 40px;
+      }
+      .logo {
+        font-size: 30px;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: -0.5px;
+        margin-bottom: 6px;
+      }
+      .logo span {
+        color: #3b82f6;
+      }
+      .tagline {
+        font-size: 13px;
+        color: #64748b;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-bottom: 56px;
+      }
+      .spinner {
+        width: 36px;
+        height: 36px;
+        border: 3px solid #1e3a5f;
+        border-top-color: #3b82f6;
+        border-radius: 50%;
+        animation: spin 0.75s linear infinite;
+        margin: 0 auto 20px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .status {
+        font-size: 13px;
+        color: #475569;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="logo">NeuroInsight <span>Research</span></div>
+      <div class="tagline">Neuroimaging Research Platform</div>
+      <div class="spinner"></div>
+      <div class="status">Starting services&hellip;</div>
+    </div>
+  </body>
+</html>
