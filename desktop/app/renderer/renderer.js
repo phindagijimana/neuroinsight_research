@@ -1,327 +1,236 @@
 /* global nirDesktop */
 
-const statusBadge = document.getElementById("statusBadge");
-const statusText = document.getElementById("statusText");
-const logOut = document.getElementById("logOut");
-const autoOpenChk = document.getElementById("autoOpenChk");
-const pathsText = document.getElementById("pathsText");
-const preflightOut = document.getElementById("preflightOut");
+// ── Element refs ────────────────────────────────────────────────────────────
+const statusDot       = document.getElementById("statusDot");
+const statusLabel     = document.getElementById("statusLabel");
+const statusText      = document.getElementById("statusText");
+const statusToast     = document.getElementById("statusToast");
+
+const licensePill     = document.getElementById("licensePill");
+const licensePillText = document.getElementById("licensePillText");
+const lockPill        = document.getElementById("lockPill");
+const lockPillText    = document.getElementById("lockPillText");
+
+const licenseBadge    = document.getElementById("licenseBadge");
 const licenseStatusText = document.getElementById("licenseStatusText");
-const licenseBadge = document.getElementById("licenseBadge");
-const licenseText = document.getElementById("licenseText");
+const licenseText     = document.getElementById("licenseText");
+
+const lockBadge       = document.getElementById("lockBadge");
+const lockStatusText  = document.getElementById("lockStatusText");
+const lockPin         = document.getElementById("lockPin");
+
+const vaultBadge      = document.getElementById("vaultBadge");
 const vaultStatusText = document.getElementById("vaultStatusText");
-const lockStatusText = document.getElementById("lockStatusText");
+const secretKey       = document.getElementById("secretKey");
+const secretValue     = document.getElementById("secretValue");
+const secretPreset    = document.getElementById("secretPreset");
 
-const startBtn = document.getElementById("startBtn");
-const stopAppBtn = document.getElementById("stopAppBtn");
-const stopAllBtn = document.getElementById("stopAllBtn");
-const openBtn = document.getElementById("openBtn");
-const refreshBtn = document.getElementById("refreshBtn");
-const controlBtn = document.getElementById("controlBtn");
-const preflightBtn = document.getElementById("preflightBtn");
-const diagBtn = document.getElementById("diagBtn");
-const licenseRefreshBtn = document.getElementById("licenseRefreshBtn");
-const licenseImportFileBtn = document.getElementById("licenseImportFileBtn");
-const licenseImportTextBtn = document.getElementById("licenseImportTextBtn");
-const vaultStatusBtn = document.getElementById("vaultStatusBtn");
-const saveSecretBtn = document.getElementById("saveSecretBtn");
-const loadSecretBtn = document.getElementById("loadSecretBtn");
-const deleteSecretBtn = document.getElementById("deleteSecretBtn");
-const secretKey = document.getElementById("secretKey");
-const secretValue = document.getElementById("secretValue");
-const secretPreset = document.getElementById("secretPreset");
-const lockRefreshBtn = document.getElementById("lockRefreshBtn");
-const lockEnableBtn = document.getElementById("lockEnableBtn");
-const lockDisableBtn = document.getElementById("lockDisableBtn");
-const lockUnlockBtn = document.getElementById("lockUnlockBtn");
-const lockNowBtn = document.getElementById("lockNowBtn");
-const lockPin = document.getElementById("lockPin");
+const preflightOut    = document.getElementById("preflightOut");
+const pathsText       = document.getElementById("pathsText");
 
-function updateLicenseBadge(label, isGood) {
-  licenseBadge.textContent = label;
-  if (isGood) {
-    licenseBadge.classList.remove("off");
-  } else {
-    licenseBadge.classList.add("off");
-  }
+const openBtn             = document.getElementById("openBtn");
+const startBtn            = document.getElementById("startBtn");
+const stopAppBtn          = document.getElementById("stopAppBtn");
+const stopAllBtn          = document.getElementById("stopAllBtn");
+const refreshBtn          = document.getElementById("refreshBtn");
+const preflightBtn        = document.getElementById("preflightBtn");
+const diagBtn             = document.getElementById("diagBtn");
+const licenseRefreshBtn   = document.getElementById("licenseRefreshBtn");
+const licenseImportFileBtn= document.getElementById("licenseImportFileBtn");
+const licenseImportTextBtn= document.getElementById("licenseImportTextBtn");
+const lockEnableBtn       = document.getElementById("lockEnableBtn");
+const lockDisableBtn      = document.getElementById("lockDisableBtn");
+const lockUnlockBtn       = document.getElementById("lockUnlockBtn");
+const lockNowBtn          = document.getElementById("lockNowBtn");
+const saveSecretBtn       = document.getElementById("saveSecretBtn");
+const loadSecretBtn       = document.getElementById("loadSecretBtn");
+const deleteSecretBtn     = document.getElementById("deleteSecretBtn");
+
+// ── Status toast ─────────────────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg, type = "neutral") {
+  if (!statusToast) return;
+  statusToast.textContent = msg;
+  statusToast.className = "visible" + (type === "ok" ? " ok" : type === "err" ? " err" : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    statusToast.className = "";
+  }, 6000);
 }
 
+// Legacy printResult shim used by event handlers below
+function printResult(title, result) {
+  const parts = [title];
+  if (result && result.stdout && result.stdout.trim()) parts.push(result.stdout.trim());
+  if (result && result.stderr && result.stderr.trim()) parts.push(result.stderr.trim());
+  const msg = parts.filter(Boolean).join(" — ");
+  const isErr = !!(result && result.stderr && result.stderr.trim() && !(result && result.ok));
+  showToast(msg, isErr ? "err" : "ok");
+}
+
+// ── Busy state ────────────────────────────────────────────────────────────────
+const allBtns = [
+  openBtn, startBtn, stopAppBtn, stopAllBtn, refreshBtn,
+  preflightBtn, diagBtn, licenseRefreshBtn, licenseImportFileBtn, licenseImportTextBtn,
+  lockEnableBtn, lockDisableBtn, lockUnlockBtn, lockNowBtn,
+  saveSecretBtn, loadSecretBtn, deleteSecretBtn,
+].filter(Boolean);
+
+function setBusy(busy) {
+  allBtns.forEach((b) => { b.disabled = busy; });
+}
+
+// ── Validators ────────────────────────────────────────────────────────────────
 function validateNamespacedSecretKey(key) {
   if (!key) return "Secret key is required.";
   if (!/^[a-z0-9_]+\.[a-z0-9_.-]+$/i.test(key)) {
-    return "Secret key must be namespaced (example: pennsieve.api_key).";
+    return "Secret key must be namespaced (e.g. pennsieve.api_key).";
   }
   return null;
 }
 
-function setBusy(busy) {
-  [
-    startBtn,
-    stopAppBtn,
-    stopAllBtn,
-    openBtn,
-    refreshBtn,
-    controlBtn,
-    preflightBtn,
-    diagBtn,
-    licenseRefreshBtn,
-    licenseImportFileBtn,
-    licenseImportTextBtn,
-    vaultStatusBtn,
-    saveSecretBtn,
-    loadSecretBtn,
-    deleteSecretBtn,
-    lockRefreshBtn,
-    lockEnableBtn,
-    lockDisableBtn,
-    lockUnlockBtn,
-    lockNowBtn,
-  ].forEach((b) => {
-    b.disabled = busy;
-  });
-}
-
-function printResult(title, result) {
-  const out = [
-    `[${new Date().toISOString()}] ${title}`,
-    result && result.stdout ? result.stdout.trim() : "",
-    result && result.stderr ? result.stderr.trim() : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-  logOut.textContent = out || "No command output.";
-}
-
+// ── Refresh helpers ──────────────────────────────────────────────────────────
 async function refreshStatus() {
   const s = await nirDesktop.getStatus();
   if (s.running) {
-    statusBadge.textContent = "Running";
-    statusBadge.classList.remove("off");
+    statusDot.className = "status-dot on";
+    statusLabel.textContent = "Backend Running";
     statusText.textContent = s.managed
-      ? `Desktop-managed backend reachable on port ${s.port}`
-      : `External backend reachable on port ${s.port}`;
+      ? `Desktop-managed · port ${s.port}`
+      : `External backend · port ${s.port}`;
+    openBtn.disabled = false;
   } else {
-    statusBadge.textContent = "Stopped";
-    statusBadge.classList.add("off");
-    statusText.textContent = "Backend not reachable on 3000/3001";
+    statusDot.className = "status-dot off";
+    statusLabel.textContent = "Backend Stopped";
+    statusText.textContent = "Not reachable on ports 3000–3050";
+    openBtn.disabled = false;
   }
-}
-
-async function refreshSettings() {
-  const settings = await nirDesktop.getDesktopSettings();
-  autoOpenChk.checked = Boolean(settings.autoOpenOnStart);
-}
-
-async function refreshPaths() {
-  const paths = await nirDesktop.getDesktopPaths();
-  pathsText.textContent = `Settings: ${paths.settingsFile} | Log: ${paths.logFile}`;
 }
 
 async function refreshLicenseStatus() {
   const st = await nirDesktop.getLicenseStatus();
   if (!st.present) {
-    licenseStatusText.textContent = `No license imported. ${st.reason || ""}`.trim();
-    updateLicenseBadge("License: Missing", false);
+    licenseBadge.textContent = "Missing";
+    licenseBadge.className = "summary-badge bad";
+    licenseStatusText.textContent = st.reason || "No license file imported.";
+    licensePill.className = "pill bad";
+    licensePillText.textContent = "No License";
     return;
   }
   if (!st.valid) {
-    licenseStatusText.textContent = `License invalid: ${st.reason || "unknown"}`;
-    updateLicenseBadge("License: Invalid", false);
+    licenseBadge.textContent = "Invalid";
+    licenseBadge.className = "summary-badge bad";
+    licenseStatusText.textContent = `Invalid: ${st.reason || "unknown"}`;
+    licensePill.className = "pill bad";
+    licensePillText.textContent = "Invalid";
     return;
   }
-  const tier = st.planTier || (st.payload && st.payload.plan_tier) || "unknown";
-  const org = st.organizationId || (st.payload && st.payload.organization_id) || "unknown";
-  const feat = typeof st.featureCount === "number"
-    ? st.featureCount
-    : ((st.payload && Array.isArray(st.payload.features)) ? st.payload.features.length : 0);
-  licenseStatusText.textContent = `License valid (${tier}, org: ${org}, features: ${feat}). Expires: ${st.expiresAt} (${st.daysRemaining} days remaining)`;
-  updateLicenseBadge(`License: Valid (${st.daysRemaining}d)`, true);
-}
-
-async function refreshVaultStatus() {
-  const st = await nirDesktop.getCredentialStoreStatus();
-  vaultStatusText.textContent = `Backend: ${st.backend} (service: ${st.serviceName})`;
+  const days = st.daysRemaining ?? "?";
+  const tier = st.planTier || (st.payload && st.payload.plan_tier) || "";
+  licenseBadge.textContent = `Valid · ${days}d`;
+  licenseBadge.className = "summary-badge ok";
+  licenseStatusText.textContent = `Valid${tier ? ` (${tier})` : ""}. Expires: ${st.expiresAt} (${days} days remaining)`;
+  licensePill.className = "pill ok";
+  licensePillText.textContent = `License · ${days}d`;
 }
 
 async function refreshLockStatus() {
   const st = await nirDesktop.getAppLockStatus();
   if (!st.enabled) {
-    lockStatusText.textContent = "App lock disabled.";
+    lockBadge.textContent = "Disabled";
+    lockBadge.className = "summary-badge";
+    lockStatusText.textContent = "App lock is disabled.";
+    lockPill.className = "pill";
+    lockPillText.textContent = "Unlocked";
     return;
   }
-  lockStatusText.textContent = st.unlocked
-    ? "App lock enabled (currently unlocked)."
-    : "App lock enabled (currently locked).";
+  if (st.unlocked) {
+    lockBadge.textContent = "Unlocked";
+    lockBadge.className = "summary-badge ok";
+    lockStatusText.textContent = "App lock enabled — currently unlocked.";
+    lockPill.className = "pill ok";
+    lockPillText.textContent = "Unlocked";
+  } else {
+    lockBadge.textContent = "Locked";
+    lockBadge.className = "summary-badge bad";
+    lockStatusText.textContent = "App lock enabled — currently locked.";
+    lockPill.className = "pill warn";
+    lockPillText.textContent = "Locked";
+  }
 }
 
+async function refreshVaultStatus() {
+  const st = await nirDesktop.getCredentialStoreStatus();
+  vaultBadge.textContent = st.backend || "…";
+  vaultStatusText.textContent = `Backend: ${st.backend} (service: ${st.serviceName})`;
+}
+
+async function refreshPaths() {
+  const paths = await nirDesktop.getDesktopPaths();
+  if (pathsText) {
+    pathsText.textContent = `Settings: ${paths.settingsFile}\nLog: ${paths.logFile}`;
+  }
+}
+
+// ── Event handlers ────────────────────────────────────────────────────────────
 startBtn.addEventListener("click", async () => {
   setBusy(true);
   try {
+    showToast("Starting backend…");
     const res = await nirDesktop.startBackend();
-    printResult("Start backend", res);
+    printResult("Start", res);
     await refreshStatus();
-  } finally {
-    setBusy(false);
-  }
+  } finally { setBusy(false); }
 });
 
 stopAppBtn.addEventListener("click", async () => {
   setBusy(true);
   try {
     const res = await nirDesktop.stopBackendApp();
-    printResult("Stop app services", res);
+    printResult("Stop services", res);
     await refreshStatus();
-  } finally {
-    setBusy(false);
-  }
+  } finally { setBusy(false); }
 });
 
 stopAllBtn.addEventListener("click", async () => {
   setBusy(true);
   try {
     const res = await nirDesktop.stopBackendAll();
-    printResult("Stop app + infra", res);
+    printResult("Stop all", res);
     await refreshStatus();
-  } finally {
-    setBusy(false);
-  }
+  } finally { setBusy(false); }
 });
 
 openBtn.addEventListener("click", async () => {
   setBusy(true);
   try {
     const res = await nirDesktop.openAppInMainWindow();
-    if (!res.ok) {
-      printResult("Open NIR in same window", { stderr: res.error || "Backend not running." });
-    } else {
-      printResult("Open NIR in same window", { stdout: `Opened http://localhost:${res.port}` });
-    }
-  } finally {
-    setBusy(false);
-  }
-});
-
-controlBtn.addEventListener("click", async () => {
-  setBusy(true);
-  try {
-    await nirDesktop.openControlCenter();
-    printResult("Control center", { stdout: "Control center opened." });
-  } finally {
-    setBusy(false);
-  }
+    if (!res.ok) showToast(res.error || "Backend not running.", "err");
+  } finally { setBusy(false); }
 });
 
 refreshBtn.addEventListener("click", async () => {
   setBusy(true);
   try {
-    await refreshStatus();
-    await refreshSettings();
-    await refreshPaths();
-    await refreshLicenseStatus();
-    await refreshVaultStatus();
-    await refreshLockStatus();
-  } finally {
-    setBusy(false);
-  }
-});
-
-lockRefreshBtn.addEventListener("click", async () => {
-  setBusy(true);
-  try {
-    await refreshLockStatus();
-  } finally {
-    setBusy(false);
-  }
-});
-
-lockEnableBtn.addEventListener("click", async () => {
-  setBusy(true);
-  try {
-    const res = await nirDesktop.enableAppLock(lockPin.value || "");
-    if (!res.ok) {
-      printResult("Enable app lock failed", { stderr: res.error || "Unknown error." });
-      return;
-    }
-    printResult("Enable app lock", { stdout: "App lock enabled." });
-    lockPin.value = "";
-    await refreshLockStatus();
-  } finally {
-    setBusy(false);
-  }
-});
-
-lockDisableBtn.addEventListener("click", async () => {
-  setBusy(true);
-  try {
-    const res = await nirDesktop.disableAppLock(lockPin.value || "");
-    if (!res.ok) {
-      printResult("Disable app lock failed", { stderr: res.error || "Unknown error." });
-      return;
-    }
-    printResult("Disable app lock", { stdout: "App lock disabled." });
-    lockPin.value = "";
-    await refreshLockStatus();
-  } finally {
-    setBusy(false);
-  }
-});
-
-lockUnlockBtn.addEventListener("click", async () => {
-  setBusy(true);
-  try {
-    const res = await nirDesktop.unlockApp(lockPin.value || "");
-    if (!res.ok) {
-      printResult("Unlock app failed", { stderr: res.error || "Invalid PIN." });
-      return;
-    }
-    printResult("Unlock app", { stdout: "App unlocked for sensitive actions." });
-    lockPin.value = "";
-    await refreshLockStatus();
-  } finally {
-    setBusy(false);
-  }
-});
-
-lockNowBtn.addEventListener("click", async () => {
-  setBusy(true);
-  try {
-    const res = await nirDesktop.lockNow();
-    if (!res.ok) {
-      printResult("Lock now failed", { stderr: res.error || "Unknown error." });
-      return;
-    }
-    printResult("Lock now", { stdout: "App lock engaged." });
-    await refreshLockStatus();
-  } finally {
-    setBusy(false);
-  }
-});
-
-autoOpenChk.addEventListener("change", async () => {
-  try {
-    const next = await nirDesktop.updateDesktopSettings({
-      autoOpenOnStart: autoOpenChk.checked,
-    });
-    printResult("Settings updated", { stdout: `autoOpenOnStart=${next.autoOpenOnStart}` });
-  } catch (e) {
-    printResult("Settings update failed", { stderr: String(e) });
-  }
+    await Promise.all([
+      refreshStatus(), refreshLicenseStatus(),
+      refreshLockStatus(), refreshVaultStatus(), refreshPaths(),
+    ]);
+  } finally { setBusy(false); }
 });
 
 preflightBtn.addEventListener("click", async () => {
   setBusy(true);
+  preflightOut.textContent = "Running…";
+  preflightOut.classList.add("visible");
   try {
     const result = await nirDesktop.runPreflight();
     preflightOut.textContent = JSON.stringify(result, null, 2);
-    printResult("Preflight", {
-      stdout: result.ok ? "Preflight passed." : "Preflight completed with warnings.",
-      stderr: result.warnings && result.warnings.length ? result.warnings.join("\n") : "",
-    });
+    showToast(result.ok ? "Preflight passed." : "Preflight completed with warnings.", result.ok ? "ok" : "neutral");
   } catch (e) {
-    printResult("Preflight failed", { stderr: String(e) });
-  } finally {
-    setBusy(false);
-  }
+    preflightOut.textContent = String(e);
+    showToast("Preflight failed.", "err");
+  } finally { setBusy(false); }
 });
 
 diagBtn.addEventListener("click", async () => {
@@ -329,145 +238,135 @@ diagBtn.addEventListener("click", async () => {
   try {
     const res = await nirDesktop.exportDiagnostics();
     if (res.ok) {
-      printResult("Diagnostics exported", { stdout: res.path });
+      showToast(`Diagnostics exported: ${res.path}`, "ok");
     } else {
-      printResult("Diagnostics export failed", { stderr: JSON.stringify(res) });
+      showToast("Diagnostics export failed.", "err");
     }
   } catch (e) {
-    printResult("Diagnostics export failed", { stderr: String(e) });
-  } finally {
-    setBusy(false);
-  }
+    showToast(String(e), "err");
+  } finally { setBusy(false); }
 });
 
 licenseRefreshBtn.addEventListener("click", async () => {
   setBusy(true);
-  try {
-    await refreshLicenseStatus();
-  } finally {
-    setBusy(false);
-  }
+  try { await refreshLicenseStatus(); } finally { setBusy(false); }
 });
 
 licenseImportFileBtn.addEventListener("click", async () => {
   setBusy(true);
   try {
     const res = await nirDesktop.importLicenseFile();
-    if (!res.ok) {
-      printResult("License import file failed", { stderr: res.error || "Import failed" });
-    } else {
-      printResult("License import file", { stdout: "Imported license file successfully." });
-      await refreshLicenseStatus();
-    }
-  } finally {
-    setBusy(false);
-  }
+    if (!res.ok) { showToast(res.error || "Import failed.", "err"); return; }
+    showToast("License imported successfully.", "ok");
+    await refreshLicenseStatus();
+  } finally { setBusy(false); }
 });
 
 licenseImportTextBtn.addEventListener("click", async () => {
   setBusy(true);
   try {
     const res = await nirDesktop.importLicenseText(licenseText.value || "");
-    if (!res.ok) {
-      printResult("License import text failed", { stderr: res.error || "Import failed" });
-    } else {
-      printResult("License import text", { stdout: "Imported license text successfully." });
-      await refreshLicenseStatus();
-    }
-  } finally {
-    setBusy(false);
-  }
+    if (!res.ok) { showToast(res.error || "Import failed.", "err"); return; }
+    showToast("License imported successfully.", "ok");
+    licenseText.value = "";
+    await refreshLicenseStatus();
+  } finally { setBusy(false); }
 });
 
-vaultStatusBtn.addEventListener("click", async () => {
+lockEnableBtn.addEventListener("click", async () => {
   setBusy(true);
   try {
-    await refreshVaultStatus();
-  } finally {
-    setBusy(false);
-  }
+    const res = await nirDesktop.enableAppLock(lockPin.value || "");
+    if (!res.ok) { showToast(res.error || "Failed to enable lock.", "err"); return; }
+    showToast("App lock enabled.", "ok");
+    lockPin.value = "";
+    await refreshLockStatus();
+  } finally { setBusy(false); }
+});
+
+lockDisableBtn.addEventListener("click", async () => {
+  setBusy(true);
+  try {
+    const res = await nirDesktop.disableAppLock(lockPin.value || "");
+    if (!res.ok) { showToast(res.error || "Failed to disable lock.", "err"); return; }
+    showToast("App lock disabled.", "ok");
+    lockPin.value = "";
+    await refreshLockStatus();
+  } finally { setBusy(false); }
+});
+
+lockUnlockBtn.addEventListener("click", async () => {
+  setBusy(true);
+  try {
+    const res = await nirDesktop.unlockApp(lockPin.value || "");
+    if (!res.ok) { showToast(res.error || "Invalid PIN.", "err"); return; }
+    showToast("App unlocked.", "ok");
+    lockPin.value = "";
+    await refreshLockStatus();
+  } finally { setBusy(false); }
+});
+
+lockNowBtn.addEventListener("click", async () => {
+  setBusy(true);
+  try {
+    const res = await nirDesktop.lockNow();
+    if (!res.ok) { showToast(res.error || "Lock failed.", "err"); return; }
+    showToast("App locked.", "ok");
+    await refreshLockStatus();
+  } finally { setBusy(false); }
 });
 
 saveSecretBtn.addEventListener("click", async () => {
   setBusy(true);
   try {
     const key = (secretKey.value || "").trim();
-    const keyErr = validateNamespacedSecretKey(key);
-    if (keyErr) {
-      printResult("Save secret failed", { stderr: keyErr });
-      return;
-    }
+    const err = validateNamespacedSecretKey(key);
+    if (err) { showToast(err, "err"); return; }
     const res = await nirDesktop.saveSecret(key, secretValue.value || "");
-    if (!res.ok) {
-      printResult("Save secret failed", { stderr: res.error || "Unknown error." });
-      return;
-    }
-    printResult("Save secret", { stdout: `Saved using backend: ${res.backend}` });
+    if (!res.ok) { showToast(res.error || "Save failed.", "err"); return; }
+    showToast(`Saved via ${res.backend}.`, "ok");
     await refreshVaultStatus();
-  } finally {
-    setBusy(false);
-  }
+  } finally { setBusy(false); }
 });
 
 loadSecretBtn.addEventListener("click", async () => {
   setBusy(true);
   try {
     const key = (secretKey.value || "").trim();
-    const keyErr = validateNamespacedSecretKey(key);
-    if (keyErr) {
-      printResult("Load secret failed", { stderr: keyErr });
-      return;
-    }
+    const err = validateNamespacedSecretKey(key);
+    if (err) { showToast(err, "err"); return; }
     const res = await nirDesktop.loadSecret(key);
-    if (!res.ok) {
-      printResult("Load secret failed", { stderr: res.error || "Unknown error." });
-      return;
-    }
-    if (res.value === null || res.value === "") {
-      printResult("Load secret", { stdout: "No value found for key." });
-      return;
-    }
+    if (!res.ok) { showToast(res.error || "Load failed.", "err"); return; }
+    if (res.value === null || res.value === "") { showToast("No value found for key.", "neutral"); return; }
     secretValue.value = res.value;
-    printResult("Load secret", { stdout: `Loaded using backend: ${res.backend}` });
-  } finally {
-    setBusy(false);
-  }
+    showToast("Secret loaded.", "ok");
+  } finally { setBusy(false); }
 });
 
 deleteSecretBtn.addEventListener("click", async () => {
   setBusy(true);
   try {
     const key = (secretKey.value || "").trim();
-    const keyErr = validateNamespacedSecretKey(key);
-    if (keyErr) {
-      printResult("Delete secret failed", { stderr: keyErr });
-      return;
-    }
+    const err = validateNamespacedSecretKey(key);
+    if (err) { showToast(err, "err"); return; }
     const res = await nirDesktop.deleteSecret(key);
-    if (!res.ok) {
-      printResult("Delete secret failed", { stderr: res.error || "Unknown error." });
-      return;
-    }
+    if (!res.ok) { showToast(res.error || "Delete failed.", "err"); return; }
     secretValue.value = "";
-    printResult("Delete secret", { stdout: `Deleted using backend: ${res.backend}` });
-  } finally {
-    setBusy(false);
-  }
+    showToast("Secret deleted.", "ok");
+  } finally { setBusy(false); }
 });
 
 secretPreset.addEventListener("change", () => {
-  if (secretPreset.value) {
-    secretKey.value = secretPreset.value;
-  }
+  if (secretPreset.value) secretKey.value = secretPreset.value;
 });
 
+// ── Init ──────────────────────────────────────────────────────────────────────
 Promise.all([
   refreshStatus(),
-  refreshSettings(),
-  refreshPaths(),
   refreshLicenseStatus(),
-  refreshVaultStatus(),
   refreshLockStatus(),
+  refreshVaultStatus(),
+  refreshPaths(),
 ]).catch((e) => {
-  printResult("Desktop init failed", { stderr: String(e) });
+  showToast("Initialisation error: " + String(e), "err");
 });
