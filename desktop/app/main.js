@@ -35,22 +35,25 @@ async function openNirInMainWindow() {
 }
 
 function buildAppMenu() {
+  const isMac = process.platform === "darwin";
   const template = [
+    ...(isMac ? [{ role: "appMenu" }] : []),
     {
-      label: "NIR Desktop",
+      label: "NeuroInsight Research",
       submenu: [
         {
-          label: "Control Center",
-          click: () => openControlCenter(),
-        },
-        {
           label: "Open NIR",
-          click: async () => {
-            await openNirInMainWindow();
-          },
+          accelerator: isMac ? "Cmd+Shift+N" : "Ctrl+Shift+N",
+          click: async () => { await openNirInMainWindow(); },
         },
         { type: "separator" },
-        { role: "quit" },
+        {
+          label: "Control Center",
+          accelerator: isMac ? "Cmd+Shift+C" : "Ctrl+Shift+C",
+          click: () => openControlCenter(),
+        },
+        { type: "separator" },
+        ...(!isMac ? [{ role: "quit" }] : []),
       ],
     },
     {
@@ -63,6 +66,7 @@ function buildAppMenu() {
         { role: "resetZoom" },
         { role: "zoomIn" },
         { role: "zoomOut" },
+        { role: "togglefullscreen" },
       ],
     },
   ];

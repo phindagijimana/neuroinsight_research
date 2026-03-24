@@ -2,7 +2,7 @@
   "name": "nir-desktop-app",
   "version": "0.1.0",
   "private": true,
-  "description": "NIR Desktop Electron shell",
+  "description": "NeuroInsight Research desktop application",
   "homepage": "https://github.com/phindagijimana/neuroinsight_research",
   "author": {
     "name": "NeuroInsight Research Team",
@@ -26,7 +26,7 @@
   },
   "build": {
     "appId": "com.neuroinsight.desktop",
-    "productName": "NeuroInsight Research Desktop",
+    "productName": "NeuroInsight Research",
     "asar": true,
     "artifactName": "nir-desktop-${version}-${os}-${arch}.${ext}",
     "directories": {
