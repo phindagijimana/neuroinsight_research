@@ -35,6 +35,15 @@ celery_app.conf.beat_schedule = {
 logger = logging.getLogger(__name__)
 
 # Allowed Docker image prefixes for neuroimaging plugins
+class WorkflowJobFatal(Exception):
+    """Non-retryable workflow validation/setup error (maps to Celery Reject)."""
+
+
+def _params_for_shell_template(resolved: dict) -> dict:
+    """Keys like _workflow_steps must not be substituted into shell command templates."""
+    return {k: v for k, v in resolved.items() if not str(k).startswith("_")}
+
+
 ALLOWED_IMAGE_PREFIXES = (
     "freesurfer/freesurfer",
     "deepmi/fastsurfer",
@@ -157,6 +166,15 @@ def _resolve_parameters(spec_dict: dict) -> dict:
                     resolved[inp_key] = inp_default
     except Exception as e:
         logger.debug(f"Could not load plugin defaults for {plugin_id}: {e}")
+
+    # Infer subject_id from BIDS-style paths (sub-XXXX) when unset — same idea as SLURM/remote backends.
+    _sid = resolved.get("subject_id")
+    if (not _sid or not str(_sid).strip()) and input_files:
+        for f in input_files:
+            m = re.search(r"(sub-[a-zA-Z0-9]+)", str(f))
+            if m:
+                resolved["subject_id"] = m.group(1)
+                break
 
     # Auto-set input file path if not already provided
     if input_files and "input_file" not in resolved:
@@ -287,6 +305,21 @@ def _prepare_volumes(spec_dict: dict, output_dir: Path) -> dict:
             volumes[meld_license_path] = {"bind": "/run/secrets/meld_license.txt", "mode": "ro"}
     except Exception as e:
         logger.warning("Could not resolve license paths: %s", e)
+
+    if plugin_id == "forward_model":
+        fm = output_dir / "native" / "forward_merge"
+        if fm.is_dir():
+            volumes[str(fm.resolve())] = {
+                "bind": "/data/inputs/forward_merge",
+                "mode": "rw",
+            }
+    elif plugin_id == "source_localization":
+        sm = output_dir / "native" / "source_merge"
+        if sm.is_dir():
+            volumes[str(sm.resolve())] = {
+                "bind": "/data/inputs/source_merge",
+                "mode": "rw",
+            }
 
     return volumes
 
@@ -456,7 +489,7 @@ def run_docker_job(self, job_id: str, spec_dict: dict) -> dict:
         if command_template:
             # Substitute parameters into command template with shell-safe escaping
             command = command_template
-            for key, value in resolved_params.items():
+            for key, value in _params_for_shell_template(resolved_params).items():
                 safe_value = _sanitize_param(str(value))
                 command = command.replace(f"{{{key}}}", safe_value)
                 command = command.replace(f"${{{key}}}", safe_value)
@@ -836,28 +869,12 @@ def _run_single_container(
             logger.debug("Could not remove container %s: %s", label, e)
 
 
-@shared_task(
-    bind=True,
-    name="backend.execution.celery_tasks.run_workflow_job",
-    acks_late=True,
-    reject_on_worker_lost=True,
-    max_retries=0,
-)
-def run_workflow_job(self, job_id: str, spec_dict: dict) -> dict:
-    """Execute a multi-step workflow by chaining plugin containers.
+def execute_workflow_job_impl(celery_task, job_id: str, spec_dict: dict) -> dict:
+    """Run a multi-step workflow synchronously.
 
-    Each step in the workflow runs its own Docker container. The output
-    directory of step N becomes available as input to step N+1.
-
-    Args:
-        job_id: Pre-generated UUID
-        spec_dict: Serialised JobSpec with _workflow_steps in parameters
-
-    Returns:
-        dict with status, exit_code, output_dir
+    celery_task: Celery task instance (for progress state), or None when running
+    in a local thread without a broker (e.g. Celery unavailable).
     """
-    from celery.exceptions import Reject
-
     data_dir = Path(spec_dict.get("data_dir", "./data")).resolve()
     output_dir = data_dir / "outputs" / job_id
 
@@ -879,13 +896,14 @@ def run_workflow_job(self, job_id: str, spec_dict: dict) -> dict:
 
     now = datetime.utcnow()
     _sync_job_to_db(job_id, "running", started_at=now, progress=1, current_phase="Preparing workflow")
-    self.update_state(state="RUNNING", meta={"started_at": now.isoformat(), "progress": 1})
+    if celery_task:
+        celery_task.update_state(state="RUNNING", meta={"started_at": now.isoformat(), "progress": 1})
 
     # Get workflow steps (plugin IDs)
     workflow_steps = spec_dict.get("parameters", {}).get("_workflow_steps", [])
     if not workflow_steps:
         _sync_job_to_db(job_id, "failed", error_message="No workflow steps defined")
-        raise Reject("No workflow steps defined", requeue=False)
+        raise WorkflowJobFatal("No workflow steps defined")
 
     # Load plugin registry
     try:
@@ -893,7 +911,7 @@ def run_workflow_job(self, job_id: str, spec_dict: dict) -> dict:
         registry = get_plugin_workflow_registry()
     except Exception as e:
         _sync_job_to_db(job_id, "failed", error_message=f"Failed to load plugin registry: {e}")
-        raise Reject(str(e), requeue=False)
+        raise WorkflowJobFatal(str(e)) from e
 
     # Validate all steps
     for step_id in workflow_steps:
@@ -901,11 +919,11 @@ def run_workflow_job(self, job_id: str, spec_dict: dict) -> dict:
         if not plugin:
             msg = f"Workflow step references unknown plugin: {step_id}"
             _sync_job_to_db(job_id, "failed", error_message=msg)
-            raise Reject(msg, requeue=False)
+            raise WorkflowJobFatal(msg)
         if not _validate_image(plugin.container_image):
             msg = f"Image '{plugin.container_image}' not in allow list"
             _sync_job_to_db(job_id, "failed", error_message=msg)
-            raise Reject(msg, requeue=False)
+            raise WorkflowJobFatal(msg)
 
     # Validate initial inputs
     input_files = spec_dict.get("input_files", [])
@@ -913,14 +931,15 @@ def run_workflow_job(self, job_id: str, spec_dict: dict) -> dict:
         if isinstance(inp, str) and not Path(inp).exists():
             msg = f"Input file not found: {inp}"
             _sync_job_to_db(job_id, "failed", error_message=msg)
-            raise Reject(msg, requeue=False)
+            raise WorkflowJobFatal(msg)
 
     total_steps = len(workflow_steps)
     resources_spec = spec_dict.get("resources", {})
 
     def update_fn(progress: int, phase: str):
         _update_progress(job_id, progress, phase)
-        self.update_state(state="RUNNING", meta={"progress": progress, "current_phase": phase})
+        if celery_task:
+            celery_task.update_state(state="RUNNING", meta={"progress": progress, "current_phase": phase})
 
     # Keep original user-supplied inputs so later steps can access files
     # that aren't produced by earlier steps (e.g. T2w scan for step 2).
@@ -954,6 +973,15 @@ def run_workflow_job(self, job_id: str, spec_dict: dict) -> dict:
         # Resolve parameters for this step
         resolved_params = _resolve_parameters(step_spec)
 
+        if step_plugin_id == "forward_model":
+            from backend.execution.workflow_merge import ensure_multimodal_forward_merge
+
+            ensure_multimodal_forward_merge(Path(output_dir), original_input_files)
+        elif step_plugin_id == "source_localization":
+            from backend.execution.workflow_merge import ensure_multimodal_source_merge
+
+            ensure_multimodal_source_merge(Path(output_dir))
+
         # Prepare volumes
         volumes = _prepare_volumes(step_spec, output_dir)
 
@@ -961,10 +989,18 @@ def run_workflow_job(self, job_id: str, spec_dict: dict) -> dict:
         command = None
         if cmd_template:
             command = cmd_template
-            for key, value in resolved_params.items():
+            for key, value in _params_for_shell_template(resolved_params).items():
                 safe_value = _sanitize_param(str(value))
                 command = command.replace(f"{{{key}}}", safe_value)
                 command = command.replace(f"${{{key}}}", safe_value)
+            wf_id = spec_dict.get("parameters", {}).get("_workflow_id") or spec_dict.get("workflow_id")
+            command = apply_workflow_nir_input_root_command_overrides(
+                workflow_steps=workflow_steps,
+                step_idx=step_idx,
+                step_plugin_id=step_plugin_id,
+                wf_id=wf_id,
+                cmd_script=command,
+            )
 
         # Load milestones for this plugin
         try:
@@ -1049,6 +1085,23 @@ def run_workflow_job(self, job_id: str, spec_dict: dict) -> dict:
         logger.warning(f"Stats CSV generation failed for workflow {job_id[:8]}: {e}")
 
     return {"status": "completed", "exit_code": 0, "output_dir": str(output_dir)}
+
+
+@shared_task(
+    bind=True,
+    name="backend.execution.celery_tasks.run_workflow_job",
+    acks_late=True,
+    reject_on_worker_lost=True,
+    max_retries=0,
+)
+def run_workflow_job(self, job_id: str, spec_dict: dict) -> dict:
+    """Celery entry: multi-step workflow (delegates to execute_workflow_job_impl)."""
+    from celery.exceptions import Reject
+
+    try:
+        return execute_workflow_job_impl(self, job_id, spec_dict)
+    except WorkflowJobFatal as e:
+        raise Reject(str(e), requeue=False) from e
 
 
 def _upload_outputs_to_minio(job_id: str, output_dir: Path) -> None:

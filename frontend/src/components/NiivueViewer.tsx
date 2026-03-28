@@ -11,6 +11,8 @@ interface NiivueViewerProps {
   segmentationUrl?: string;
   pipelineName?: string;
   onLoad?: () => void;
+  /** Canvas height in pixels (default 600; use smaller in EEG+Brain layout). */
+  canvasHeightPx?: number;
 }
 
 const isHippocampalPipeline = (name?: string): boolean => {
@@ -23,7 +25,8 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
   imageUrl,
   segmentationUrl,
   pipelineName,
-  onLoad
+  onLoad,
+  canvasHeightPx = 600,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const nvRef = useRef<Niivue | null>(null);
@@ -266,13 +269,19 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
       </div>
 
       {/* Canvas */}
-      <div className="relative bg-black rounded-lg overflow-hidden" style={{ height: '600px' }}>
+      <div
+        className="relative bg-black rounded-lg overflow-hidden"
+        style={{ height: `${canvasHeightPx}px` }}
+      >
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-10">
             <div className="text-white text-lg">Loading volumes...</div>
           </div>
         )}
-        <canvas ref={canvasRef} style={{ width: '100%', height: '600px' }} />
+        <canvas
+          ref={canvasRef}
+          style={{ width: '100%', height: `${canvasHeightPx}px` }}
+        />
       </div>
 
       {/* Instructions */}

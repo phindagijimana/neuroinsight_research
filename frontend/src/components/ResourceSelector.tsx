@@ -174,7 +174,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
   /*  RENDER                                                                 */
   /* ----------------------------------------------------------------------- */
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 h-full flex flex-col gap-4">
+    <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 h-full flex flex-col gap-4 shadow-sm">
       {/* Header + customize toggle */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
@@ -327,12 +327,6 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
                 : 'Job will request GPU access on the remote server.'}
             </p>
           )}
-          {para?.gpu_optional && limits.gpuAvail && !resources.gpu && (
-            <p className="text-[10px] text-navy-500 -mt-1 ml-1">
-              This plugin supports GPU acceleration for faster processing.
-            </p>
-          )}
-
           {/* -- Advanced: Parallelization ----------------------------- */}
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}

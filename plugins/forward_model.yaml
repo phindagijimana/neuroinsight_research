@@ -1,0 +1,67 @@
+# Plugin: Forward model / lead field (MNE)
+id: forward_model
+name: "EEG Forward Model"
+version: "1.0.0"
+type: plugin
+domain: eeg_imaging
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "EEG Forward Model"
+
+description: >
+  Computes MNE forward solution from cleaned EEG info, head↔MRI transform,
+  and optional source space + BEM under models/. If those files are absent,
+  uses a reproducible sphere BEM + volume source grid (logged WARNING).
+
+authors:
+  - "NeuroInsight Research Team"
+
+references:
+  - "https://mne.tools/stable/auto_tutorials/forward/"
+
+container:
+  runtime: docker
+  image: "phindagijimana321/eeg-forward-model-mne:1.0.7"
+  digest: "sha256:6af86dbaa70ad704f4c1df5e4766f280a71ec16dc49cb147a916f707368c675b"
+
+inputs:
+  required: []
+  optional: []
+
+input_format:
+  format_name: "FIF + trans + src + BEM"
+  description: "See eeg/docker/README.md (forward model inputs)."
+
+parameters: []
+
+resources:
+  profiles:
+    default:
+      cpus: 4
+      mem_gb: 16
+      time_hours: 4
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/forward_model"
+    logs_dir: "{run_root}/logs/forward_model"
+  stages:
+    - id: forward
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+        export NIR_INPUT_ROOT=/data/inputs
+        export NIR_OUTPUT_ROOT=/data/outputs/native/forward_model
+        mkdir -p "$NIR_OUTPUT_ROOT" /data/outputs/logs/forward_model
+        python /app/run.py
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true

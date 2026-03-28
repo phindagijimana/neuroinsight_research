@@ -5,7 +5,7 @@
  * Combines file upload/directory selection with job list
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { FileUpload } from '../components/FileUpload';
 import { apiService } from '../services/api';
 import type { Job } from '../types';
@@ -18,9 +18,12 @@ import Trash2 from '../components/icons/Trash2';
 import Eye from '../components/icons/Eye';
 import JobProgressBar from '../components/JobProgressBar';
 import SlurmQueueMonitor from '../components/SlurmQueueMonitor';
+import type { ViewerTab } from '../utils/viewerQuery';
+
+const SAMPLE_VIEWER_TABS: ViewerTab[] = ['eeg', 'imaging', 'eeg-brain'];
 
 interface JobsPageProps {
-  setActivePage: (page: string) => void;
+  setActivePage: (page: string, opts?: { viewerTab?: ViewerTab }) => void;
   setSelectedJobId: (jobId: string) => void;
 }
 
@@ -175,6 +178,27 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
     setActivePage('dashboard');
   };
 
+  const openSampleInViewer = (job: Job, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const hint = job.parameters?._sample_viewer_tab as string | undefined;
+    const tab =
+      hint && SAMPLE_VIEWER_TABS.includes(hint as ViewerTab)
+        ? (hint as ViewerTab)
+        : 'imaging';
+    setSelectedJobId(job.id);
+    setActivePage('viewer', { viewerTab: tab });
+  };
+
+  const sortedJobs = useMemo(() => {
+    return [...jobs].sort((a, b) => {
+      const as = a.is_sample_job ? 1 : 0;
+      const bs = b.is_sample_job ? 1 : 0;
+      return bs - as;
+    });
+  }, [jobs]);
+
+  const hasSampleJobs = useMemo(() => jobs.some((j) => j.is_sample_job), [jobs]);
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
@@ -224,38 +248,32 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-navy-50 to-white">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Upload Section */}
-        <div className="mb-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50/90 to-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-8">
+        {/* Submit jobs — single surface above metrics */}
+        <div className="relative z-10 mb-6 md:mb-8">
           <FileUpload
             onJobsSubmitted={handleJobsSubmitted}
             onBack={() => setActivePage('home')}
           />
         </div>
 
-        {/* Statistics */}
+        {/* Statistics — one quiet strip */}
         {stats.total > 0 && (
-          <div className="mb-6 grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="bg-white rounded-lg shadow p-4 border-l-4 border-navy-400">
-              <div className="text-2xl font-bold text-navy-700">{stats.total}</div>
-              <div className="text-sm text-navy-500">Total Jobs</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4 border-l-4 border-navy-300">
-              <div className="text-2xl font-bold text-navy-600">{stats.pending}</div>
-              <div className="text-sm text-navy-400">Pending</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4 border-l-4 border-[#003d7a]">
-              <div className="text-2xl font-bold text-[#003d7a]">{stats.running}</div>
-              <div className="text-sm text-navy-500">Running</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
-              <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-              <div className="text-sm text-gray-600">Completed</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4 border-l-4 border-red-400">
-              <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
-              <div className="text-sm text-gray-600">Failed</div>
+          <div className="mb-6 rounded-2xl border border-gray-200/90 bg-white/90 px-4 py-3.5 shadow-sm backdrop-blur-sm sm:px-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-6">
+              {[
+                { label: 'Total', value: stats.total, valueClass: 'text-gray-900' },
+                { label: 'Pending', value: stats.pending, valueClass: 'text-slate-600' },
+                { label: 'Running', value: stats.running, valueClass: 'text-[#003d7a]' },
+                { label: 'Completed', value: stats.completed, valueClass: 'text-emerald-700' },
+                { label: 'Failed', value: stats.failed, valueClass: 'text-red-600' },
+              ].map((s) => (
+                <div key={s.label} className="flex min-w-[4.5rem] items-baseline gap-2">
+                  <span className={`text-lg font-semibold tabular-nums ${s.valueClass}`}>{s.value}</span>
+                  <span className="text-xs font-medium uppercase tracking-wide text-gray-400">{s.label}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -265,29 +283,40 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
           <SlurmQueueMonitor visible={true} />
         </div>
 
+        {hasSampleJobs && (
+          <div className="mb-6 rounded-xl border border-emerald-100/80 bg-emerald-50/50 px-4 py-3 sm:px-5 sm:py-3.5">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-800/90">Sample EEG demos</h3>
+            <p className="text-sm text-emerald-900/85 mt-1 leading-relaxed">
+              Synthetic data jobs below open the Viewer: <span className="font-medium">EEG preprocessing</span> → Signal View;{' '}
+              <span className="font-medium">EEG source localization</span> → Multimodal View.
+            </p>
+          </div>
+        )}
+
         {/* Jobs List */}
-        <div className="bg-white rounded-xl shadow-lg border border-navy-100">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="rounded-2xl border border-gray-200/90 bg-white shadow-sm">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Overview of All Processing Jobs</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                {lastRefreshTime && `Last updated: ${formatDate(lastRefreshTime.toISOString())}`}
-              </p>
-              <p className="text-xs text-navy-600 mt-1">
-                Click on a completed job to view detailed results in Dashboard
+              <h2 className="text-lg font-semibold text-gray-900 tracking-tight">Jobs</h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {lastRefreshTime ? (
+                  <>Updated {formatDate(lastRefreshTime.toISOString())} · completed jobs open in Dashboard</>
+                ) : (
+                  'Completed jobs open in Dashboard'
+                )}
               </p>
             </div>
             <button
               onClick={() => fetchJobs(true)}
               disabled={isRefreshing}
-              className="px-4 py-2 bg-[#003d7a] text-white rounded-md hover:bg-[#002b55] disabled:opacity-50 text-sm font-medium"
+              className="shrink-0 px-4 py-2 rounded-lg bg-[#003d7a] text-white text-sm font-medium hover:bg-[#002b55] disabled:opacity-50 transition-colors"
             >
               {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </button>
           </div>
 
           {jobsLoading ? (
-            <div className="px-6 py-12 text-center">
+            <div className="px-4 sm:px-6 py-12 text-center">
               <div className="animate-spin h-8 w-8 border-4 border-[#003d7a] border-t-transparent rounded-full mx-auto"></div>
               <p className="text-navy-500 mt-4">Loading jobs...</p>
             </div>
@@ -297,11 +326,11 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
               <p className="text-gray-600">No jobs yet. Process some data to get started!</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
-              {jobs.map((job) => (
+            <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+              {sortedJobs.map((job) => (
                 <div
                   key={job.id}
-                  className="px-6 py-4 hover:bg-gray-50 transition cursor-pointer"
+                  className="px-4 sm:px-6 py-3.5 hover:bg-slate-50/80 transition cursor-pointer"
                   onClick={() => handleViewJob(job.id)}
                 >
                   <div className="flex items-center justify-between">
@@ -313,6 +342,11 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                             <span className="text-sm font-medium text-gray-900">
                               {job.display_name || job.pipeline_name}
                             </span>
+                            {job.is_sample_job && (
+                              <span className="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                Sample
+                              </span>
+                            )}
                             <span className="text-xs px-2 py-0.5 rounded bg-navy-50 text-[#003d7a] border border-navy-200">
                               {job.execution_mode === 'workflow' ? 'Workflow' : 'Plugin'}
                             </span>
@@ -336,7 +370,11 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                             )}
                           </div>
                           <div className="mt-1 text-xs text-gray-500 truncate">
-                            Input: {job.input_files[0] || 'N/A'}
+                            {job.is_sample_job ? (
+                              <span>Bundled synthetic EEG (and toy T1 for the source demo)</span>
+                            ) : (
+                              <>Input: {job.input_files[0] || 'N/A'}</>
+                            )}
                           </div>
                           <div className="text-xs text-gray-400 mt-1">
                             Submitted: {formatDate(job.submitted_at)}
@@ -348,6 +386,14 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                               currentPhase={job.status === 'completed' ? 'Completed' : job.current_phase}
                               status={job.status}
                             />
+                          )}
+                          {job.status === 'failed' && job.error_message && (
+                            <p
+                              className="mt-2 text-xs text-red-800 font-mono line-clamp-4"
+                              title={job.error_message}
+                            >
+                              {job.error_message}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -366,12 +412,21 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                           <Eye className="w-5 h-5" />
                         </button>
                       )}
-                      
+                      {job.status === 'completed' && job.is_sample_job && (
+                        <button
+                          type="button"
+                          onClick={(e) => openSampleInViewer(job, e)}
+                          className="px-2 py-1 text-xs font-medium text-white bg-[#003d7a] rounded-md hover:bg-[#002b55] transition"
+                          title="Open Viewer with the right tab for this sample"
+                        >
+                          Viewer
+                        </button>
+                      )}
                       <button
                         onClick={(e) => handleDeleteJob(job.id, e)}
-                        disabled={deletingJobs.has(job.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition disabled:opacity-50"
-                        title="Delete job"
+                        disabled={deletingJobs.has(job.id) || job.is_sample_job}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition disabled:opacity-40 disabled:pointer-events-none"
+                        title={job.is_sample_job ? 'Sample jobs cannot be deleted' : 'Delete job'}
                       >
                         {deletingJobs.has(job.id) ? (
                           <div className="animate-spin h-5 w-5 border-2 border-gray-400 border-t-transparent rounded-full"></div>

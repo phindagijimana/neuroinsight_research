@@ -1,0 +1,135 @@
+# Workflow: Multimodal Epilepsy Biomarker
+# Full eight-step chain: EEG imaging branch, structural MRI segmentation, ROI fusion, scoring.
+id: multimodal_epilepsy_biomarker
+name: "Multimodal Epilepsy Biomarker"
+version: "1.0.0"
+type: workflow
+domain: eeg_imaging
+
+description: >
+  Combines EEG source localization with FreeSurfer vol-only segmentation,
+  extracts ROI-level multimodal features, and produces biomarker summaries
+  (laterality, concordance, viewer-ready JSON).
+
+developer_contract: >
+  Workflows only orchestrate plugins. T1 for mri_segmentation should be staged
+  as /data/inputs/T1w.nii.gz for the FreeSurfer-based step; EEG/MNE paths follow
+  individual plugin input_format sections.
+
+authors:
+  - "NeuroInsight Research Team"
+
+inputs:
+  required:
+    - key: input_dir
+      type: directory
+      description: >
+        Single staging folder on disk: must contain the EEG layout (default eeg/raw/) and
+        T1w.nii.gz (or symlink) in the same directory. Do not split EEG and MRI across
+        separate parent folders; copy or link both into one run folder before submitting.
+    - key: T1w
+      type: nifti
+      description: >
+        T1-weighted MRI for FreeSurfer vol-only segmentation; must live under the same
+        staging directory as input_dir (submission API enforces one folder).
+  optional:
+    - key: eeg_raw_path
+      type: string
+      default: "eeg/raw"
+    - key: subject_id
+      type: string
+      default: "subject"
+      description: "Subject id for FreeSurfer -s and downstream artifacts."
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license.txt"
+    - key: threads
+      type: int
+      default: 8
+      description: "OpenMP threads for recon-all (mri_segmentation)."
+
+input_format:
+  format_name: "EEG + T1 MRI (+ BEM optional)"
+  description: >
+    Multimodal staging: continuous EEG, T1 NIfTI for segmentation, and inputs
+    required by coregistration/forward/source plugins.
+  example_structure: |
+    run_inputs/
+      eeg/raw/...
+      T1w.nii.gz
+      models/
+        src.fif
+        bem_sol.fif
+      mri/bem/...
+
+validation:
+  preflight_checks:
+    - "directory_exists(input_dir)"
+    - "nifti_readable(T1w)"
+  staging_rule: >
+    All workflow inputs must be under one staging directory (EEG + T1 together).
+
+# Steps run in order (see Celery workflow runner). EEG source branch first,
+# then structural MRI segmentation, then ROI fusion and biomarker scoring.
+steps:
+  - id: eeg_preprocessing
+    uses: eeg_preprocessing
+    with:
+      eeg_raw_path: "{inputs.eeg_raw_path}"
+
+  - id: spike_detection
+    uses: spike_detection
+    depends_on:
+      - eeg_preprocessing
+
+  - id: eeg_mri_coregistration
+    uses: eeg_mri_coregistration
+    depends_on:
+      - spike_detection
+
+  - id: forward_model
+    uses: forward_model
+    depends_on:
+      - eeg_mri_coregistration
+
+  - id: source_localization
+    uses: source_localization
+    depends_on:
+      - forward_model
+
+  - id: mri_segmentation
+    uses: mri_segmentation
+    with:
+      T1w: "{inputs.T1w}"
+      subject_id: "{inputs.subject_id}"
+      fs_license: "{inputs.fs_license}"
+      threads: "{inputs.threads}"
+
+  - id: roi_feature_extraction
+    uses: roi_feature_extraction
+    depends_on:
+      - source_localization
+      - mri_segmentation
+
+  - id: biomarker_scoring
+    uses: biomarker_scoring
+    depends_on:
+      - roi_feature_extraction
+
+outputs:
+  native:
+    - "{run_root}/native/eeg_preprocessing"
+    - "{run_root}/native/spike_detection"
+    - "{run_root}/native/eeg_mri_coregistration"
+    - "{run_root}/native/forward_model"
+    - "{run_root}/native/source_localization"
+    - "{run_root}/native/mri_segmentation"
+    - "{run_root}/native/roi_feature_extraction"
+    - "{run_root}/native/biomarker_scoring"
+  bundle:
+    - "{run_root}/bundle"
+
+reproducibility:
+  pin_containers: true
+  write_run_manifest: true
+  store_exact_commands: true

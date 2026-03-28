@@ -1,0 +1,63 @@
+# Plugin: ROI feature extraction (multimodal fusion)
+id: roi_feature_extraction
+name: "ROI Feature Extraction"
+version: "1.0.0"
+type: plugin
+domain: eeg_imaging
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "ROI Feature Extraction"
+
+description: >
+  Maps source NIfTI and segmentation label volumes into per-ROI features
+  (source intensity, structural volumes, concordance block).
+
+authors:
+  - "NeuroInsight Research Team"
+
+container:
+  runtime: docker
+  image: "phindagijimana321/eeg-roi-feature-extraction:1.0.0"
+  digest: "sha256:445aebca1f0ca8e1d858354e6ce18d6aa7626b1a042ba68e98e3295a2afb3eb0"
+
+inputs:
+  required: []
+  optional: []
+
+input_format:
+  format_name: "NIfTI + labels + roi_definitions.json"
+  description: "source/source_map.nii.gz, segmentation/region_labels.nii.gz, metadata/roi_definitions.json"
+
+parameters: []
+
+resources:
+  profiles:
+    default:
+      cpus: 2
+      mem_gb: 8
+      time_hours: 1
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/roi_feature_extraction"
+    logs_dir: "{run_root}/logs/roi_feature_extraction"
+  stages:
+    - id: extract
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+        export NIR_INPUT_ROOT=/data/inputs
+        export NIR_OUTPUT_ROOT=/data/outputs/native/roi_feature_extraction
+        mkdir -p "$NIR_OUTPUT_ROOT" /data/outputs/logs/roi_feature_extraction
+        python /app/run.py
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true

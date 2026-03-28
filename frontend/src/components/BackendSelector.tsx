@@ -275,7 +275,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
   const backendTabs = TABS.filter(t => t.backendId);
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 h-full flex flex-col">
+    <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 h-full flex flex-col shadow-sm">
 
       {/* Row 1: Data Source -- all 5 options */}
       {showPlatformTabs && (
@@ -369,9 +369,6 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
               <Server className="h-3.5 w-3.5" />
               SSH Connection
             </h4>
-            <p className="text-xs text-gray-500">
-              Uses SSH agent authentication (<code className="text-xs bg-gray-100 px-1 rounded">ssh-add -l</code>)
-            </p>
           </div>
 
           <div className="space-y-3">
@@ -501,45 +498,13 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
                   >
                     {isSwitching ? (<><Loader2 className="h-4 w-4 animate-spin" />Activating...</>) : (
                       <>{selectedBackend === 'remote_hpc' ? <Server className="h-4 w-4" /> : <Cloud className="h-4 w-4" />}
-                        {selectedBackend === 'remote_hpc' ? 'Activate SLURM Backend' : 'Activate Remote Docker'}</>
+                        {selectedBackend === 'remote_hpc' ? 'Activate SLURM' : 'Activate Remote'}</>
                     )}
                   </button>
                 )}
               </>
             )}
           </div>
-
-          <div className="mt-3 p-2 bg-navy-50 border border-navy-200 rounded">
-            <p className="text-xs text-navy-700">
-              <strong>Note:</strong> Uses SSH agent (no password). Load keys: <code className="bg-navy-100 px-1 rounded">ssh-add ~/.ssh/id_rsa</code>
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Cross-system info: data and compute on different systems */}
-      {!isPlatformSelected && dataSource !== 'local' && selectedBackend === 'local' && dataSourceNeedsSSH && (
-        <div className="mt-2 p-2 bg-navy-50 border border-navy-200 rounded">
-          <p className="text-xs text-navy-700">
-            <strong>Note:</strong> Data is on a remote host but compute is local.
-            Input paths must be accessible from this machine (e.g. NFS mount) or files will be downloaded before processing.
-          </p>
-        </div>
-      )}
-      {!isPlatformSelected && dataSource === 'local' && computeNeedsSSH && (
-        <div className="mt-2 p-2 bg-navy-50 border border-navy-200 rounded">
-          <p className="text-xs text-navy-700">
-            <strong>Note:</strong> Data is local but compute is remote.
-            Input files will be uploaded to the remote host before processing.
-          </p>
-        </div>
-      )}
-      {!isPlatformSelected && dataSourceNeedsSSH && computeNeedsSSH && dataSource !== (selectedBackend === 'remote_hpc' ? 'hpc' : 'remote') && (
-        <div className="mt-2 p-2 bg-navy-50 border border-navy-200 rounded">
-          <p className="text-xs text-navy-700">
-            <strong>Note:</strong> Data source and compute are on different remote systems.
-            The SSH connection is shared &mdash; input paths must be accessible from the compute server (e.g. shared NFS filesystem).
-          </p>
         </div>
       )}
 

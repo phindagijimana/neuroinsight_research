@@ -194,6 +194,12 @@
 
 import { useState, lazy, Suspense } from 'react';
 import Navigation from './components/Navigation';
+import {
+  clearViewerQueryParam,
+  setViewerQueryParam,
+  shouldOpenViewerFromUrl,
+  type ViewerTab,
+} from './utils/viewerQuery';
 
 // Page type definition for type-safe navigation -- exported for child components
 export type Page = 'home' | 'jobs' | 'dashboard' | 'viewer' | 'transfer' | 'docs';
@@ -206,12 +212,28 @@ const ViewerPage = lazy(() => import('./pages/ViewerPage'));
 const TransferPage = lazy(() => import('./pages/TransferPage'));
 const DocsPage = lazy(() => import('./pages/DocsPage'));
 
-function App() {
-  const [activePage, setActivePage] = useState<Page>('home');
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+type NavigateOptions = { viewerTab?: ViewerTab };
 
-  // Type-safe page setter that child components can use
-  const navigateTo = (page: string) => setActivePage(page as Page);
+function App() {
+  const [activePage, setActivePage] = useState<Page>(() => {
+    if (typeof window === 'undefined') return 'home';
+    return shouldOpenViewerFromUrl(window.location.search) ? 'viewer' : 'home';
+  });
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  /** Bumps when navigating to Viewer so the page re-reads `?viewer=` (e.g. header while already on Viewer). */
+  const [viewerNavEpoch, setViewerNavEpoch] = useState(0);
+
+  /** Updates URL `?viewer=` when entering/leaving the Viewer page (deep links). */
+  const navigateTo = (page: string, opts?: NavigateOptions) => {
+    const p = page as Page;
+    if (p !== 'viewer') {
+      clearViewerQueryParam();
+    } else {
+      setViewerQueryParam(opts?.viewerTab ?? 'imaging');
+      setViewerNavEpoch((e) => e + 1);
+    }
+    setActivePage(p);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -243,6 +265,7 @@ function App() {
           <ViewerPage 
             selectedJobId={selectedJobId}
             setSelectedJobId={setSelectedJobId}
+            viewerNavEpoch={viewerNavEpoch}
           />
         )}
 

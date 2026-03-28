@@ -1,0 +1,68 @@
+# Plugin: EEG–MRI coregistration (MNE transform + electrode coords)
+id: eeg_mri_coregistration
+name: "EEG–MRI Coregistration"
+version: "1.0.0"
+type: plugin
+domain: eeg_imaging
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "EEG–MRI Coregistration"
+
+description: >
+  Produces head↔MRI transform (trans.fif passthrough or JSON 4×4) and electrode
+  coordinates in MRI space from cleaned EEG.
+
+authors:
+  - "NeuroInsight Research Team"
+
+container:
+  runtime: docker
+  image: "phindagijimana321/eeg-mri-coregistration-mne:1.0.2"
+  digest: "sha256:8250c5091045978e0761dcb34bfa954a3fa2ce5f0b7c0fbaa2271634fe677636"
+
+inputs:
+  required: []
+  optional: []
+
+input_format:
+  format_name: "FIF + optional transform"
+  description: >
+    eeg/clean_raw.fif from preprocessing. Optional head→MRI alignment: coreg/trans.fif or
+    coreg/eeg_to_mri_trans.fif, or metadata/eeg_to_mri_transform.json (4×4 "matrix").
+    Place these under the same staging folder as the EEG (input_dir). SLURM workflows copy
+    them next to preprocessing output before this step; if none are provided, a reproducible
+    identity transform is used (log WARNING — replace for publication-quality source imaging).
+
+parameters: []
+
+resources:
+  profiles:
+    default:
+      cpus: 4
+      mem_gb: 12
+      time_hours: 2
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/eeg_mri_coregistration"
+    logs_dir: "{run_root}/logs/eeg_mri_coregistration"
+  stages:
+    - id: coreg
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+        export NIR_INPUT_ROOT=/data/inputs
+        export NIR_OUTPUT_ROOT=/data/outputs/native/eeg_mri_coregistration
+        mkdir -p "$NIR_OUTPUT_ROOT" /data/outputs/logs/eeg_mri_coregistration
+        python /app/run.py
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true

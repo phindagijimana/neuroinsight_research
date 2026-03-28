@@ -1,0 +1,5 @@
+mne==1.8.0
+numpy>=1.24,<3
+# SciPy 1.14+ drops sph_harm from scipy.special; MNE 1.8 imports it (see mne/transforms.py).
+scipy>=1.9,<1.14
+PyYAML>=6.0

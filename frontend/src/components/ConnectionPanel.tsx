@@ -271,7 +271,6 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
                     className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-transparent" />
                 </div>
               </div>
-              <p className="text-[10px] text-gray-400">Uses SSH agent. Load keys: <code className="bg-gray-100 px-1 rounded">ssh-add ~/.ssh/id_ed25519</code></p>
             </>
           )}
 

@@ -94,6 +94,42 @@ ensure_dirs() {
     mkdir -p "$LOG_DIR" "$PID_DIR" "$DATA_DIR"/{uploads,outputs}
 }
 
+# Keep venv aligned with requirements.txt (new packages like mne/nibabel after upgrades).
+# Writes venv/.nir-requirements.sha256 after a successful install.
+ensure_python_deps() {
+    [ -f "$SCRIPT_DIR/requirements.txt" ] || return 0
+    [ -d "$SCRIPT_DIR/venv" ] || return 0
+
+    local mark="$SCRIPT_DIR/venv/.nir-requirements.sha256"
+    local current
+    current=$(python3 -c "import hashlib, pathlib; p=pathlib.Path('$SCRIPT_DIR/requirements.txt'); print(hashlib.sha256(p.read_bytes()).hexdigest())" 2>/dev/null) || current=""
+
+    local need=0
+    if [ ! -f "$mark" ] || [ "$(cat "$mark" 2>/dev/null)" != "$current" ]; then
+        need=1
+    fi
+    if ! python3 -c "import fastapi" &>/dev/null; then
+        need=1
+    fi
+    # EEG preview API + bundled sample jobs
+    if ! python3 -c "import mne, nibabel" &>/dev/null; then
+        need=1
+    fi
+
+    if [ "$need" -eq 0 ]; then
+        return 0
+    fi
+
+    info "Syncing Python packages from requirements.txt (includes MNE + NiBabel for EEG) ..."
+    if python3 -m pip install -q -r "$SCRIPT_DIR/requirements.txt"; then
+        printf '%s\n' "$current" > "$mark"
+        success "Python dependencies are up to date"
+    else
+        error "pip install failed — check requirements.txt and network access"
+        return 1
+    fi
+}
+
 rotate_log_file() {
     # rotate_log_file <path> [max_mb] [keep]
     local log_path="$1"
@@ -439,6 +475,7 @@ cmd_install() {
     fi
     source venv/bin/activate
     python3 -m pip install -q -r requirements.txt 2>&1 | tail -5
+    python3 -c "import hashlib, pathlib; p=pathlib.Path('$SCRIPT_DIR/requirements.txt'); print(hashlib.sha256(p.read_bytes()).hexdigest())" > "$SCRIPT_DIR/venv/.nir-requirements.sha256" 2>/dev/null || true
     success "Python dependencies installed (venv)"
 
     # -- Frontend dependencies -------------------------------------------------
@@ -1419,11 +1456,7 @@ preflight_checks() {
     fi
     source venv/bin/activate
 
-    if [ -f "requirements.txt" ] && ! python3 -c "import fastapi" &>/dev/null; then
-        info "Python dependencies missing — installing ..."
-        python3 -m pip install -q -r requirements.txt 2>&1 | tail -3
-        success "Python dependencies installed"
-    fi
+    ensure_python_deps || exit 1
 
     if [ -d "frontend" ] && [ ! -d "frontend/node_modules" ]; then
         info "Frontend dependencies missing — installing ..."
@@ -1485,7 +1518,11 @@ preflight_checks() {
 # ==============================================================================
 cmd_preflight() {
     header
-    python3 -m backend.cli.preflight "$@"
+    if [ -d "$SCRIPT_DIR/venv" ]; then
+        # shellcheck source=/dev/null
+        source "$SCRIPT_DIR/venv/bin/activate"
+    fi
+    (cd "$SCRIPT_DIR" && python3 -m backend.cli.preflight "$@")
 }
 
 # ==============================================================================

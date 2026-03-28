@@ -78,11 +78,11 @@ const SlurmQueueMonitor: React.FC<SlurmQueueMonitorProps> = ({
   if (!visible) return null;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="rounded-2xl border border-gray-200/90 bg-white/90 p-4 shadow-sm">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-          <Server className="h-4 w-4 text-navy-600" />
-          SLURM Queue
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 flex items-center gap-1.5">
+          <Server className="h-4 w-4 text-[#003d7a]" />
+          SLURM queue
         </h3>
         <div className="flex items-center gap-2">
           {lastRefresh && (

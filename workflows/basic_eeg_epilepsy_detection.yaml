@@ -1,0 +1,68 @@
+# Workflow: Basic EEG Epilepsy Detection
+# Starter pipeline: clean continuous EEG, then epileptiform spike detection.
+id: basic_eeg_epilepsy_detection
+name: "Basic EEG Epilepsy Detection"
+version: "1.0.0"
+type: workflow
+domain: eeg
+
+description: >
+  Cleans raw EEG (bandpass, notch, average reference) then runs baseline
+  spike-candidate detection. Suitable for Signal View and clinical-style review.
+
+developer_contract: >
+  Workflows only orchestrate plugins. Staging under /data/inputs must follow
+  each plugin’s input_format (see plugin YAML).
+
+authors:
+  - "NeuroInsight Research Team"
+
+inputs:
+  required:
+    - key: input_dir
+      type: directory
+      description: >
+        Directory staged for the run (raw EEG under eeg/raw/ per plugin contract).
+  optional:
+    - key: eeg_raw_path
+      type: string
+      default: "eeg/raw"
+      description: "Path relative to input_dir for raw EEG files."
+
+input_format:
+  format_name: "Directory with continuous EEG"
+  description: >
+    Place continuous EEG (EDF, FIF, BrainVision, BDF) under input_dir/eeg/raw/
+    or set eeg_raw_path to match your layout.
+  example_structure: |
+    run_inputs/
+      eeg/
+        raw/
+          recording.edf
+
+validation:
+  preflight_checks:
+    - "directory_exists(input_dir)"
+
+steps:
+  - id: eeg_preprocessing
+    uses: eeg_preprocessing
+    with:
+      eeg_raw_path: "{inputs.eeg_raw_path}"
+
+  - id: spike_detection
+    uses: spike_detection
+    depends_on:
+      - eeg_preprocessing
+
+outputs:
+  native:
+    - "{run_root}/native/eeg_preprocessing"
+    - "{run_root}/native/spike_detection"
+  bundle:
+    - "{run_root}/bundle"
+
+reproducibility:
+  pin_containers: true
+  write_run_manifest: true
+  store_exact_commands: true

@@ -1,0 +1,63 @@
+# Plugin: Spike detection (baseline MNE + scipy)
+id: spike_detection
+name: "EEG Spike Detection"
+version: "1.0.0"
+type: plugin
+domain: eeg
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "EEG Spike Detection"
+
+description: >
+  Baseline epileptiform candidate detection (band-limited Hilbert envelope + peaks).
+  Requires preprocessed EEG at inputs/eeg/clean_raw.fif from the preprocessing step.
+
+authors:
+  - "NeuroInsight Research Team"
+
+container:
+  runtime: docker
+  image: "phindagijimana321/eeg-spike-detection-mne:1.0.1"
+  digest: "sha256:89a2e5c524efdbfe7a456e4d61847980978306bf36564e7bd496fd1bf9153713"
+
+inputs:
+  required: []
+  optional: []
+
+input_format:
+  format_name: "MNE FIF"
+  description: "clean_raw.fif under /data/inputs/eeg/"
+
+parameters: []
+
+resources:
+  profiles:
+    default:
+      cpus: 4
+      mem_gb: 8
+      time_hours: 2
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/spike_detection"
+    logs_dir: "{run_root}/logs/spike_detection"
+  stages:
+    - id: detect
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+        export NIR_INPUT_ROOT=/data/inputs
+        export NIR_OUTPUT_ROOT=/data/outputs/native/spike_detection
+        mkdir -p "$NIR_OUTPUT_ROOT" /data/outputs/logs/spike_detection
+        python /app/run.py
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true

@@ -23,11 +23,16 @@ interface ApiFile {
   size_bytes?: number;
 }
 
+/** Which viewer tab is picking files (controls View button + row open). */
+export type ViewerFileMode = 'imaging' | 'eeg' | 'multimodal';
+
 interface FileBrowserProps {
   jobId: string;
   onFileSelect?: (path: string) => void;
   showDownload?: boolean;
   showViewButton?: boolean;
+  /** Default imaging — matches legacy NIfTI-only viewer. */
+  viewerFileMode?: ViewerFileMode;
 }
 
 /** Check if a file is a viewable medical image. */
@@ -38,8 +43,30 @@ export const isViewableImage = (filename: string): boolean => {
   return imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
 };
 
+/** EEG formats supported by backend MNE preview. */
+export const isViewableEegFile = (filename: string): boolean => {
+  const l = filename.toLowerCase();
+  return (
+    l.endsWith('.edf') ||
+    l.endsWith('.fif') ||
+    l.endsWith('.fif.gz') ||
+    l.endsWith('.vhdr') ||
+    l.endsWith('.bdf')
+  );
+};
+
+function viewableInViewerMode(
+  isImage: boolean,
+  isEeg: boolean,
+  mode: ViewerFileMode
+): boolean {
+  if (mode === 'imaging') return isImage;
+  if (mode === 'eeg') return isEeg;
+  return isImage || isEeg;
+}
+
 /** Group flat file list into a folder tree. */
-function buildTree(files: ApiFile[]): TreeNode[] {
+function buildTree(files: ApiFile[], viewerFileMode: ViewerFileMode): TreeNode[] {
   const root: TreeNode = { name: '', type: 'folder', path: '', children: [] };
 
   for (const f of files) {
@@ -49,12 +76,16 @@ function buildTree(files: ApiFile[]): TreeNode[] {
       const part = parts[i];
       const isLast = i === parts.length - 1;
       if (isLast) {
+        const isImage = isViewableImage(part);
+        const isEeg = isViewableEegFile(part);
         current.children!.push({
           name: part,
           type: 'file',
           path: f.path,
           size: f.size,
-          isImage: isViewableImage(part),
+          isImage,
+          isEeg,
+          viewInViewer: viewableInViewerMode(isImage, isEeg, viewerFileMode),
           fileType: f.type,
         });
       } else {
@@ -94,7 +125,7 @@ const FileTreeItem: React.FC<{
   const handleClick = () => {
     if (item.type === 'folder') {
       setIsExpanded(!isExpanded);
-    } else if (onFileSelect && item.isImage) {
+    } else if (onFileSelect && item.viewInViewer) {
       onFileSelect(item.path);
     }
   };
@@ -112,6 +143,8 @@ const FileTreeItem: React.FC<{
           <Folder className="w-4 h-4 text-navy-500 flex-shrink-0" />
         ) : item.isImage ? (
           <Brain className="w-4 h-4 text-navy-500 flex-shrink-0" />
+        ) : item.isEeg ? (
+          <Activity className="w-4 h-4 text-emerald-600 flex-shrink-0" />
         ) : (
           <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
         )}
@@ -124,7 +157,7 @@ const FileTreeItem: React.FC<{
 
         {item.type === 'file' && (
           <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
-            {showViewButton && item.isImage && (
+            {showViewButton && item.viewInViewer && (
               <button
                 onClick={() => onFileSelect && onFileSelect(item.path)}
                 className="p-1 text-[#003d7a] hover:bg-navy-100 rounded transition"
@@ -170,6 +203,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   onFileSelect,
   showDownload = true,
   showViewButton = false,
+  viewerFileMode = 'imaging',
 }) => {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -204,7 +238,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     };
     fetchFiles();
     return () => { cancelled = true; };
-  }, [jobId]);
+  }, [jobId, viewerFileMode]);
 
   const handleDownload = async (downloadPath: string, name: string) => {
     try {
