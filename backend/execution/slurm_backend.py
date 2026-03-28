@@ -1372,16 +1372,17 @@ class SLURMBackend(ExecutionBackend):
         # Symlinks in inputs/ point to host paths invisible inside the container,
         # so we mount each item individually instead of the parent directory.
         lines.append("# Build per-item input bind mounts (resolves symlinks)")
-        lines.append('INPUT_BINDS=""')
+        # Use a bash array so paths with spaces (e.g. .../Sample Data/...) survive exec expansion.
+        lines.append("declare -a INPUT_BINDS_ARR=()")
         lines.append(f'for item in {job_dir}/inputs/*; do')
         lines.append('  [ -e "$item" ] || [ -L "$item" ] || continue')
         lines.append('  name=$(basename "$item")')
         lines.append('  if [ -L "$item" ]; then')
         lines.append('    target=$(readlink -f "$item")')
-        lines.append('    INPUT_BINDS="$INPUT_BINDS --bind $target:/data/inputs/$name:ro"')
+        lines.append('    INPUT_BINDS_ARR+=(--bind "$target:/data/inputs/$name:ro")')
         lines.append('    echo "Input (resolved symlink): $target -> /data/inputs/$name"')
         lines.append('  else')
-        lines.append(f'    INPUT_BINDS="$INPUT_BINDS --bind $item:/data/inputs/$name:ro"')
+        lines.append('    INPUT_BINDS_ARR+=(--bind "$item:/data/inputs/$name:ro")')
         lines.append('    echo "Input (direct): $item -> /data/inputs/$name"')
         lines.append('  fi')
         lines.append('done')
@@ -1521,7 +1522,7 @@ class SLURMBackend(ExecutionBackend):
             lines.append("")
             logger.info("Added MELD work-directory bind mounts under %s/work/", job_dir)
 
-        binds_str = " ".join(f"--bind {b}" for b in bind_mounts)
+        binds_str = " ".join(f'--bind "{b}"' for b in bind_mounts)
         envs_str = " ".join(f"--env {k}={v}" for k, v in container_envs.items())
 
         all_params = self._resolve_all_params(spec)
@@ -1599,7 +1600,9 @@ class SLURMBackend(ExecutionBackend):
                                     or input_name.replace("_derivatives", "") == prev_pid
                                     or input_name == "subjects_dir"
                                     or input_name == "freesurfer_subjects_dir"):
-                                step_extra_binds += f" --bind {full_host_path}:{container_input}:rw"
+                                step_extra_binds += (
+                                    f' --bind "{full_host_path}:{container_input}:rw"'
+                                )
                                 step_override_names.append(input_name)
                                 logger.info(
                                     "Workflow step %d: bind previous output %s -> %s",
@@ -1630,7 +1633,7 @@ class SLURMBackend(ExecutionBackend):
                     skip_list = " ".join(step_override_names)
                     lines.append(f'# Filter INPUT_BINDS for step {step_num} (skip names overridden by inter-step binds)')
                     lines.append(f'{skip_var}="{skip_list}"')
-                    lines.append(f'{input_var}=""')
+                    lines.append(f'{input_var}=()')
                     lines.append(f'for item in {job_dir}/inputs/*; do')
                     lines.append(f'  [ -e "$item" ] || [ -L "$item" ] || continue')
                     lines.append(f'  name=$(basename "$item")')
@@ -1638,15 +1641,18 @@ class SLURMBackend(ExecutionBackend):
                     lines.append(f'  [ $_skip -eq 1 ] && continue')
                     lines.append(f'  if [ -L "$item" ]; then')
                     lines.append(f'    target=$(readlink -f "$item")')
-                    lines.append(f'    {input_var}="${input_var} --bind $target:/data/inputs/$name:ro"')
+                    lines.append(f'    echo "Input (symlink): $item -> $target"')
                     lines.append(f'  else')
-                    lines.append(f'    {input_var}="${input_var} --bind $item:/data/inputs/$name:ro"')
+                    lines.append(f'    echo "Input (direct): $item"')
                     lines.append(f'  fi')
+                    lines.append(
+                        f'  {input_var}+=(--bind "$item:/data/inputs/$name:ro")'
+                    )
                     lines.append(f'done')
                     lines.append("")
-                    input_binds_ref = f"${input_var}"
+                    input_binds_ref = '"${' + input_var + '[@]}"'
                 else:
-                    input_binds_ref = "$INPUT_BINDS"
+                    input_binds_ref = '"${INPUT_BINDS_ARR[@]}"'
 
                 lines.append(f'# ---- Workflow step {step_num}/{total}: {step_name} ----')
                 lines.append(f'if [ $PIPELINE_EXIT -eq 0 ]; then')
@@ -1718,7 +1724,7 @@ class SLURMBackend(ExecutionBackend):
             plugin_id = spec.parameters.get("_plugin_id", "")
             pwd_flag = "--pwd /app " if plugin_id == "meld_graph" else ""
             lines.append(
-                f"$CONTAINER_RT exec --writable-tmpfs {pwd_flag}{envs_str} {binds_str} $INPUT_BINDS "
+                f"$CONTAINER_RT exec --writable-tmpfs {pwd_flag}{envs_str} {binds_str} \"${{INPUT_BINDS_ARR[@]}}\" "
                 f"--bind {job_dir}/scripts/pipeline_cmd.sh:/run_pipeline.sh:ro "
                 f"docker://{image} "
                 f"bash /run_pipeline.sh 2>&1 | tee {job_dir}/outputs/logs/container.log"
