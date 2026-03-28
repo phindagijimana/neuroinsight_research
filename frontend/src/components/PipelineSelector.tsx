@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, Info, Zap, GitBranch, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, Zap, GitBranch, CheckCircle, AlertTriangle } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { Pipeline } from '../types';
 
@@ -17,13 +17,22 @@ interface PipelineSelectorProps {
 
 type SelectionMode = 'plugins' | 'workflows';
 
+type PipelineCategory =
+  | 'structural'
+  | 'functional'
+  | 'diffusion'
+  | 'conversion'
+  | 'epilepsy'
+  | 'eeg'
+  | 'multimodal';
+
 interface Plugin {
   id: string;
   name: string;
   version: string;
   container: string;
   description: string;
-  category: 'structural' | 'functional' | 'diffusion' | 'conversion' | 'epilepsy';
+  category: PipelineCategory;
   user_selectable?: boolean; // If false, plugin is hidden from UI (utility plugins)
   input_format_name?: string;
   input_format_description?: string;
@@ -36,10 +45,33 @@ interface Workflow {
   version: string;
   description: string;
   plugins: string[]; // Plugin IDs in order
-  category: 'structural' | 'functional' | 'diffusion' | 'conversion' | 'epilepsy';
+  category: PipelineCategory;
   input_format_name?: string;
   input_format_description?: string;
   input_format_example?: string;
+}
+
+/** Map backend `domain` (from plugins/*.yaml) to UI category labels. */
+function mapDomainToCategory(domain: string | undefined): PipelineCategory {
+  const d = (domain || '').trim();
+  switch (d) {
+    case 'structural_mri':
+      return 'structural';
+    case 'functional_mri':
+      return 'functional';
+    case 'diffusion_mri':
+      return 'diffusion';
+    case 'epilepsy':
+      return 'epilepsy';
+    case 'conversion':
+      return 'conversion';
+    case 'eeg':
+      return 'eeg';
+    case 'eeg_imaging':
+      return 'multimodal';
+    default:
+      return 'structural';
+  }
 }
 
 // Mock plugins data
@@ -49,126 +81,163 @@ const MOCK_PLUGINS: Plugin[] = [
     name: 'DICOM to NIfTI Converter',
     version: '1.0.0',
     container: 'nipy/heudiconv:1.3.4',
-    description: 'Convert DICOM images to NIfTI format with JSON sidecars',
+    description: '',
     category: 'conversion',
-    input_format_name: 'DICOM Directory',
-    input_format_description: 'A folder containing DICOM files from the scanner.',
-    input_format_example: 'dicom_dir/\n  series001/\n    IM-0001-0001.dcm\n    IM-0001-0002.dcm'
   },
   {
     id: 'freesurfer_recon',
     name: 'FreeSurfer recon-all',
     version: '7.4.1',
     container: 'freesurfer/freesurfer:7.4.1',
-    description: 'Full cortical reconstruction and subcortical segmentation',
+    description: '',
     category: 'structural',
-    input_format_name: 'Single NIfTI',
-    input_format_description: 'A single T1-weighted MRI scan in NIfTI format.',
-    input_format_example: 'any_folder/\n  sub-01_T1w.nii.gz'
   },
   {
     id: 'fastsurfer',
     name: 'FastSurfer',
     version: '2.0.0',
     container: 'deepmi/fastsurfer:v2.4.2',
-    description: 'Fast deep learning-based cortical parcellation (FreeSurfer-compatible)',
+    description: '',
     category: 'structural',
-    input_format_name: 'Single NIfTI',
-    input_format_description: 'A single T1-weighted MRI scan in NIfTI format.',
-    input_format_example: 'any_folder/\n  sub-01_T1w.nii.gz'
   },
   {
     id: 'segmentha_t1',
     name: 'FreeSurfer SegmentHA_T1',
     version: '7.4.1',
     container: 'freesurfer/freesurfer:7.4.1',
-    description: 'Segment hippocampal subfields and amygdala nuclei from T1',
+    description: '',
     category: 'structural',
-    input_format_name: 'FreeSurfer SUBJECTS_DIR',
-    input_format_description: 'Requires completed FreeSurfer recon-all outputs.'
   },
   {
     id: 'segmentha_t2',
     name: 'FreeSurfer SegmentHA_T2',
     version: '7.4.1',
     container: 'freesurfer/freesurfer:7.4.1',
-    description: 'Enhanced hippocampal subfields using high-res T2',
+    description: '',
     category: 'structural',
-    input_format_name: 'FreeSurfer SUBJECTS_DIR + T2w NIfTI',
-    input_format_description: 'Requires recon-all outputs plus a T2-weighted scan.'
   },
   {
     id: 'fmriprep',
     name: 'fMRIPrep',
     version: '23.2.1',
     container: 'nipreps/fmriprep:23.2.1',
-    description: 'Preprocessing of fMRI data (motion correction, distortion correction, coregistration)',
+    description: '',
     category: 'functional',
-    input_format_name: 'BIDS',
-    input_format_description: 'A BIDS dataset with T1w and BOLD sequences.',
-    input_format_example: 'bids_dataset/\n  dataset_description.json\n  sub-01/\n    anat/\n      sub-01_T1w.nii.gz\n    func/\n      sub-01_task-rest_bold.nii.gz'
   },
   {
     id: 'xcpd',
     name: 'XCP-D',
     version: '0.6.1',
     container: 'pennlinc/xcp_d:0.6.1',
-    description: 'Postprocessing of fMRI: denoising, parcellation, connectivity matrices',
+    description: '',
     category: 'functional',
-    input_format_name: 'fMRIPrep Derivatives',
-    input_format_description: 'Output directory from a completed fMRIPrep run.'
   },
   {
     id: 'qsiprep',
     name: 'QSIPrep',
     version: '0.20.0',
     container: 'pennbbl/qsiprep:0.20.0',
-    description: 'Preprocessing of diffusion MRI (distortion, motion, coregistration)',
+    description: '',
     category: 'diffusion',
-    input_format_name: 'BIDS (with DWI)',
-    input_format_description: 'A BIDS dataset with DWI, bvals/bvecs, and T1w.',
-    input_format_example: 'bids_dataset/\n  sub-01/\n    anat/sub-01_T1w.nii.gz\n    dwi/\n      sub-01_dwi.nii.gz\n      sub-01_dwi.bval\n      sub-01_dwi.bvec'
   },
   {
     id: 'qsirecon',
     name: 'QSIRecon',
     version: '0.20.0',
     container: 'pennlinc/qsirecon:1.1.1',
-    description: 'Diffusion reconstruction, tractography, and connectomes',
+    description: '',
     category: 'diffusion',
-    input_format_name: 'QSIPrep Derivatives',
-    input_format_description: 'Output directory from a completed QSIPrep run.'
   },
   {
     id: 'meld_graph',
     name: 'MELD Graph',
     version: '1.0.0',
     container: 'phindagijimana321/meld_graph:v2.2.4-nir2',
-    description: 'Cortical dysplasia detection for epilepsy research',
+    description: '',
     category: 'epilepsy',
-    input_format_name: 'FreeSurfer SUBJECTS_DIR',
-    input_format_description: 'Requires completed FreeSurfer recon-all outputs.'
   },
   {
     id: 'freesurfer_longitudinal',
     name: 'FreeSurfer Longitudinal',
     version: '1.0.0',
     container: 'freesurfer/freesurfer:7.4.1',
-    description: 'Full FreeSurfer longitudinal stream (CROSS -> BASE -> LONG) for >=2 timepoints',
+    description: '',
     category: 'structural',
     user_selectable: true,
-    input_format_name: 'Multiple Timepoint NIfTIs',
-    input_format_description: '>=2 T1w NIfTI scans from different timepoints for the same subject.',
-    input_format_example: 'subject_data/\n  ses-01/sub-01_ses-01_T1w.nii.gz\n  ses-02/sub-01_ses-02_T1w.nii.gz'
   },
   {
     id: 'freesurfer_longitudinal_stats',
     name: 'FreeSurfer Longitudinal Stats Utility',
     version: '1.0.0',
     container: 'freesurfer/freesurfer:7.4.1',
-    description: 'Utility plugin for post-processing FreeSurfer longitudinal outputs (QDEC tables, slopes)',
+    description: '',
     category: 'structural',
     user_selectable: false // Hidden from UI - only called by workflows
+  },
+  // EEG / multimodal (mirrors plugins/*.yaml — shown when API is offline)
+  {
+    id: 'eeg_preprocessing',
+    name: 'EEG Preprocessing',
+    version: '1.0.0',
+    container: 'phindagijimana321/eeg-preprocessing-mne:1.0.1',
+    description: '',
+    category: 'eeg',
+  },
+  {
+    id: 'spike_detection',
+    name: 'EEG Spike Detection',
+    version: '1.0.0',
+    container: 'phindagijimana321/eeg-spike-detection-mne:1.0.1',
+    description: '',
+    category: 'eeg',
+  },
+  {
+    id: 'eeg_mri_coregistration',
+    name: 'EEG–MRI Coregistration',
+    version: '1.0.0',
+    container: 'phindagijimana321/eeg-mri-coregistration-mne:1.0.1',
+    description: '',
+    category: 'multimodal',
+  },
+  {
+    id: 'forward_model',
+    name: 'EEG Forward Model',
+    version: '1.0.0',
+    container: 'phindagijimana321/eeg-forward-model-mne:1.0.1',
+    description: '',
+    category: 'multimodal',
+  },
+  {
+    id: 'source_localization',
+    name: 'EEG Source Localization',
+    version: '1.0.0',
+    container: 'phindagijimana321/eeg-source-localization-mne:1.0.1',
+    description: '',
+    category: 'multimodal',
+  },
+  {
+    id: 'mri_segmentation',
+    name: 'MRI Segmentation (FreeSurfer VolOnly)',
+    version: '7.4.1',
+    container: 'phindagijimana321/freesurfer-autorecon-volonly:7.4.1',
+    description: '',
+    category: 'multimodal',
+  },
+  {
+    id: 'roi_feature_extraction',
+    name: 'ROI Feature Extraction',
+    version: '1.0.0',
+    container: 'phindagijimana321/eeg-roi-feature-extraction:1.0.0',
+    description: '',
+    category: 'multimodal',
+  },
+  {
+    id: 'biomarker_scoring',
+    name: 'Biomarker Scoring',
+    version: '1.0.0',
+    container: 'phindagijimana321/eeg-biomarker-scoring:1.0.0',
+    description: '',
+    category: 'multimodal',
   },
 ];
 
@@ -178,7 +247,7 @@ const MOCK_WORKFLOWS: Workflow[] = [
     id: 'dicom_ingestion',
     name: 'DICOM Ingestion',
     version: '1.0.0',
-    description: 'Convert DICOM images to NIfTI format',
+    description: '',
     plugins: ['dcm2niix'],
     category: 'conversion'
   },
@@ -186,7 +255,7 @@ const MOCK_WORKFLOWS: Workflow[] = [
     id: 'structural_segmentation',
     name: 'FastSurfer Segmentation and Volumetry',
     version: '1.0.0',
-    description: 'Full cortical and subcortical segmentation with volumetry',
+    description: '',
     plugins: ['fastsurfer'],
     category: 'structural'
   },
@@ -194,7 +263,7 @@ const MOCK_WORKFLOWS: Workflow[] = [
     id: 'hippocampal_subfields_t1',
     name: 'Hippocampal Subfields Segmentation T1',
     version: '1.0.0',
-    description: 'Segment hippocampal subfields and amygdala nuclei from T1',
+    description: '',
     plugins: ['freesurfer_recon', 'segmentha_t1'],
     category: 'structural'
   },
@@ -202,7 +271,7 @@ const MOCK_WORKFLOWS: Workflow[] = [
     id: 'hippocampal_subfields_t2',
     name: 'Hippocampal Subfields Segmentation T1 + T2',
     version: '1.0.0',
-    description: 'Enhanced hippocampal subfield segmentation with high-res T2',
+    description: '',
     plugins: ['freesurfer_recon', 'segmentha_t2'],
     category: 'structural'
   },
@@ -210,7 +279,7 @@ const MOCK_WORKFLOWS: Workflow[] = [
     id: 'fmri_preprocess',
     name: 'fMRI Preprocessing',
     version: '1.0.0',
-    description: 'Preprocess functional MRI data',
+    description: '',
     plugins: ['fmriprep'],
     category: 'functional'
   },
@@ -218,7 +287,7 @@ const MOCK_WORKFLOWS: Workflow[] = [
     id: 'fmri_full',
     name: 'fMRI Full Pipeline',
     version: '1.0.0',
-    description: 'Complete fMRI pipeline: preprocessing + connectivity analysis',
+    description: '',
     plugins: ['fmriprep', 'xcpd'],
     category: 'functional'
   },
@@ -226,7 +295,7 @@ const MOCK_WORKFLOWS: Workflow[] = [
     id: 'diffusion_preprocess',
     name: 'Diffusion Preprocessing',
     version: '1.0.0',
-    description: 'Preprocess diffusion MRI data',
+    description: '',
     plugins: ['qsiprep'],
     category: 'diffusion'
   },
@@ -234,7 +303,7 @@ const MOCK_WORKFLOWS: Workflow[] = [
     id: 'diffusion_full',
     name: 'Diffusion Full Pipeline',
     version: '1.0.0',
-    description: 'Complete diffusion pipeline: preprocessing + tractography',
+    description: '',
     plugins: ['qsiprep', 'qsirecon'],
     category: 'diffusion'
   },
@@ -242,7 +311,7 @@ const MOCK_WORKFLOWS: Workflow[] = [
     id: 'cortical_lesion_detection',
     name: 'Cortical Lesion Detection',
     version: '1.0.0',
-    description: 'Detect cortical dysplasia for epilepsy research',
+    description: '',
     plugins: ['freesurfer_recon', 'meld_graph'],
     category: 'epilepsy'
   },
@@ -250,9 +319,49 @@ const MOCK_WORKFLOWS: Workflow[] = [
     id: 'freesurfer_longitudinal_full',
     name: 'FreeSurfer Longitudinal Full',
     version: '1.0.0',
-    description: 'End-to-end longitudinal analysis: recon-all (CROSS → BASE → LONG) + stats extraction and slopes',
+    description: '',
     plugins: ['freesurfer_longitudinal', 'freesurfer_longitudinal_stats'],
     category: 'structural'
+  },
+  {
+    id: 'basic_eeg_epilepsy_detection',
+    name: 'Basic EEG Epilepsy Detection',
+    version: '1.0.0',
+    description: '',
+    plugins: ['eeg_preprocessing', 'spike_detection'],
+    category: 'eeg',
+  },
+  {
+    id: 'eeg_source_localization',
+    name: 'EEG Source Localization',
+    version: '1.0.0',
+    description: '',
+    plugins: [
+      'eeg_preprocessing',
+      'spike_detection',
+      'eeg_mri_coregistration',
+      'forward_model',
+      'source_localization',
+    ],
+    category: 'multimodal',
+  },
+  {
+    id: 'multimodal_epilepsy_biomarker',
+    name: 'Multimodal Epilepsy Biomarker',
+    version: '1.0.0',
+    description:
+      'Stage EEG (e.g. eeg/raw/) and T1w.nii.gz in one folder; submit paths only under that folder.',
+    plugins: [
+      'eeg_preprocessing',
+      'spike_detection',
+      'eeg_mri_coregistration',
+      'forward_model',
+      'source_localization',
+      'mri_segmentation',
+      'roi_feature_extraction',
+      'biomarker_scoring',
+    ],
+    category: 'multimodal',
   },
 ];
 
@@ -263,14 +372,10 @@ const getCategoryLabel = (category: string) => {
     case 'diffusion': return 'Diffusion';
     case 'conversion': return 'Conversion';
     case 'epilepsy': return 'Epilepsy';
+    case 'eeg': return 'EEG';
+    case 'multimodal': return 'EEG + Imaging';
     default: return category;
   }
-};
-
-const shortenDescription = (text: string, maxWords = 19): string => {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length <= maxWords) return text;
-  return `${words.slice(0, maxWords).join(' ')}...`;
 };
 
 export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
@@ -302,57 +407,43 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   useEffect(() => {
     async function fetchData() {
       try {
-        // Fetch ALL plugins (including utilities for workflow step lookups),
-        // workflows, and license status from API
-        const [pluginsRes, workflowsRes, licenseRes] = await Promise.all([
+        // Fetch ALL plugins (including utilities for workflow step lookups) and workflows
+        const [pluginsRes, workflowsRes] = await Promise.all([
           apiService.getPlugins(false),
           apiService.getWorkflows(),
-          apiService.getLicenseStatus().catch(() => null),
         ]);
-        
-        if (licenseRes) {
-          setLicenseStatus(licenseRes);
-        }
 
-        if (pluginsRes.plugins.length > 0) {
+        const rawPlugins = pluginsRes.plugins ?? [];
+        if (rawPlugins.length > 0) {
+          setError(null);
           // Map API response to our Plugin interface
-          const apiPlugins: Plugin[] = pluginsRes.plugins.map((p: any) => ({
+          const apiPlugins: Plugin[] = rawPlugins.map((p: any) => ({
             id: p.id,
             name: p.name,
             version: p.version,
             container: p.container_image,
-            description: p.description,
-            category: (p.domain === 'structural_mri' ? 'structural' :
-                       p.domain === 'functional_mri' ? 'functional' :
-                       p.domain === 'diffusion_mri' ? 'diffusion' :
-                       p.domain === 'epilepsy' ? 'epilepsy' :
-                       p.domain === 'conversion' ? 'conversion' : 'structural') as Plugin['category'],
-            input_format_name: p.input_format?.format_name,
-            input_format_description: p.input_format?.description,
-            input_format_example: p.input_format?.example_structure,
+            description: '',
+            category: mapDomainToCategory(p.domain),
             user_selectable: p.user_selectable,
           }));
 
+          const rawWfs = workflowsRes.workflows ?? [];
           // Map API response to our Workflow interface
-          const apiWorkflows: Workflow[] = workflowsRes.workflows.map((w: any) => ({
+          const apiWorkflows: Workflow[] = rawWfs.map((w: any) => ({
             id: w.id,
             name: w.name,
             version: w.version,
-            description: w.description,
+            description: '',
             plugins: w.plugin_ids || [],
-            input_format_name: w.input_format?.format_name,
-            input_format_description: w.input_format?.description,
-            input_format_example: w.input_format?.example_structure,
-            category: (w.domain === 'structural_mri' ? 'structural' :
-                       w.domain === 'functional_mri' ? 'functional' :
-                       w.domain === 'diffusion_mri' ? 'diffusion' :
-                       w.domain === 'epilepsy' ? 'epilepsy' :
-                       w.domain === 'conversion' ? 'conversion' : 'structural') as Workflow['category'],
+            category: mapDomainToCategory(w.domain),
           }));
 
           setLivePlugins(apiPlugins);
           setLiveWorkflows(apiWorkflows);
           setUsingLiveData(true);
+        } else {
+          setUsingLiveData(false);
+          setError('API returned no plugins — using demo catalog. Start the backend so plugins/ YAML is loaded.');
         }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -379,7 +470,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
         onPipelineSelect({
           name: wf.name,
           version: wf.version,
-          description: wf.description,
+          description: '',
         } as Pipeline);
         onExecutionSelect?.({ type: 'workflow', id: wf.id, name: wf.name });
       }
@@ -395,7 +486,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
       onPipelineSelect({
         name: plugin.name,
         version: plugin.version,
-        description: plugin.description,
+        description: '',
         container_image: plugin.container,
       } as Pipeline);
       onExecutionSelect?.({ type: 'plugin', id: plugin.id, name: plugin.name });
@@ -414,28 +505,19 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
       onPipelineSelect({
         name: workflow.name,
         version: workflow.version,
-        description: workflow.description,
+        description: '',
         container_image: pluginContainers.join(', '),
       } as Pipeline);
       onExecutionSelect?.({ type: 'workflow', id: workflow.id, name: workflow.name });
     }
   };
 
-  const selectedPlugin = activePlugins.find(p => p.id === selectedPluginId);
-  const selectedWorkflow = activeWorkflows.find(w => w.id === selectedWorkflowId);
-  // Preserve workflow step order (plugin_ids from YAML) rather than activePlugins array order
-  const workflowPlugins = selectedWorkflow
-    ? selectedWorkflow.plugins
-        .map(pid => activePlugins.find(p => p.id === pid))
-        .filter((p): p is Plugin => p !== undefined)
-    : [];
-
   if (loading) {
     return (
-      <div className="bg-white shadow sm:rounded-lg p-6 h-full flex items-center justify-center">
+      <div className="rounded-xl border border-gray-100 bg-white p-5 flex items-center justify-center shadow-sm">
         <div className="flex items-center">
           <Loader2 className="h-6 w-6 animate-spin text-[#003d7a] mr-2" />
-          <span className="text-gray-600">Loading pipelines...</span>
+          <span className="text-sm text-gray-500">Loading pipelines…</span>
         </div>
       </div>
     );
@@ -443,15 +525,15 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
 
   if (error) {
     return (
-      <div className="bg-white shadow sm:rounded-lg p-6 h-full flex flex-col">
+      <div className="rounded-xl border border-gray-100 bg-white p-5 flex flex-col shadow-sm">
         {/* Mode Toggle */}
         <div className="flex gap-2 mb-4">
           <button
             onClick={() => setMode('plugins')}
-            className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition ${
+            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
               mode === 'plugins'
-                ? 'bg-[#003d7a] text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-[#003d7a] text-white shadow-sm'
+                : 'bg-slate-100/80 text-gray-700 hover:bg-slate-100'
             }`}
           >
             <Zap className="w-4 h-4 inline mr-2" />
@@ -471,15 +553,15 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
         </div>
 
         {/* Using mock data since API failed */}
-        <div className="text-sm text-gray-700 bg-navy-50 border border-navy-200 rounded p-3">
-          <strong className="text-[#003d7a]">Note:</strong> API unavailable. Showing mock data for demonstration.
+        <div className="text-sm text-gray-600 bg-amber-50/80 border border-amber-100/80 rounded-lg px-3 py-2.5">
+          <span className="font-medium text-amber-900/90">Offline catalog.</span> Connect the backend for live plugins.
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white shadow sm:rounded-lg p-6 h-full flex flex-col">
+    <div className="rounded-xl border border-gray-100 bg-white p-5 flex flex-col shadow-sm">
       {/* Mode Toggle */}
       <div className="flex gap-2 mb-4">
         <button
@@ -489,10 +571,10 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
             setSelectedPluginId(firstSelectablePlugin?.id || null);
             setSelectedWorkflowId(null);
           }}
-          className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition ${
+          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
             mode === 'plugins'
-              ? 'bg-[#003d7a] text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              ? 'bg-[#003d7a] text-white shadow-sm'
+              : 'bg-slate-100/80 text-gray-700 hover:bg-slate-100'
           }`}
         >
           <Zap className="w-4 h-4 inline mr-2" />
@@ -504,10 +586,10 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
             setSelectedWorkflowId(activeWorkflows[0]?.id || null);
             setSelectedPluginId(null);
           }}
-          className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition ${
+          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
             mode === 'workflows'
-              ? 'bg-[#003d7a] text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              ? 'bg-[#003d7a] text-white shadow-sm'
+              : 'bg-slate-100/80 text-gray-700 hover:bg-slate-100'
           }`}
         >
           <GitBranch className="w-4 h-4 inline mr-2" />
@@ -515,46 +597,11 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
         </button>
       </div>
 
-      {/* Data source & license indicators */}
-      <div className="mb-3 space-y-1">
-        <div className="text-xs text-gray-500 flex items-center gap-1">
-          <span className={`inline-block w-2 h-2 rounded-full ${usingLiveData ? 'bg-green-500' : 'bg-navy-500'}`}></span>
-          {usingLiveData
-            ? `Live: ${userSelectablePlugins.length} plugins, ${activeWorkflows.length} workflows`
-            : `Demo: ${userSelectablePlugins.length} plugins, ${activeWorkflows.length} workflows`
-          }
+      {error && (
+        <div className="text-sm text-amber-900/90 bg-amber-50/80 border border-amber-100/80 rounded-lg px-3 py-2.5 mb-3">
+          {error}
         </div>
-        {licenseStatus && (
-          <div className="space-y-0.5">
-            <div className={`text-xs flex items-center gap-1 ${licenseStatus.freesurfer.found ? 'text-green-600' : 'text-navy-600'}`}>
-              {licenseStatus.freesurfer.found ? (
-                <>
-                  <CheckCircle className="w-3 h-3" />
-                  FreeSurfer license detected
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="w-3 h-3" />
-                  <span>No FreeSurfer license — place <code className="bg-gray-100 px-1 rounded text-[10px]">license.txt</code> in project root</span>
-                </>
-              )}
-            </div>
-            <div className={`text-xs flex items-center gap-1 ${licenseStatus.meld_graph.found ? 'text-green-600' : 'text-navy-600'}`}>
-              {licenseStatus.meld_graph.found ? (
-                <>
-                  <CheckCircle className="w-3 h-3" />
-                  MELD Graph license detected
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="w-3 h-3" />
-                  <span>No MELD license — place <code className="bg-gray-100 px-1 rounded text-[10px]">meld_license.txt</code> in project root</span>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Plugin Selector */}
       {mode === 'plugins' && (
@@ -593,61 +640,6 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
               </option>
             ))}
           </select>
-        </div>
-      )}
-
-      {/* Selected Plugin Details */}
-      {selectedPlugin && mode === 'plugins' && (
-        <div className="mt-6 space-y-3">
-          {/* Description */}
-          <div className="p-4 bg-gray-50 rounded-md">
-            <div className="flex items-start">
-              <Info className="h-5 w-5 text-[#003d7a] mr-3 flex-shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-sm font-medium text-gray-900">Description</h4>
-                <p className="text-sm text-gray-600 mt-1">{shortenDescription(selectedPlugin.description)}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Input format hint -- brief label only, full details in Docs page */}
-          {selectedPlugin.input_format_name && (
-            <div className="flex items-center gap-2 px-4 py-2 bg-navy-50 rounded-md">
-              <span className="text-xs text-gray-500">Input:</span>
-              <span className="text-xs font-medium text-[#003d7a]">{selectedPlugin.input_format_name}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Selected Workflow Details */}
-      {selectedWorkflow && mode === 'workflows' && (
-        <div className="mt-6 space-y-3">
-          {/* Pipeline Steps */}
-          <div className="p-4 bg-navy-50 border border-navy-200 rounded-md">
-            <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
-              <GitBranch className="w-4 h-4 text-[#003d7a]" />
-              Pipeline Steps
-            </h4>
-            <div className="space-y-3">
-              {workflowPlugins.map((plugin, idx) => (
-                <div key={plugin.id} className="flex items-start gap-3 bg-white p-3 rounded-md border border-gray-300">
-                  <div className="flex flex-col items-center">
-                    <div className="w-8 h-8 rounded-full bg-[#003d7a] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
-                      {idx + 1}
-                    </div>
-                    {idx < workflowPlugins.length - 1 && (
-                      <div className="w-0.5 h-8 bg-[#003d7a] opacity-30 my-1"></div>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <h5 className="text-sm font-semibold text-gray-900">{plugin.name}</h5>
-                    <p className="text-xs text-gray-600 mt-1">{shortenDescription(plugin.description)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
 

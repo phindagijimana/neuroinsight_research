@@ -32,6 +32,8 @@ paramiko==3.4.0
 # Data Processing
 pyyaml==6.0.1
 python-multipart==0.0.6
+mne>=1.6.0,<2
+nibabel>=5.2.0,<6
 
 # System Monitoring
 psutil==5.9.8

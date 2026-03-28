@@ -9,6 +9,7 @@ Supports both local output directories and remote HPC paths accessed via SSH.
 import hashlib
 import json
 import logging
+import os
 import tarfile
 import tempfile
 from dataclasses import dataclass
@@ -833,6 +834,225 @@ async def download_stats_csv(job_id: str, csv_filename: str):
         filename=f"{job_id[:8]}_{csv_filename}",
         headers={"Content-Disposition": f'attachment; filename="{job_id[:8]}_{csv_filename}"'},
     )
+
+
+# --------------------------------------------------------------------------- #
+#  EEG preview (MNE — downsampled JSON for web viewer)                         #
+# --------------------------------------------------------------------------- #
+
+
+def _resolve_result_file_to_local(job_id: str, file_path: str) -> tuple[Path, bool]:
+    """Local path to a job result file. If bool is True, caller must delete the file."""
+    normalized = PurePosixPath(file_path)
+    if ".." in normalized.parts:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file path (path traversal detected)",
+        )
+
+    loc = _ensure_output(job_id)
+    filename = normalized.name
+
+    if loc.is_remote:
+        ssh = _get_ssh()
+        if not ssh:
+            raise HTTPException(status_code=503, detail="SSH not connected")
+
+        remote_file = f"{loc.remote_path}/{file_path}"
+        try:
+            local_tmp = _remote_download_to_temp(
+                ssh, remote_file, suffix=f"_{filename}"
+            )
+        except FileNotFoundError:
+            raise HTTPException(
+                status_code=404, detail=f"File not found: {file_path}"
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Download failed: {e}")
+
+        return Path(local_tmp), True
+
+    output_dir = loc.local_path
+    target = (output_dir / file_path).resolve()
+
+    try:
+        target.relative_to(output_dir.resolve())
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file path (path traversal detected)",
+        )
+
+    if not target.exists():
+        raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+    if not target.is_file():
+        raise HTTPException(status_code=400, detail=f"Not a file: {file_path}")
+
+    return target, False
+
+
+def _load_multimodal_manifest(job_id: str) -> dict:
+    """Parse ``nir_multimodal_manifest.json`` from job output (local or remote)."""
+    from backend.services.multimodal_bundle import MANIFEST_FILENAME, load_manifest_dict
+
+    loc = _ensure_output(job_id)
+    if loc.is_remote:
+        ssh = _get_ssh()
+        if not ssh:
+            raise HTTPException(
+                status_code=503, detail="SSH not connected for remote job output",
+            )
+        remote_manifest = f"{loc.remote_path.rstrip('/')}/{MANIFEST_FILENAME}"
+        try:
+            text = _remote_read_text(ssh, remote_manifest)
+        except FileNotFoundError:
+            raise HTTPException(
+                status_code=404,
+                detail="No multimodal manifest for this job",
+            ) from None
+        return json.loads(text)
+
+    mp = (loc.local_path / MANIFEST_FILENAME).resolve()
+    try:
+        mp.relative_to(loc.local_path.resolve())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid manifest path") from None
+    if not mp.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="No multimodal manifest for this job",
+        )
+    return load_manifest_dict(mp)
+
+
+@router.get("/{job_id}/multimodal_manifest")
+def multimodal_manifest(job_id: str):
+    """Linked EEG + cortical bundle metadata (paths, alignment, QC)."""
+    return _load_multimodal_manifest(job_id)
+
+
+@router.get("/{job_id}/multimodal_mesh")
+def multimodal_mesh(job_id: str):
+    """Cortical mesh for WebGL: flat ``vertices`` (x,y,z × V) and ``faces`` (i,j,k × F)."""
+    manifest = _load_multimodal_manifest(job_id)
+    rel = manifest.get("cortex_npz")
+    if not rel or not isinstance(rel, str):
+        raise HTTPException(
+            status_code=500,
+            detail="Manifest missing cortex_npz path",
+        )
+
+    local_path, unlink_after = _resolve_result_file_to_local(job_id, rel)
+    try:
+        import numpy as np
+
+        z = np.load(local_path)
+        v = np.asarray(z["vertices"], dtype=np.float64)
+        fa = np.asarray(z["faces"], dtype=np.int64)
+        return {
+            "vertices": v.reshape(-1).tolist(),
+            "faces": fa.reshape(-1).tolist(),
+            "vertex_count": int(v.shape[0]),
+            "face_count": int(fa.shape[0]),
+        }
+    finally:
+        if unlink_after:
+            try:
+                os.unlink(local_path)
+            except OSError:
+                pass
+
+
+@router.get("/{job_id}/multimodal_source_frame")
+def multimodal_source_frame(
+    job_id: str,
+    time_index: int = Query(0, ge=0, le=1_000_000),
+):
+    """Per-vertex scalar source map at one downsampled time index (matches EEG preview grid)."""
+    manifest = _load_multimodal_manifest(job_id)
+    rel = manifest.get("cortex_npz")
+    if not rel or not isinstance(rel, str):
+        raise HTTPException(
+            status_code=500,
+            detail="Manifest missing cortex_npz path",
+        )
+
+    local_path, unlink_after = _resolve_result_file_to_local(job_id, rel)
+    try:
+        import numpy as np
+
+        z = np.load(local_path)
+        data = np.asarray(z["data"], dtype=np.float64)
+        times = np.asarray(z["times"], dtype=np.float64)
+        t_n = int(data.shape[1])
+        if time_index >= t_n:
+            raise HTTPException(
+                status_code=400,
+                detail=f"time_index must be < {t_n}",
+            )
+        col = data[:, time_index]
+        lo, hi = float(np.percentile(col, 5)), float(np.percentile(col, 95))
+        if hi <= lo:
+            lo, hi = float(np.min(col)), float(np.max(col))
+        if hi <= lo:
+            lo, hi = lo - 1.0, hi + 1.0
+        return {
+            "time_index": time_index,
+            "time_s": float(times[time_index]),
+            "n_times": t_n,
+            "values": [float(x) for x in col],
+            "vmin": lo,
+            "vmax": hi,
+        }
+    finally:
+        if unlink_after:
+            try:
+                os.unlink(local_path)
+            except OSError:
+                pass
+
+
+@router.get("/{job_id}/eeg_preview")
+def eeg_preview(
+    job_id: str,
+    file_path: str = Query(..., description="Relative path within job output"),
+    duration_s: float = Query(5.0, ge=0.5, le=120.0),
+    n_time_points: int = Query(600, ge=50, le=4000),
+    max_channels: int = Query(32, ge=1, le=128),
+    time_offset_s: float = Query(
+        0.0,
+        ge=0.0,
+        le=864000.0,
+        description="Start of preview window in seconds from file start (pan)",
+    ),
+):
+    """Return downsampled EEG waveforms + 2D positions for the Viewer (MNE)."""
+    from backend.services.eeg_preview import build_eeg_preview
+
+    local_path, unlink_after = _resolve_result_file_to_local(job_id, file_path)
+    try:
+        return build_eeg_preview(
+            local_path,
+            duration_s=duration_s,
+            n_time_points=n_time_points,
+            max_channels=max_channels,
+            time_offset_s=time_offset_s,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("eeg_preview failed for %s", file_path)
+        raise HTTPException(
+            status_code=500, detail=f"EEG preview failed: {e}"
+        ) from e
+    finally:
+        if unlink_after:
+            try:
+                os.unlink(local_path)
+            except OSError:
+                pass
 
 
 # --------------------------------------------------------------------------- #

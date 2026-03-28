@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   ChevronRight,
   FolderTree,
+  CheckCircle,
 } from 'lucide-react';
 
 interface InputFormat {
@@ -479,6 +480,12 @@ const WorkflowDetail: React.FC<{ workflow: WorkflowDoc }> = ({ workflow }) => {
 /*  Main Page                                                                 */
 /* -------------------------------------------------------------------------- */
 
+type LicenseStatus = {
+  freesurfer: { found: boolean; path: string | null; registration_url: string };
+  meld_graph: { found: boolean; path: string | null; registration_url: string };
+  hint: string;
+};
+
 const DocsPage: React.FC<DocsPageProps> = () => {
   const [plugins, setPlugins] = useState<PluginDoc[]>([]);
   const [workflows, setWorkflows] = useState<WorkflowDoc[]>([]);
@@ -487,13 +494,20 @@ const DocsPage: React.FC<DocsPageProps> = () => {
   const [activeTab, setActiveTab] = useState<'plugins' | 'workflows'>('plugins');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [licenseStatus, setLicenseStatus] = useState<LicenseStatus | null>(null);
 
   useEffect(() => {
     async function fetchDocs() {
       try {
-        const data = await apiService.getDocsAll();
+        const [data, licenseRes] = await Promise.all([
+          apiService.getDocsAll(),
+          apiService.getLicenseStatus().catch(() => null),
+        ]);
         setPlugins(data.plugins || []);
         setWorkflows(data.workflows || []);
+        if (licenseRes) {
+          setLicenseStatus(licenseRes);
+        }
         // Auto-select first plugin
         if (data.plugins?.length > 0) {
           setSelectedId(data.plugins[0].id);
@@ -562,6 +576,58 @@ const DocsPage: React.FC<DocsPageProps> = () => {
         <p className="text-gray-500 text-sm ml-10">
           Browse plugins and workflows. Select one to view its full specification.
         </p>
+        {!error && (plugins.length > 0 || workflows.length > 0) && (
+          <div className="ml-10 mt-4 max-w-2xl rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-1.5">
+            <div className="text-xs text-gray-600 flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500 flex-shrink-0" aria-hidden />
+              <span>
+                Live:{' '}
+                {plugins.filter((p) => p.user_selectable !== false).length} selectable plugins,{' '}
+                {workflows.length} workflows
+              </span>
+            </div>
+            {licenseStatus && (
+              <div className="space-y-0.5 pt-0.5 border-t border-gray-200">
+                <div
+                  className={`text-xs flex items-center gap-1 ${licenseStatus.freesurfer.found ? 'text-green-600' : 'text-navy-600'}`}
+                >
+                  {licenseStatus.freesurfer.found ? (
+                    <>
+                      <CheckCircle className="w-3 h-3 flex-shrink-0" />
+                      FreeSurfer license detected
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      <span>
+                        No FreeSurfer license — place{' '}
+                        <code className="bg-gray-100 px-1 rounded text-[10px]">license.txt</code> in project root
+                      </span>
+                    </>
+                  )}
+                </div>
+                <div
+                  className={`text-xs flex items-center gap-1 ${licenseStatus.meld_graph.found ? 'text-green-600' : 'text-navy-600'}`}
+                >
+                  {licenseStatus.meld_graph.found ? (
+                    <>
+                      <CheckCircle className="w-3 h-3 flex-shrink-0" />
+                      MELD Graph license detected
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      <span>
+                        No MELD license — place{' '}
+                        <code className="bg-gray-100 px-1 rounded text-[10px]">meld_license.txt</code> in project root
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {error && (

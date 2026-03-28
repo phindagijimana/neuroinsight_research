@@ -47,6 +47,10 @@ import type {
   BatchSubmitRequest, 
   BatchSubmitResponse,
   SystemResources,
+  EegPreviewPayload,
+  MultimodalManifest,
+  MultimodalMeshPayload,
+  MultimodalSourceFramePayload,
 } from '../types';
 
 // Backend API URL (configured via environment variable or default)
@@ -168,8 +172,10 @@ export const apiService = {
    * @param userSelectableOnly - If true, hide utility plugins (default: true)
    */
   async getPlugins(userSelectableOnly: boolean = true): Promise<{ plugins: any[]; total: number }> {
+    // Axios may omit `false` from params in some setups; string keeps `user_selectable_only` explicit
+    // so the backend returns every plugin (needed for workflow step resolution).
     const response = await api.get('/api/plugins', {
-      params: { user_selectable_only: userSelectableOnly }
+      params: { user_selectable_only: userSelectableOnly ? 'true' : 'false' },
     });
     return response.data;
   },
@@ -699,6 +705,65 @@ export const apiService = {
   /** Find segmentation files. */
   async getJobSegmentations(jobId: string): Promise<{ job_id: string; segmentations: any[] }> {
     const resp = await api.get(`/api/results/${jobId}/segmentation`);
+    return resp.data;
+  },
+
+  /**
+   * Downsampled EEG (MNE) for Viewer — .edf, .bdf, .vhdr, .fif.
+   * filePath is the job-relative path (same as download?s file_path).
+   */
+  async getEegPreview(
+    jobId: string,
+    filePath: string,
+    opts?: {
+      duration_s?: number;
+      n_time_points?: number;
+      max_channels?: number;
+      time_offset_s?: number;
+    }
+  ): Promise<EegPreviewPayload> {
+    const resp = await api.get(`/api/results/${jobId}/eeg_preview`, {
+      params: {
+        file_path: filePath,
+        duration_s: opts?.duration_s,
+        n_time_points: opts?.n_time_points,
+        max_channels: opts?.max_channels,
+        time_offset_s: opts?.time_offset_s,
+      },
+      timeout: 120000,
+    });
+    return resp.data;
+  },
+
+  /** Multimodal bundle manifest, or null if job has no ``nir_multimodal_manifest.json``. */
+  async getMultimodalManifest(jobId: string): Promise<MultimodalManifest | null> {
+    try {
+      const resp = await api.get(`/api/results/${jobId}/multimodal_manifest`);
+      return resp.data;
+    } catch (error) {
+      const ax = error as AxiosError;
+      if (ax.response?.status === 404) return null;
+      throw error;
+    }
+  },
+
+  /** Cortical mesh (flat vertices + indices) for WebGL. */
+  async getMultimodalMesh(jobId: string): Promise<MultimodalMeshPayload> {
+    const resp = await api.get(`/api/results/${jobId}/multimodal_mesh`, {
+      timeout: 120000,
+    });
+    return resp.data;
+  },
+
+  /** Vertex scalar map at one time index (aligned with compact EEG preview when bundle says so). */
+  async getMultimodalSourceFrame(
+    jobId: string,
+    timeIndex: number
+  ): Promise<MultimodalSourceFramePayload> {
+    const resp = await api.get(`/api/results/${jobId}/multimodal_source_frame`, {
+      params: { time_index: timeIndex },
+      timeout: 60000,
+    });
     return resp.data;
   },
 

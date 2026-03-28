@@ -39,6 +39,7 @@ from backend.core.ssh_manager import (
     SSHCommandError,
     get_ssh_manager,
 )
+from backend.execution.workflow_nir_env import apply_workflow_nir_input_root_command_overrides
 
 logger = logging.getLogger(__name__)
 
@@ -1548,6 +1549,7 @@ class SLURMBackend(ExecutionBackend):
             "freesurfer_autorecon_volonly":  "native/freesurfer/SUBJECTS_DIR",
             "freesurfer_longitudinal":      "native/freesurfer/SUBJECTS_DIR",
             "fastsurfer":    "native/fastsurfer",
+            "eeg_preprocessing": "native/eeg_preprocessing",
             "tsc_data_preparation":         "native/tsc_data_prep",
             "tsc_skull_strip_synthstrip":   "native/tsc_skull_strip",
             "tsc_t2_combine_niftymic":      "native/tsc_t2_combine",
@@ -1568,6 +1570,15 @@ class SLURMBackend(ExecutionBackend):
                 step_pid = step["plugin_id"]
 
                 cmd_script = _substitute_params(step["command_template"])
+                wf_id = spec.parameters.get("_workflow_id") if spec.parameters else None
+                step_ids = [s["plugin_id"] for s in workflow_steps]
+                cmd_script = apply_workflow_nir_input_root_command_overrides(
+                    workflow_steps=step_ids,
+                    step_idx=step_idx,
+                    step_plugin_id=step_pid,
+                    wf_id=wf_id,
+                    cmd_script=cmd_script,
+                )
 
                 # Build extra bind mounts for inter-step output chaining.
                 # Scan the command template for /data/inputs/{name} references and
@@ -1595,6 +1606,17 @@ class SLURMBackend(ExecutionBackend):
                                     step_num, full_host_path, container_input,
                                 )
                                 break
+
+                if step_pid == "forward_model":
+                    fm_host = f"{job_dir}/outputs/native/forward_merge"
+                    step_extra_binds += (
+                        f" --bind {fm_host}:/data/inputs/forward_merge:rw"
+                    )
+                elif step_pid == "source_localization":
+                    sm_host = f"{job_dir}/outputs/native/source_merge"
+                    step_extra_binds += (
+                        f" --bind {sm_host}:/data/inputs/source_merge:rw"
+                    )
 
                 # Record this step's output path for downstream steps
                 if step_pid in _PLUGIN_OUTPUT_DIRS:
@@ -1629,6 +1651,40 @@ class SLURMBackend(ExecutionBackend):
                 lines.append(f'# ---- Workflow step {step_num}/{total}: {step_name} ----')
                 lines.append(f'if [ $PIPELINE_EXIT -eq 0 ]; then')
                 lines.append(f'echo "=== WORKFLOW STEP {step_num}/{total}: {step_name} ==="')
+                # eeg_mri_coregistration uses NIR_INPUT_ROOT=/data/inputs/eeg_preprocessing; that bind only
+                # contains prior-step outputs. Copy transforms from staged input_dir into that tree so the
+                # container sees metadata/coreg next to eeg/clean_raw.fif, or drop a reproducible identity JSON.
+                if step_pid == "eeg_mri_coregistration":
+                    lines.append(f'NI_EP_OUT="{job_dir}/outputs/native/eeg_preprocessing"')
+                    lines.append(f'NI_STAGED="{job_dir}/inputs/input_dir"')
+                    lines.append('mkdir -p "$NI_EP_OUT/metadata" "$NI_EP_OUT/coreg"')
+                    lines.append('if [ -f "$NI_STAGED/metadata/eeg_to_mri_transform.json" ]; then')
+                    lines.append('  cp -f "$NI_STAGED/metadata/eeg_to_mri_transform.json" "$NI_EP_OUT/metadata/"')
+                    lines.append('elif [ ! -f "$NI_EP_OUT/metadata/eeg_to_mri_transform.json" ]; then')
+                    lines.append('  cat > "$NI_EP_OUT/metadata/eeg_to_mri_transform.json" << \'NI_IDENTITY_MATRIX_EOF\'')
+                    lines.append('{"matrix":[[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]}')
+                    lines.append('NI_IDENTITY_MATRIX_EOF')
+                    lines.append('fi')
+                    lines.append('for _tf in trans.fif eeg_to_mri_trans.fif; do')
+                    lines.append('  if [ -f "$NI_STAGED/coreg/$_tf" ] && [ ! -f "$NI_EP_OUT/coreg/$_tf" ]; then')
+                    lines.append('    cp -f "$NI_STAGED/coreg/$_tf" "$NI_EP_OUT/coreg/$_tf"')
+                    lines.append('  fi')
+                    lines.append('done')
+                if step_pid == "forward_model":
+                    lines.append(f'NI_FM="{job_dir}/outputs/native/forward_merge"')
+                    lines.append('rm -rf "$NI_FM" 2>/dev/null; mkdir -p "$NI_FM"')
+                    lines.append(f'ln -sfn "{job_dir}/outputs/native/eeg_preprocessing/eeg" "$NI_FM/eeg"')
+                    lines.append(f'ln -sfn "{job_dir}/outputs/native/eeg_mri_coregistration/coreg" "$NI_FM/coreg"')
+                    lines.append(
+                        f'if [ -d "{job_dir}/inputs/input_dir/models" ]; then '
+                        f'ln -sfn "{job_dir}/inputs/input_dir/models" "$NI_FM/models"; fi'
+                    )
+                if step_pid == "source_localization":
+                    lines.append(f'NI_SM="{job_dir}/outputs/native/source_merge"')
+                    lines.append('rm -rf "$NI_SM" 2>/dev/null; mkdir -p "$NI_SM"')
+                    lines.append(f'ln -sfn "{job_dir}/outputs/native/eeg_preprocessing/eeg" "$NI_SM/eeg"')
+                    lines.append(f'ln -sfn "{job_dir}/outputs/native/forward_model/models" "$NI_SM/models"')
+                    lines.append(f'ln -sfn "{job_dir}/outputs/native/spike_detection/events" "$NI_SM/events"')
                 lines.append(f"cat > {job_dir}/scripts/step_{step_num}_cmd.sh << 'NI_STEP_{step_num}_EOF'")
                 lines.append(cmd_script)
                 lines.append(f"NI_STEP_{step_num}_EOF")

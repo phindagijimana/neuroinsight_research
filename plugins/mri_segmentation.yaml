@@ -1,0 +1,105 @@
+# Plugin: MRI segmentation (FreeSurfer volumetric — multimodal epilepsy branch)
+# Same container as freesurfer_autorecon_volonly; distinct plugin id for EEG+imaging workflows.
+id: mri_segmentation
+name: "MRI Segmentation (FreeSurfer VolOnly)"
+version: "1.0.0"
+type: plugin
+domain: eeg_imaging
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "MRI Segmentation (VolOnly)"
+
+description: >
+  FreeSurfer autorecon1 + autorecon2-volonly plus mri_segstats (aseg.stats).
+  Used as the structural branch for multimodal epilepsy biomarker workflows.
+
+authors:
+  - "NeuroInsight Research Team"
+  - "Based on FreeSurfer (Fischl, 2012)"
+
+references:
+  - "Fischl, B. (2012). FreeSurfer. Neuroimage, 62(2), 774-781."
+
+container:
+  runtime: docker
+  image: "phindagijimana321/freesurfer-autorecon-volonly:7.4.1"
+  digest: "sha256:dce99940b0f1e606c6457ea5e2e36a9f5f0ca4da1b2fd612cd97f5d69623c684"
+
+inputs:
+  required:
+    - key: T1w
+      type: nifti
+      description: "T1-weighted MRI (.nii.gz)"
+  optional:
+    - key: subject_id
+      type: string
+      default: "subject"
+      description: "FreeSurfer subject id (-s)"
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license.txt"
+    - key: recon_all_extra_args
+      type: string
+      default: ""
+      description: "Extra args to recon-all"
+
+input_format:
+  format_name: "T1 NIfTI"
+  description: "Skull-on T1; staged as /data/inputs/T1w.nii.gz for this runner."
+
+parameters:
+  - name: threads
+    type: int
+    default: 8
+    min_value: 1
+    max_value: 32
+    description: "OpenMP threads for recon-all"
+
+resources:
+  profiles:
+    default:
+      cpus: 8
+      mem_gb: 32
+      time_hours: 10
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/mri_segmentation"
+    subjects_dir: "{run_root}/native/mri_segmentation/SUBJECTS_DIR"
+    logs_dir: "{run_root}/logs/mri_segmentation"
+  stages:
+    - id: recon_and_segstats
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+        export FS_LICENSE="${FS_LICENSE:-/license/license.txt}"
+        export SUBJECTS_DIR=/data/outputs/native/mri_segmentation/SUBJECTS_DIR
+        mkdir -p "$SUBJECTS_DIR" /data/outputs/logs/mri_segmentation
+        echo "Running FreeSurfer autorecon1 + autorecon2-volonly..."
+        EXTRA_ARGS="{recon_all_extra_args}"
+        recon-all \
+          -i /data/inputs/T1w.nii.gz \
+          -s {subject_id} \
+          -sd "$SUBJECTS_DIR" \
+          -autorecon1 \
+          -autorecon2-volonly \
+          -parallel \
+          -openmp {threads} \
+          $EXTRA_ARGS
+        echo "Running mri_segstats on aseg..."
+        mri_segstats \
+          --seg "$SUBJECTS_DIR/{subject_id}/mri/aseg.auto.mgz" \
+          --excludeid 0 \
+          --sum "$SUBJECTS_DIR/{subject_id}/stats/aseg.stats" \
+          --i "$SUBJECTS_DIR/{subject_id}/mri/brain.mgz"
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true

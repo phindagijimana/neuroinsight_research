@@ -1,0 +1,90 @@
+# Workflow: EEG Source Localization
+# EEG preprocessing → spikes → EEG–MRI coregistration → forward model → inverse.
+id: eeg_source_localization
+name: "EEG Source Localization"
+version: "1.0.0"
+type: workflow
+domain: eeg_imaging
+
+description: >
+  End-to-end source imaging: clean EEG, detect spike candidates, align sensors
+  to MRI, compute the forward solution, then minimum-norm / dSPM-style inverse.
+  Outputs support Brain View and Multimodal View when bundled.
+
+developer_contract: >
+  Workflows only orchestrate plugins. Supply MRI (T1), optional BEM/surfaces,
+  and EEG under the staged layout expected by each plugin (see plugin YAML).
+
+authors:
+  - "NeuroInsight Research Team"
+
+inputs:
+  required:
+    - key: input_dir
+      type: directory
+      description: >
+        Staged run inputs: EEG under eeg/, MRI (e.g. T1w.nii.gz) and optional BEM
+        per forward_model / coregistration plugin contracts.
+  optional:
+    - key: eeg_raw_path
+      type: string
+      default: "eeg/raw"
+    - key: fs_license
+      type: path
+      description: "FreeSurfer license path when required by staged anatomy tooling."
+
+input_format:
+  format_name: "EEG + structural MRI (+ optional BEM)"
+  description: >
+    Continuous EEG and T1-weighted MRI co-registered inputs as required by
+    eeg_mri_coregistration and forward_model plugins.
+  example_structure: |
+    run_inputs/
+      eeg/raw/...
+      mri/T1w.nii.gz
+      mri/bem/...
+
+validation:
+  preflight_checks:
+    - "directory_exists(input_dir)"
+
+steps:
+  - id: eeg_preprocessing
+    uses: eeg_preprocessing
+    with:
+      eeg_raw_path: "{inputs.eeg_raw_path}"
+
+  - id: spike_detection
+    uses: spike_detection
+    depends_on:
+      - eeg_preprocessing
+
+  - id: eeg_mri_coregistration
+    uses: eeg_mri_coregistration
+    depends_on:
+      - spike_detection
+
+  - id: forward_model
+    uses: forward_model
+    depends_on:
+      - eeg_mri_coregistration
+
+  - id: source_localization
+    uses: source_localization
+    depends_on:
+      - forward_model
+
+outputs:
+  native:
+    - "{run_root}/native/eeg_preprocessing"
+    - "{run_root}/native/spike_detection"
+    - "{run_root}/native/eeg_mri_coregistration"
+    - "{run_root}/native/forward_model"
+    - "{run_root}/native/source_localization"
+  bundle:
+    - "{run_root}/bundle"
+
+reproducibility:
+  pin_containers: true
+  write_run_manifest: true
+  store_exact_commands: true

@@ -1,0 +1,62 @@
+# Plugin: Biomarker scoring (multimodal summary)
+id: biomarker_scoring
+name: "Biomarker Scoring"
+version: "1.0.0"
+type: plugin
+domain: eeg_imaging
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "Biomarker Scoring"
+
+description: >
+  Scores fused ROI features into laterality, concordance, and viewer_summary JSON.
+
+authors:
+  - "NeuroInsight Research Team"
+
+container:
+  runtime: docker
+  image: "phindagijimana321/eeg-biomarker-scoring:1.0.0"
+  digest: "sha256:8d20a3d922b99ee273c7e2cf59c77f47d9cc4c4913564756c91cef277e1d32c0"
+
+inputs:
+  required: []
+  optional: []
+
+input_format:
+  format_name: "ROI feature JSONs"
+  description: "features/roi_source_features.json, roi_structural_features.json, concordance_features.json"
+
+parameters: []
+
+resources:
+  profiles:
+    default:
+      cpus: 2
+      mem_gb: 4
+      time_hours: 1
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/biomarker_scoring"
+    logs_dir: "{run_root}/logs/biomarker_scoring"
+  stages:
+    - id: score
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+        export NIR_INPUT_ROOT=/data/inputs
+        export NIR_OUTPUT_ROOT=/data/outputs/native/biomarker_scoring
+        mkdir -p "$NIR_OUTPUT_ROOT" /data/outputs/logs/biomarker_scoring
+        python /app/run.py
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true

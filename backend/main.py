@@ -107,6 +107,13 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"Startup stale-job reap failed: {e}")
 
+    try:
+        from backend.services.sample_eeg_jobs import ensure_sample_eeg_jobs
+
+        ensure_sample_eeg_jobs()
+    except Exception as e:
+        logger.warning(f"Sample EEG demo jobs not installed: {e}")
+
     # Auto-reconnect to HPC if a previous session config is persisted
     try:
         from backend.core.hpc_config_store import load_hpc_config
@@ -831,6 +838,14 @@ def submit_workflow_job(workflow_id: str, request: WorkflowJobSubmitRequest, db:
     _check_licenses(step_plugin_ids)
     _enforce_disk_guard_for_submission(step_plugin_ids, f"workflow '{workflow.name}'")
 
+    if workflow_id == "multimodal_epilepsy_biomarker":
+        from backend.validation.workflow_staging import validate_multimodal_epilepsy_biomarker_inputs
+
+        try:
+            validate_multimodal_epilepsy_biomarker_inputs(request.input_files)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     # Compute resources from all steps: sum time_hours, take max of mem/cpus
     first_plugin = pw_registry.get_plugin(workflow.steps[0].uses)
     total_time = 0
@@ -1468,10 +1483,15 @@ def list_jobs(status: Optional[str] = None, limit: int = 100, db: Session = Depe
     query = query.order_by(Job.submitted_at.desc()).limit(limit)
     jobs = query.all()
     payload = []
+    from backend.services.sample_eeg_jobs import SAMPLE_JOB_DISPLAY
+
     for job in jobs:
         item = job.to_dict()
         item["progress"] = quantize_progress(item.get("progress", 0))
         item.update(_build_job_display_fields(job))
+        if job.id in SAMPLE_JOB_DISPLAY:
+            item["display_name"] = SAMPLE_JOB_DISPLAY[job.id]
+            item["is_sample_job"] = True
         payload.append(item)
     return {"jobs": payload}
 
@@ -2140,15 +2160,25 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
         except Exception as e:
             logger.debug("Could not refresh live progress for job %s: %s", job_id[:8], e)
 
+    from backend.services.sample_eeg_jobs import SAMPLE_JOB_DISPLAY
+
     payload = job.to_dict()
     payload["progress"] = quantize_progress(payload.get("progress", 0))
     payload.update(_build_job_display_fields(job))
+    if job.id in SAMPLE_JOB_DISPLAY:
+        payload["display_name"] = SAMPLE_JOB_DISPLAY[job.id]
+        payload["is_sample_job"] = True
     return payload
 
 
 @app.post("/api/jobs/{job_id}/cancel")
 def cancel_job(job_id: str, db: Session = Depends(get_db)):
     """Cancel a running job."""
+    from backend.services.sample_eeg_jobs import SAMPLE_JOB_IDS
+
+    if job_id in SAMPLE_JOB_IDS:
+        raise HTTPException(status_code=400, detail="Sample jobs cannot be cancelled.")
+
     job = db.query(Job).filter(Job.id == job_id, Job.deleted == False).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -2185,6 +2215,14 @@ def get_job_logs(job_id: str):
 @app.delete("/api/jobs/{job_id}")
 def delete_job(job_id: str, db: Session = Depends(get_db)):
     """Delete a job -- stops the container first if still running."""
+    from backend.services.sample_eeg_jobs import SAMPLE_JOB_IDS
+
+    if job_id in SAMPLE_JOB_IDS:
+        raise HTTPException(
+            status_code=400,
+            detail="Sample demonstration jobs cannot be deleted.",
+        )
+
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")

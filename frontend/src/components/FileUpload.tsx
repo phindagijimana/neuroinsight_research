@@ -148,13 +148,20 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
 
     try {
       const jobIds: string[] = [];
+      const wfP: Record<string, string> = {};
       for (const file of files) {
         const filePath = `${inputDir}/${file}`;
         if (selectedExecution?.type === 'plugin' && selectedExecution.id) {
           const result = await apiService.submitPluginJob(selectedExecution.id, [filePath], {}, customResources || undefined);
           jobIds.push(result.job_id);
         } else if (selectedExecution?.type === 'workflow' && selectedExecution.id) {
-          const result = await apiService.submitWorkflowJob(selectedExecution.id, [filePath], {}, customResources || undefined);
+          const inputs = [filePath];
+          const result = await apiService.submitWorkflowJob(
+            selectedExecution.id,
+            inputs,
+            wfP,
+            customResources || undefined
+          );
           jobIds.push(result.job_id);
         } else {
           const result = await apiService.submitBatchJob({
@@ -183,11 +190,12 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
     setError(null);
 
     try {
+      const wfP: Record<string, string> = {};
       const result = await apiService.submitWorkflowBatch(
         selectedExecution.id,
         bidsDir,
         subjectIds,
-        {},
+        wfP,
         customResources || undefined,
       );
       const jobIds = result.jobs.map(j => j.job_id);
@@ -212,11 +220,18 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
     setError(null);
 
     try {
+      const wfP: Record<string, string> = {};
       if (selectedExecution?.type === 'plugin' && selectedExecution.id) {
         const result = await apiService.submitPluginJob(selectedExecution.id, [uploadedFilePath], {}, customResources || undefined);
         onJobsSubmitted([result.job_id]);
       } else if (selectedExecution?.type === 'workflow' && selectedExecution.id) {
-        const result = await apiService.submitWorkflowJob(selectedExecution.id, [uploadedFilePath], {}, customResources || undefined);
+        const inputs = [uploadedFilePath];
+        const result = await apiService.submitWorkflowJob(
+          selectedExecution.id,
+          inputs,
+          wfP,
+          customResources || undefined
+        );
         onJobsSubmitted([result.job_id]);
       } else {
         const result = await apiService.submitJob(selectedPipeline.name, [uploadedFilePath], {}, customResources || undefined);
@@ -240,11 +255,20 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
         : [transferredPath];
       const srcPlatform = isPlatformSource ? dataSource : undefined;
       const srcDatasetId = isPlatformSource ? (platformDatasetId || undefined) : undefined;
+      const wfP: Record<string, string> = {};
+      const pathsForSubmit = inputFiles;
       if (selectedExecution?.type === 'plugin' && selectedExecution.id) {
         const result = await apiService.submitPluginJob(selectedExecution.id, inputFiles, {}, customResources || undefined, srcPlatform, srcDatasetId);
         onJobsSubmitted([result.job_id]);
       } else if (selectedExecution?.type === 'workflow' && selectedExecution.id) {
-        const result = await apiService.submitWorkflowJob(selectedExecution.id, inputFiles, {}, customResources || undefined, srcPlatform, srcDatasetId);
+        const result = await apiService.submitWorkflowJob(
+          selectedExecution.id,
+          pathsForSubmit,
+          wfP,
+          customResources || undefined,
+          srcPlatform,
+          srcDatasetId
+        );
         onJobsSubmitted([result.job_id]);
       }
     } catch (err: any) {
@@ -356,15 +380,15 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
 
         {/* Step: Pipeline + submit */}
         {currentStep === 'pipeline' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:items-start">
             <div className="space-y-4">
               <PipelineSelector onPipelineSelect={setSelectedPipeline} selectedPipeline={selectedPipeline} onExecutionSelect={setSelectedExecution} />
               {selectedPipeline && (
                 <ResourceSelector plugin={selectedPipeline} backendType={selectedBackend === 'local' ? 'local' : selectedBackend === 'remote_hpc' ? 'hpc' : 'remote'} onResourcesChange={setCustomResources} />
               )}
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
-              <h3 className="text-sm font-semibold text-gray-700">Ready to Process</h3>
+            <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 space-y-4">
+              <h3 className="text-sm font-semibold text-gray-800">Ready to Process</h3>
               <div className="text-xs text-gray-600 space-y-1">
                 <p><strong>Source:</strong> {dataSource === 'pennsieve' ? 'Pennsieve' : 'XNAT'}</p>
                 <p><strong>Files:</strong> {platformFiles.length}</p>
@@ -402,7 +426,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
 
       <div className="space-y-4">
         {/* Row 1: Unified Backend (with platform tabs) + Resource Configuration */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
           <BackendSelector {...backendProps} />
 
           {selectedPipeline && (
@@ -415,14 +439,14 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
         </div>
 
         {/* Row 2: Input Mode + Pipeline Selector */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 lg:items-start">
           {selectedPipeline && (
-            <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4 flex flex-col h-full">
+            <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 space-y-4 flex flex-col h-full">
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Input Mode</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Input Mode</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <button onClick={() => setMode('single')}
-                    className={`p-3 rounded-md border transition-all ${mode === 'single' ? 'border-navy-600 bg-navy-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                    className={`p-3 rounded-lg border text-left transition-all ${mode === 'single' ? 'border-[#003d7a]/40 bg-white shadow-sm ring-1 ring-[#003d7a]/15' : 'border-gray-200/80 bg-white hover:border-gray-300'}`}>
                     <div className="flex items-center mb-1">
                       <Upload className={`h-4 w-4 mr-1.5 ${mode === 'single' ? 'text-navy-600' : 'text-gray-400'}`} />
                       <span className="text-sm font-medium text-gray-900">Single</span>
@@ -470,7 +494,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
             </div>
           )}
 
-          <PipelineSelector onPipelineSelect={setSelectedPipeline} selectedPipeline={selectedPipeline} onExecutionSelect={setSelectedExecution} />
+          <div className="space-y-3 min-w-0">
+            <PipelineSelector onPipelineSelect={setSelectedPipeline} selectedPipeline={selectedPipeline} onExecutionSelect={setSelectedExecution} />
+          </div>
         </div>
       </div>
     </div>

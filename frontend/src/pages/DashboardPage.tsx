@@ -16,11 +16,14 @@ import RefreshCw from '../components/icons/RefreshCw';
 import Eye from '../components/icons/Eye';
 import Activity from '../components/icons/Activity';
 import Download from '../components/icons/Download';
+import type { ViewerTab } from '../utils/viewerQuery';
+
+const VIEWER_TABS: ViewerTab[] = ['eeg', 'imaging', 'eeg-brain'];
 
 interface DashboardPageProps {
   selectedJobId: string | null;
   setSelectedJobId: (jobId: string | null) => void;
-  setActivePage: (page: string) => void;
+  setActivePage: (page: string, opts?: { viewerTab?: ViewerTab }) => void;
 }
 
 interface Provenance {
@@ -111,9 +114,11 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
   };
 
   const handleViewInViewer = () => {
-    if (selectedJobId) {
-      setActivePage('viewer');
-    }
+    if (!selectedJobId || !selectedJob) return;
+    const hint = selectedJob.parameters?._sample_viewer_tab as string | undefined;
+    const tab =
+      hint && VIEWER_TABS.includes(hint as ViewerTab) ? (hint as ViewerTab) : 'imaging';
+    setActivePage('viewer', { viewerTab: tab });
   };
 
   const completedJobs = jobs.filter(j => j.status === 'completed');
@@ -216,6 +221,13 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                   <p className="text-gray-600">
                     Job ID: {selectedJob.id} &middot;{' '}
                     {selectedJob.execution_mode === 'workflow' ? 'Workflow' : 'Plugin'} Execution
+                    {selectedJob.is_sample_job && (
+                      <>
+                        {' '}
+                        &middot;{' '}
+                        <span className="text-emerald-700 font-medium">Bundled sample data</span>
+                      </>
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -248,6 +260,13 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                   )}
                 </div>
               </div>
+              {selectedJob.is_sample_job && selectedJob.status === 'completed' && (
+                <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+                  Open in Viewer picks the right mode for this sample (Signal View or Multimodal View). Use{' '}
+                  <strong>Show files</strong> in the Viewer if you want to open the demo FIF or NIfTI
+                  manually.
+                </p>
+              )}
             </div>
 
             {/* QC Summary Cards */}
@@ -390,14 +409,39 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
               </div>
             )}
 
-            {/* Running/Failed job message */}
+            {/* Running / pending / failed (show backend error_message when failed) */}
             {selectedJob.status !== 'completed' && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-                <p className="text-sm text-yellow-800">
-                  {selectedJob.status === 'running' && 'This job is still running. Results will appear when processing completes.'}
-                  {selectedJob.status === 'pending' && 'This job is pending. Results will be available after processing.'}
-                  {selectedJob.status === 'failed' && 'This job failed. Check the job logs for details.'}
-                </p>
+              <div
+                className={
+                  selectedJob.status === 'failed'
+                    ? 'bg-red-50 border border-red-200 rounded-lg p-6 text-left'
+                    : 'bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center'
+                }
+              >
+                {selectedJob.status === 'running' && (
+                  <p className="text-sm text-yellow-800">
+                    This job is still running. Results will appear when processing completes.
+                  </p>
+                )}
+                {selectedJob.status === 'pending' && (
+                  <p className="text-sm text-yellow-800">
+                    This job is pending. Results will be available after processing.
+                  </p>
+                )}
+                {selectedJob.status === 'failed' && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-red-900">This job failed</p>
+                    {selectedJob.error_message ? (
+                      <pre className="text-xs text-red-900 whitespace-pre-wrap break-words font-mono bg-white/60 rounded p-3 border border-red-100 max-h-64 overflow-y-auto">
+                        {selectedJob.error_message}
+                      </pre>
+                    ) : (
+                      <p className="text-sm text-red-800">
+                        No error details were recorded. Use the API or backend logs for this job if you need more context.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

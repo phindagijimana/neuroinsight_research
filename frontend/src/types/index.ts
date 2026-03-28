@@ -232,6 +232,9 @@ export interface Job {
   /** Human-readable label for the current pipeline phase */
   current_phase?: string | null;
 
+  /** Bundled demo job (EEG viewer onboarding) — cannot be deleted via API */
+  is_sample_job?: boolean;
+
   /** ISO 8601 timestamp when job was submitted */
   submitted_at: string;
 
@@ -440,4 +443,60 @@ export interface TransferStatus {
   error?: string | null;
   created_at?: string;
   completed_at?: string | null;
+}
+
+/** Downsampled EEG preview from GET /api/results/{job_id}/eeg_preview */
+export interface EegPreviewPayload {
+  sfreq: number;
+  duration_s: number;
+  /** Start of this window in the recording (seconds); ``times`` are absolute from file t=0. */
+  time_offset_s?: number;
+  /** Full recording length (seconds), from header. */
+  total_duration_s?: number;
+  times: number[];
+  ch_names: string[];
+  waveforms: number[][];
+  positions: { name: string; x: number; y: number }[];
+  source_file: string;
+}
+
+/** nir_multimodal_manifest.json — linked EEG + cortical source bundle */
+export interface MultimodalManifest {
+  schema_version: number;
+  eeg_file?: string;
+  mri_ref?: string;
+  cortex_npz?: string;
+  space?: string;
+  source_units?: string;
+  inverse_method?: string;
+  /** How EEG, source mesh, and MRI relate (for Multimodal View explanation). */
+  linkage?: {
+    eeg_file?: string;
+    mri_ref?: string;
+    registration?: string;
+    signal_to_source?: string;
+    source_to_anatomy?: string;
+  };
+  time_alignment?: {
+    duration_s?: number;
+    n_time_points?: number;
+    note?: string;
+  };
+  qc?: { status?: string; message?: string };
+}
+
+export interface MultimodalMeshPayload {
+  vertices: number[];
+  faces: number[];
+  vertex_count: number;
+  face_count: number;
+}
+
+export interface MultimodalSourceFramePayload {
+  time_index: number;
+  time_s: number;
+  n_times: number;
+  values: number[];
+  vmin: number;
+  vmax: number;
 }

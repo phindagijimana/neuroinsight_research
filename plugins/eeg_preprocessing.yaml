@@ -1,0 +1,69 @@
+# Plugin: EEG preprocessing (MNE-Python)
+id: eeg_preprocessing
+name: "EEG Preprocessing"
+version: "1.0.0"
+type: plugin
+domain: eeg
+
+visibility:
+  user_selectable: true
+  ui_category: primary
+  ui_label: "EEG Preprocessing"
+
+description: >
+  Bandpass, notch, and average reference on continuous EEG using MNE-Python.
+  Expects raw EEG under the staged input layout (eeg/raw as file or directory).
+
+authors:
+  - "NeuroInsight Research Team"
+
+references:
+  - "https://mne.tools/stable/auto_tutorials/preprocessing/"
+
+container:
+  runtime: docker
+  image: "phindagijimana321/eeg-preprocessing-mne:1.0.1"
+  digest: "sha256:76300d0c35f9b5603480d8eabe155207d55e63b59a6551745b7797ba4a68817a"
+
+inputs:
+  required: []
+  optional:
+    - key: eeg_raw_path
+      type: string
+      description: "Relative path under inputs for raw EEG (default: eeg/raw)"
+
+input_format:
+  format_name: "EEG (EDF, FIF, BrainVision, BDF)"
+  description: "Continuous EEG; place under /data/inputs/eeg/raw per run staging."
+
+parameters: []
+
+resources:
+  profiles:
+    default:
+      cpus: 4
+      mem_gb: 8
+      time_hours: 2
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/eeg_preprocessing"
+    logs_dir: "{run_root}/logs/eeg_preprocessing"
+  stages:
+    - id: preprocess
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+        export NIR_INPUT_ROOT=/data/inputs
+        export NIR_OUTPUT_ROOT=/data/outputs/native/eeg_preprocessing
+        mkdir -p "$NIR_OUTPUT_ROOT" /data/outputs/logs/eeg_preprocessing
+        python /app/run.py
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true

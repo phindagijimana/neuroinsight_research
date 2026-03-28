@@ -181,9 +181,48 @@ class LocalDockerBackend(ExecutionBackend):
             logger.info(f"Dispatched job {job_id[:8]} to Celery ({task_name}, task_id={result.id})")
         except Exception as e:
             logger.warning(f"Celery dispatch failed for job {job_id[:8]}: {e}. Running in-thread.")
-            self._run_in_thread(job_id, spec_dict)
+            if spec_dict.get("execution_mode") == "workflow":
+                self._run_workflow_in_thread(job_id, spec_dict)
+            else:
+                self._run_in_thread(job_id, spec_dict)
 
         return job_id
+
+    def _run_workflow_in_thread(self, job_id: str, spec_dict: dict) -> None:
+        """Fallback: run full multi-step workflow without Celery."""
+
+        def _execute():
+            try:
+                from backend.execution.celery_tasks import (
+                    WorkflowJobFatal,
+                    execute_workflow_job_impl,
+                )
+
+                result = execute_workflow_job_impl(None, job_id, spec_dict)
+                with self._lock:
+                    if result.get("status") == "completed":
+                        self._jobs[job_id]["status"] = JobStatus.COMPLETED
+                        self._jobs[job_id]["exit_code"] = 0
+                    else:
+                        self._jobs[job_id]["status"] = JobStatus.FAILED
+                        self._jobs[job_id]["exit_code"] = result.get("exit_code", -1)
+                        self._jobs[job_id]["error_message"] = result.get("error", "")
+                    self._jobs[job_id]["completed_at"] = datetime.utcnow()
+            except WorkflowJobFatal as ex:
+                logger.error(f"In-thread workflow rejected for job {job_id[:8]}: {ex}")
+                with self._lock:
+                    self._jobs[job_id]["status"] = JobStatus.FAILED
+                    self._jobs[job_id]["error_message"] = str(ex)
+                    self._jobs[job_id]["completed_at"] = datetime.utcnow()
+            except Exception as ex:
+                logger.error(f"In-thread workflow failed for job {job_id[:8]}: {ex}")
+                with self._lock:
+                    self._jobs[job_id]["status"] = JobStatus.FAILED
+                    self._jobs[job_id]["error_message"] = str(ex)
+                    self._jobs[job_id]["completed_at"] = datetime.utcnow()
+
+        thread = threading.Thread(target=_execute, name=f"wf-{job_id[:8]}", daemon=True)
+        thread.start()
 
     def _run_in_thread(self, job_id: str, spec_dict: dict) -> None:
         """Fallback: run job in a background thread when Celery is unavailable."""
@@ -229,8 +268,8 @@ class LocalDockerBackend(ExecutionBackend):
                 command_template = spec_dict.get("command_template", "")
                 if command_template:
                     command = command_template
-                    from backend.execution.celery_tasks import _sanitize_param
-                    for key, value in resolved_params.items():
+                    from backend.execution.celery_tasks import _params_for_shell_template, _sanitize_param
+                    for key, value in _params_for_shell_template(resolved_params).items():
                         safe_value = _sanitize_param(str(value))
                         command = command.replace(f"{{{key}}}", safe_value)
                         command = command.replace(f"${{{key}}}", safe_value)
