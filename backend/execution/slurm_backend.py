@@ -1537,6 +1537,24 @@ class SLURMBackend(ExecutionBackend):
                     result = result.replace(f"${{{key}}}", safe_val)
             return result
 
+        def _patch_single_plugin_nir_input_root_for_staging(script: str) -> str:
+            """Inputs are mounted at /data/inputs/<basename>; templates must not use /data/inputs alone."""
+            if spec.workflow_id or not spec.plugin_id or not spec.input_files or len(spec.input_files) != 1:
+                return script
+            name = PurePosixPath(spec.input_files[0].strip().rstrip("/")).name
+            if not name:
+                return script
+            lower = name.lower()
+            if lower.endswith(".nii.gz") or lower.endswith(
+                (".nii", ".edf", ".bdf", ".fif", ".vhdr", ".mgz", ".mif", ".dcm", ".tsv", ".json")
+            ):
+                return script
+            old = "export NIR_INPUT_ROOT=/data/inputs"
+            new = f"export NIR_INPUT_ROOT=/data/inputs/{name}"
+            if old in script and new not in script:
+                return script.replace(old, new, 1)
+            return script
+
         # Map of plugin_id -> container output path (populated during step iteration)
         _step_output_paths: dict[str, str] = {}
 
@@ -1712,6 +1730,7 @@ class SLURMBackend(ExecutionBackend):
         elif command_template:
             # ---- Single plugin: one container ----
             cmd_script = _substitute_params(command_template)
+            cmd_script = _patch_single_plugin_nir_input_root_for_staging(cmd_script)
 
             lines.append("# Write pipeline command script")
             lines.append(f"cat > {job_dir}/scripts/pipeline_cmd.sh << 'NEUROINSIGHT_CMD_EOF'")

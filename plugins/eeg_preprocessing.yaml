@@ -13,6 +13,9 @@ visibility:
 description: >
   Bandpass, notch, and average reference on continuous EEG using MNE-Python.
   Expects raw EEG under the staged input layout (eeg/raw as file or directory).
+  Relabels common auxiliary channels mis-typed as EEG (EKG/ECG/EMG/EOG) and outputs
+  EEG-only data for downstream forward/source steps. Optional metadata/channels.tsv
+  (BIDS) sets channel types before heuristics.
 
 authors:
   - "NeuroInsight Research Team"
@@ -22,8 +25,7 @@ references:
 
 container:
   runtime: docker
-  image: "phindagijimana321/eeg-preprocessing-mne:1.0.1"
-  digest: "sha256:76300d0c35f9b5603480d8eabe155207d55e63b59a6551745b7797ba4a68817a"
+  image: "phindagijimana321/eeg-preprocessing-mne:1.0.3"
 
 inputs:
   required: []

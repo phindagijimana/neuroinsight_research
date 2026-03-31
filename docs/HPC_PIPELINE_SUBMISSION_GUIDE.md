@@ -76,8 +76,9 @@ In the right panel, choose between **Plugins** (single tools) or **Workflows** (
 | FreeSurfer Longitudinal Full | Longitudinal recon-all → Stats | Directory of T1w NIfTIs | Longitudinal cortical analysis |
 | Cortical Lesion Detection | recon-all → MELD Graph | Single T1w NIfTI | Epilepsy lesion detection |
 | Hippocampal Sclerosis Detection | recon-all → HS Detection | Single T1w NIfTI | Hippocampal sclerosis analysis |
+| **Multimodal Epilepsy Biomarker** | **8 steps** (EEG prep → spike → coreg → forward → source → FS vol → ROI features → biomarkers) | **One staging directory** on HPC | EEG + T1 for source imaging and multimodal scoring |
 
-Select the desired workflow from the dropdown.
+Select the desired workflow from the dropdown (workflow id: `multimodal_epilepsy_biomarker`).
 
 ---
 
@@ -200,7 +201,51 @@ your_input_dir/
 
 ---
 
-### D. FreeSurfer recon-all (Single Plugin)
+### D. Multimodal Epilepsy Biomarker (8-step EEG + MRI)
+
+**What it does:** Runs the full NIR multimodal chain: preprocess continuous EEG, spike detection, EEG–MRI coregistration, forward model, source localization, FreeSurfer **volume-only** segmentation on T1, ROI feature fusion, and biomarker scoring.
+
+**Where the data must live:** On the **HPC filesystem** (home directory, project space, or NFS path visible to compute nodes). The SLURM backend **does not copy** large datasets from your laptop; it **symlinks** your chosen paths into `~/…/jobs/<job-id>/inputs/` on the cluster.
+
+**Order of operations (do not skip):**
+
+1. **SSH to the HPC login node** (or another session where your lab NFS mounts are visible). BDSP/BIND paths such as `/mnt/nfs/Gugger_Lab/...` are only valid there—not on your laptop by default.
+2. **Optional — build one staging folder** from separate BIDS EEG + BIND MRI trees: from a checkout of this repo on the cluster, run `eeg/scripts/stage_bdsp_bind_multimodal.py` (see the script docstring). Write the output under something like `…/Documents/NeuroInsight_Research/multimodal_<id>/`.
+3. **Connect NIR to HPC** — complete **Step 1** in this guide (SSH tunnel to the NIR server, Jobs page **Data Source: HPC**, **Compute: HPC**, fill SSH fields, **Activate SLURM Backend**).
+4. **Submit** the workflow from the UI (steps below) so SLURM runs on the cluster.
+
+**Required layout — one folder** (EEG and T1 must not be split across unrelated parents):
+
+```
+your_run_on_hpc/
+  eeg/
+    raw/
+      recording.edf          # or .fif / BrainVision / BDF (see eeg/EEG.md)
+  T1w.nii.gz                 # T1 for FreeSurfer vol-only (mri_segmentation step)
+```
+
+**Optional** (same folder or subfolders, depending on your study):
+
+- `models/` with BEM / source space / `src.fif` etc. (see `eeg/docker/README.md`); if absent, plugins may fall back to sphere BEM with a logged warning.
+- FreeSurfer **license**: place `license.txt` in the NIR server project root as for other workflows, or pass `fs_license` if your deployment supports it.
+
+**How to submit (after HPC SSH + UI connection in Step 1):**
+
+1. Confirm **SLURM Backend** is active (you already completed **Step 1: Connect to HPC in the UI**).
+2. **Workflows** → **Multimodal Epilepsy Biomarker**.
+3. **Batch** mode → **Browse** on the HPC side to `your_run_on_hpc` (the directory that contains **both** `eeg/raw/` and `T1w.nii.gz`).
+4. **Use This Directory**, then **Submit Directory as Input** (same pattern as BIDS workflows).
+5. The API requires a **single staging root**: do not submit only the T1 file; submit the **folder** that contains EEG + T1.
+
+**Notes:**
+
+- If your lab keeps EEG on NFS (example path pattern in `eeg/EEG.md`), ensure **batch nodes** can read that path; otherwise stage a copy or symlink under your HPC home that compute nodes see.
+- Wall time is the **sum** of per-step defaults in the workflow; use **Customize** under resources if your cluster allows longer jobs.
+- For REST submission, `POST /api/workflows/multimodal_epilepsy_biomarker/submit` with `input_files` listing path(s) that resolve to that **one** staging directory (see `backend/validation/workflow_staging.py`).
+
+---
+
+### E. FreeSurfer recon-all (Single Plugin)
 
 **What it does:** Runs FreeSurfer's full cortical reconstruction on a single T1w scan.
 
@@ -218,7 +263,7 @@ your_input_dir/
 
 ---
 
-### E. Cortical Lesion Detection (recon-all → MELD Graph)
+### F. Cortical Lesion Detection (recon-all → MELD Graph)
 
 **What it does:** Runs FreeSurfer recon-all followed by MELD Graph neural network for cortical dysplasia detection in drug-resistant epilepsy.
 
