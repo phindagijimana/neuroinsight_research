@@ -10,6 +10,71 @@ Complete guide for deploying and using the NeuroInsight Research platform for ne
 - 16GB+ RAM (32GB recommended for processing)
 - SSH key-based authentication (for remote/HPC connections)
 
+## NIR Desktop installer (optional)
+
+If you install **NIR Desktop** from a downloaded build (`.exe`, `.dmg`/`.app`, `.AppImage`/`.deb`), the OS may block or warn on first launch because the file was downloaded from the internet. This is normal for unsigned or pilot builds. Use the steps for your platform **with the real path and filename** of your download (names vary by version and architecture).
+
+### Windows (PowerShell)
+
+Downloads are often **blocked** until you clear the *mark of the web*. Use the **full path to the installer**, including the **`.exe`** extension.
+
+```powershell
+Unblock-File -LiteralPath "$env:USERPROFILE\Downloads\nir-desktop-0.1.0-win-x64.exe"
+```
+
+Replace the file name with whatever appears in your `Downloads` folder. To list matching files:
+
+```powershell
+Get-ChildItem "$env:USERPROFILE\Downloads" | Where-Object { $_.Name -like "*nir*" }
+```
+
+To unblock **everything** under a folder (for example after unzipping an archive):
+
+```powershell
+Get-ChildItem -LiteralPath "C:\Path\To\Folder" -Recurse -File | Unblock-File
+```
+
+You can also **right‑click** the file in File Explorer → **Properties** → check **Unblock** (if shown) → **OK**.
+
+**Note:** `Unblock-File` addresses download blocking. If **SmartScreen** still warns about an unsigned app, use **More info** → **Run anyway** if your policy allows, or rely on a signed build from your organization.
+
+### macOS (Terminal)
+
+Gatekeeper may quarantine downloaded apps. After you copy **NeuroInsight Research.app** into `/Applications` (or before opening the installer), clear **quarantine** extended attributes:
+
+```bash
+xattr -cr "/Applications/NeuroInsight Research.app"
+```
+
+If the app name or path differs, adjust the path. For a **`.dmg` or `.app` still in Downloads**, you can remove the quarantine attribute on that file first (example names):
+
+```bash
+xattr -d com.apple.quarantine ~/Downloads/nir-desktop-0.1.0-mac-x64.dmg
+```
+
+Then open the disk image or drag the app to **Applications**, and run `xattr -cr` on the installed `.app` if needed.
+
+**Note:** Fully trusted distribution uses Apple notarization and Developer ID signing; pilot/unsigned builds may still require a **right‑click → Open** the first time.
+
+### Linux
+
+Linux does not use Windows `Unblock-File` or macOS `xattr` quarantine in the same way.
+
+- **AppImage:** make it executable, then run:
+
+```bash
+chmod +x ~/Downloads/nir-desktop-*-linux-*.AppImage
+~/Downloads/nir-desktop-*-linux-*.AppImage
+```
+
+- **`.deb`:** install with your package manager, e.g. `sudo apt install ./nir-desktop-*.deb` (exact command depends on distribution).
+
+Verify **checksums** against `desktop-release-sha256.txt` (or your release notes) when provided.
+
+### Web UI without the desktop shell
+
+The same NeuroInsight **web interface** is available by running the stack from the repository (for example `./research start`) and opening the backend URL in a browser. That path does not require installing the desktop `.exe`/`.app`/AppImage.
+
 ## Docker Installation
 
 Docker is required for local processing and for containerized deployment. Choose the method for your platform.
@@ -264,6 +329,14 @@ NeuroInsight separates **where your data lives** from **where processing runs**.
 | **HPC/SLURM** | Submit jobs to an HPC cluster via SLURM | SSH access, SLURM, Singularity/Apptainer |
 
 You select a **data source** and a **compute backend** on the main processing page. Any combination works. For example: Local + Local Docker (simplest), Pennsieve + HPC/SLURM (download from cloud, process on cluster), or XNAT + Local Docker (download from hospital archive, process locally).
+
+### EEG workflows: layout and channels
+
+EEG-related workflows (for example basic detection, source localization, and multimodal epilepsy biomarker) expect a **staging directory** as input with continuous EEG under **`eeg/raw/`** by default (formats such as EDF, FIF, BrainVision, BDF). You do **not** need a full BIDS dataset unless you choose to organize or convert data that way separately.
+
+**Default path:** preprocessing applies **name-based heuristics** so common auxiliary traces (for example EKG, EOG, EMG) are not treated as scalp EEG. For many clinical exports this is **enough**, provided you **quickly verify** that channel **labels and roles** match the recording (wrong labels break both heuristics and any optional sidecar).
+
+**Optional:** place **`metadata/channels.tsv`** next to your EEG (BIDS-style `name` and `type` columns) to set channel types **explicitly** when file headers are unreliable, for multi-site consistency, or for stricter reproducibility. See `eeg/EEG.md` and the HPC pipeline guide for staging details.
 
 ---
 

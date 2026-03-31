@@ -35,6 +35,90 @@ import numpy as np
 from mne.minimum_norm import apply_inverse, make_inverse_operator
 
 
+def _vol_stc_vertex_positions(stc: mne.VolSourceEstimate, forward: mne.Forward) -> np.ndarray:
+    """RAS positions (n_vertices, 3) for each row of stc.data (volume source space)."""
+    rr_out: list[np.ndarray] = []
+    for si, s in enumerate(forward["src"]):
+        v = stc.vertices[si]
+        if len(v) == 0:
+            continue
+        r = s["rr"]
+        for i in v:
+            if i >= len(r):
+                raise RuntimeError(
+                    f"vertex index {i} out of bounds for src space {si} (rr len {len(r)})"
+                )
+            rr_out.append(r[i])
+    pos = np.asarray(rr_out, dtype=float)
+    if pos.shape[0] != stc.data.shape[0]:
+        raise RuntimeError(
+            f"vertex position count {pos.shape[0]} != stc.data rows {stc.data.shape[0]}"
+        )
+    return pos
+
+
+def _peak_and_laterality(
+    stc: mne.SourceEstimate | mne.VolSourceEstimate,
+    forward: mne.Forward,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Surface STC supports hemi= on get_peak; volume STC does not (MNE 1.8)."""
+    if isinstance(stc, mne.VolSourceEstimate):
+        pos = _vol_stc_vertex_positions(stc, forward)
+        data_abs = np.abs(stc.data)
+        peak_amp = np.max(data_abs, axis=1)
+        left = pos[:, 0] < 0.0
+        lh_max = float(np.max(peak_amp[left])) if np.any(left) else 0.0
+        rh_max = float(np.max(peak_amp[~left])) if np.any(~left) else 0.0
+        stronger = "lh" if lh_max >= rh_max else "rh"
+
+        def _peak_vert_time(mask: np.ndarray) -> tuple[int, float]:
+            if not np.any(mask):
+                return 0, 0.0
+            idx_local = np.where(mask)[0]
+            j = int(np.argmax(peak_amp[mask]))
+            im = int(idx_local[j])
+            t_i = int(np.argmax(np.abs(stc.data[im])))
+            return int(np.concatenate(stc.vertices)[im]), float(stc.times[t_i])
+
+        v_lh, t_lh = _peak_vert_time(left)
+        v_rh, t_rh = _peak_vert_time(~left)
+        peak_coords = {
+            "lh": {"vertex": v_lh, "time_s": t_lh},
+            "rh": {"vertex": v_rh, "time_s": t_rh},
+            "mne_version": mne.__version__,
+            "method": "dSPM",
+            "source_space": "volume",
+            "note": "Volume grid inverse; hemisphere split by RAS x<0 (left). Not MNI mm without morphing.",
+        }
+        lat = {
+            "stronger_hemisphere": stronger,
+            "lh_peak_abs_max": lh_max,
+            "rh_peak_abs_max": rh_max,
+        }
+        return peak_coords, lat
+
+    v_lh, t_lh = stc.get_peak(hemi="lh", time_as_index=False)
+    v_rh, t_rh = stc.get_peak(hemi="rh", time_as_index=False)
+    n_lh = len(stc.vertices[0])
+    lh_max = float(np.max(np.abs(stc.data[:n_lh])))
+    rh_max = float(np.max(np.abs(stc.data[n_lh:])))
+    stronger = "lh" if lh_max >= rh_max else "rh"
+    peak_coords = {
+        "lh": {"vertex": int(v_lh), "time_s": float(t_lh)},
+        "rh": {"vertex": int(v_rh), "time_s": float(t_rh)},
+        "mne_version": mne.__version__,
+        "method": "dSPM",
+        "source_space": "surface",
+        "note": "Vertices are in source space; not MNI mm without morphing.",
+    }
+    lat = {
+        "stronger_hemisphere": stronger,
+        "lh_peak_abs_max": lh_max,
+        "rh_peak_abs_max": rh_max,
+    }
+    return peak_coords, lat
+
+
 def _log(msg: str, log_fp: Path) -> None:
     line = msg + "\n"
     print(msg, flush=True)
@@ -90,11 +174,12 @@ def main() -> int:
 
         _log("Computing noise covariance from raw (first 60 s)", log_path)
         tmax = min(60.0, float(raw.times[-1]))
+        # empirical: no scikit-learn (shrunk/auto require sklearn in many MNE builds)
         noise_cov = mne.compute_raw_covariance(
             raw,
             tmax=tmax,
             picks=eeg_picks,
-            method="shrunk",
+            method="empirical",
             verbose="ERROR",
         )
 
@@ -148,26 +233,7 @@ def main() -> int:
         stem = src_dir / "source_estimate"
         stc.save(str(stem))
 
-        v_lh, t_lh = stc.get_peak(hemi="lh", time_as_index=False)
-        v_rh, t_rh = stc.get_peak(hemi="rh", time_as_index=False)
-
-        n_lh = len(stc.vertices[0])
-        lh_max = float(np.max(np.abs(stc.data[:n_lh])))
-        rh_max = float(np.max(np.abs(stc.data[n_lh:])))
-        stronger = "lh" if lh_max >= rh_max else "rh"
-
-        peak_coords = {
-            "lh": {"vertex": int(v_lh), "time_s": float(t_lh)},
-            "rh": {"vertex": int(v_rh), "time_s": float(t_rh)},
-            "mne_version": mne.__version__,
-            "method": "dSPM",
-            "note": "Vertices are in source space; not MNI mm without morphing.",
-        }
-        lat = {
-            "stronger_hemisphere": stronger,
-            "lh_peak_abs_max": lh_max,
-            "rh_peak_abs_max": rh_max,
-        }
+        peak_coords, lat = _peak_and_laterality(stc, forward)
 
         (src_dir / "peak_coordinates.json").write_text(
             json.dumps(peak_coords, indent=2), encoding="utf-8"

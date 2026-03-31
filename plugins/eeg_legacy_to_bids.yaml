@@ -1,0 +1,71 @@
+# Plugin: Legacy EEG → BIDS (MNE-BIDS)
+id: eeg_legacy_to_bids
+name: "EEG Legacy to BIDS"
+version: "1.0.0"
+type: plugin
+domain: eeg
+
+visibility:
+  user_selectable: true
+  ui_category: utility
+  ui_label: "EEG → BIDS conversion"
+
+description: >
+  Converts flat continuous EEG (EDF, BDF, BrainVision, FIF under eeg/raw/) into a minimal
+  BIDS EEG dataset under outputs. Optional metadata/channels.tsv (BIDS) sets channel types
+  for reproducible EEG vs ECG/EOG/EMG. Optional metadata/bids_config.yaml sets subject, task,
+  session, run. Does not replace vendor-specific formats; convert those to EDF/FIF first.
+  Pair with eeg_preprocessing on the BIDS export for a BIDS-native path, or keep using the
+  legacy flat layout with preprocessing heuristics only.
+
+authors:
+  - "NeuroInsight Research Team"
+
+references:
+  - "https://mne.tools/mne-bids/stable/use.html"
+
+container:
+  runtime: docker
+  image: "phindagijimana321/eeg-legacy-to-bids-mne:1.0.0"
+
+inputs:
+  required: []
+  optional: []
+
+input_format:
+  format_name: "Flat EEG + optional BIDS sidecars"
+  description: >
+    Place one raw file under eeg/raw/ (or metadata/channels.tsv + bids_config.yaml).
+    See docker/eeg-mne-legacy-to-bids/app/run.py module docstring.
+
+parameters: []
+
+resources:
+  profiles:
+    default:
+      cpus: 2
+      mem_gb: 8
+      time_hours: 1
+      gpus: 0
+
+execution:
+  style: single_stage
+  workdirs:
+    native_root: "{run_root}/native/eeg_legacy_to_bids"
+    logs_dir: "{run_root}/logs/eeg_legacy_to_bids"
+  stages:
+    - id: convert
+      kind: single
+      profile: default
+      command_template: |
+        #!/bin/bash
+        set -e
+        export NIR_INPUT_ROOT=/data/inputs
+        export NIR_OUTPUT_ROOT=/data/outputs/native/eeg_legacy_to_bids
+        mkdir -p "$NIR_OUTPUT_ROOT" /data/outputs/logs/eeg_legacy_to_bids
+        python /app/run.py
+
+provenance:
+  write_run_manifest: true
+  record_exact_commands: true
+  record_container_digest: true

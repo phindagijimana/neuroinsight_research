@@ -1,0 +1,7 @@
+mne==1.8.0
+mne-bids>=0.15,<0.20
+pybv>=0.7.3
+numpy>=1.24,<3
+scipy>=1.9,<1.14
+PyYAML>=6.0
+pandas>=2.0,<3

@@ -959,8 +959,8 @@ def multimodal_mesh(job_id: str):
         if unlink_after:
             try:
                 os.unlink(local_path)
-            except OSError:
-                pass
+            except OSError as e:
+                logger.debug("Could not remove temp file %s: %s", local_path, e)
 
 
 @router.get("/{job_id}/multimodal_source_frame")
@@ -1008,8 +1008,8 @@ def multimodal_source_frame(
         if unlink_after:
             try:
                 os.unlink(local_path)
-            except OSError:
-                pass
+            except OSError as e:
+                logger.debug("Could not remove temp file %s: %s", local_path, e)
 
 
 @router.get("/{job_id}/eeg_preview")
@@ -1051,8 +1051,8 @@ def eeg_preview(
         if unlink_after:
             try:
                 os.unlink(local_path)
-            except OSError:
-                pass
+            except OSError as e:
+                logger.debug("Could not remove temp file %s: %s", local_path, e)
 
 
 # --------------------------------------------------------------------------- #

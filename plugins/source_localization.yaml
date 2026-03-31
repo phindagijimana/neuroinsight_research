@@ -22,7 +22,7 @@ references:
 
 container:
   runtime: docker
-  image: "phindagijimana321/eeg-source-localization-mne:1.0.1"
+  image: "phindagijimana321/eeg-source-localization-mne:1.0.3"
   digest: "sha256:40087916c65d904d359cb070428ac74db53e51f5c80da12abd785bc7e7fc3bf1"
 
 inputs:
