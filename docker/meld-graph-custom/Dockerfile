@@ -6,6 +6,11 @@ LABEL org.opencontainers.image.source="https://github.com/MELDProject/meld_graph
 LABEL org.opencontainers.image.vendor="NeuroInsight"
 LABEL org.opencontainers.image.version="v2.2.4-nir2"
 
+# Upgrade NumPy + h5py together (ABI-aligned wheels; h5py 3.11+ supports numpy 1.26 / 2.x)
+RUN python3 -m pip install --no-cache-dir --upgrade \
+    "numpy>=1.26.4,<2.3" \
+    "h5py>=3.11.0"
+
 # Install util-linux (flock) and bake MELD cache data into image so runtime
 # execution is deterministic and does not depend on network/downloads.
 RUN apt-get update \
