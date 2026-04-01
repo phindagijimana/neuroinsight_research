@@ -15,13 +15,13 @@ Inputs:
   optional: $NIR_INPUT_ROOT/events/spike_events.tsv  (first column: onset in seconds)
 
 Outputs:
-  $NIR_OUTPUT_ROOT/source/source_estimate-*.stc  (lh + rh)
+  $NIR_OUTPUT_ROOT/source/source_estimate-*.stc  (lh + rh for surface; volume STC otherwise)
+  $NIR_OUTPUT_ROOT/source/source_map.nii.gz  (volume-grid inverses only; mean abs over time)
   $NIR_OUTPUT_ROOT/source/peak_coordinates.json
   $NIR_OUTPUT_ROOT/source/laterality_summary.json
   $NIR_OUTPUT_ROOT/logs/source_localization.log
 
-Note: NIfTI volume export (`source_map.nii.gz`) is not produced here; use morphing
-or a follow-up plugin when subject MRI alignment is available.
+Surface-only SourceEstimate does not write source_map.nii.gz (use volume forward for ROI NIfTI).
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ import os
 from pathlib import Path
 
 import mne
+import nibabel as nib
 import numpy as np
 from mne.minimum_norm import apply_inverse, make_inverse_operator
 
@@ -165,6 +166,7 @@ def main() -> int:
 
         _log(f"Loading raw {raw_path}", log_path)
         raw = mne.io.read_raw_fif(raw_path, preload=True, verbose="ERROR")
+        raw.set_eeg_reference("average", projection=True, verbose="ERROR")
         eeg_picks = mne.pick_types(raw.info, eeg=True, exclude=[])
         if len(eeg_picks) == 0:
             raise RuntimeError("No EEG channels in raw; expected EEG for inverse.")
@@ -194,14 +196,16 @@ def main() -> int:
 
         sfreq = raw.info["sfreq"]
         onsets = _load_spike_onsets_sec(spike_path)
+        fs = int(raw.first_samp)
         if onsets:
+            # Onsets are seconds from the start of this Raw; events use absolute file samples.
             events = np.array(
-                [[int(o * sfreq), 0, 1] for o in onsets],
+                [[fs + int(o * sfreq), 0, 1] for o in onsets],
                 dtype=np.int64,
             )
             _log(f"Using {len(onsets)} spike-aligned epochs from {spike_path}", log_path)
         else:
-            mid = max(int(sfreq * 2.0), raw.n_times // 2)
+            mid = fs + max(int(sfreq * 2.0), raw.n_times // 2)
             events = np.array([[mid, 0, 1]], dtype=np.int64)
             _log("No spike_events.tsv; using single synthetic epoch at mid-recording.", log_path)
 
@@ -242,7 +246,36 @@ def main() -> int:
             json.dumps(lat, indent=2), encoding="utf-8"
         )
 
-        _log(f"Wrote {stem}-lh.stc / {stem}-rh.stc", log_path)
+        if isinstance(stc, mne.VolSourceEstimate):
+            try:
+                _log(
+                    "Exporting volume source map to NIfTI (source/source_map.nii.gz)",
+                    log_path,
+                )
+                vol_img = stc.as_volume(
+                    forward["src"], dest="mri", mri_resolution=False
+                )
+                data = np.asarray(vol_img.dataobj)
+                if data.ndim == 4:
+                    data = np.mean(np.abs(data), axis=-1)
+                else:
+                    data = np.abs(np.squeeze(data))
+                if data.ndim != 3:
+                    raise RuntimeError(
+                        f"Expected 3D volume after reduction, got shape {data.shape}"
+                    )
+                out_img = nib.Nifti1Image(data, vol_img.affine)
+                nib.save(out_img, str(src_dir / "source_map.nii.gz"))
+                _log("Wrote source/source_map.nii.gz", log_path)
+            except Exception as e:
+                _log(f"WARNING: could not export volume NIfTI: {e}", log_path)
+        else:
+            _log(
+                "Surface SourceEstimate: source_map.nii.gz not written (volume inverse only).",
+                log_path,
+            )
+
+        _log(f"Wrote STC under {stem}*", log_path)
         return 0
     except Exception as e:
         _log(f"ERROR: {e}", log_path)

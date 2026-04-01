@@ -9,6 +9,11 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+__all__ = (
+    "ensure_multimodal_forward_merge",
+    "ensure_multimodal_source_merge",
+)
+
 
 def _staging_dir_from_input_files(input_files: list[str]) -> Optional[Path]:
     for p in input_files or []:
@@ -34,9 +39,13 @@ def ensure_multimodal_forward_merge(output_dir: Path, input_files: list[str]) ->
         (fm / "coreg").symlink_to(cg.resolve(), target_is_directory=True)
     else:
         logger.warning("forward_merge: missing %s", cg)
-    staged = _staging_dir_from_input_files(input_files)
-    if staged and (staged / "models").is_dir():
-        (fm / "models").symlink_to((staged / "models").resolve(), target_is_directory=True)
+    bem_models = output_dir / "native" / "bem_source_space" / "models"
+    if bem_models.is_dir():
+        (fm / "models").symlink_to(bem_models.resolve(), target_is_directory=True)
+    else:
+        staged = _staging_dir_from_input_files(input_files)
+        if staged and (staged / "models").is_dir():
+            (fm / "models").symlink_to((staged / "models").resolve(), target_is_directory=True)
 
 
 def ensure_multimodal_source_merge(output_dir: Path) -> None:

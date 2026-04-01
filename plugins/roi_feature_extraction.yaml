@@ -19,8 +19,8 @@ authors:
 
 container:
   runtime: docker
-  image: "phindagijimana321/eeg-roi-feature-extraction:1.0.0"
-  digest: "sha256:445aebca1f0ca8e1d858354e6ce18d6aa7626b1a042ba68e98e3295a2afb3eb0"
+  image: "phindagijimana321/eeg-roi-feature-extraction:1.0.1"
+  digest: ""
 
 inputs:
   required: []

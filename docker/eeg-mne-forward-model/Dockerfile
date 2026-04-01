@@ -5,7 +5,7 @@ FROM python:3.11-slim-bookworm
 LABEL org.opencontainers.image.title="NIR eeg-forward-model-mne"
 LABEL org.opencontainers.image.description="Lead field / forward solution from trans, src, BEM"
 LABEL org.opencontainers.image.source="NeuroInsight Research Tool"
-LABEL org.opencontainers.image.version="1.0.7"
+LABEL org.opencontainers.image.version="1.0.10"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 \

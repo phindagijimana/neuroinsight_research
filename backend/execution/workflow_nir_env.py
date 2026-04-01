@@ -74,6 +74,14 @@ def apply_workflow_nir_input_root_command_overrides(
     # Coreg reads the same clean_raw.fif but follows spike_detection; still mount preprocessing.
     elif step_plugin_id == "eeg_mri_coregistration":
         cmd_script = _chain_eeg_preprocessing_root(cmd_script)
+    elif step_plugin_id == "bem_source_space":
+        if wf_id:
+            root = resolve_workflow_directory_input_container_root(wf_id)
+            if root:
+                cmd_script = cmd_script.replace(
+                    "export NIR_INPUT_ROOT=/data/inputs",
+                    f"export NIR_INPUT_ROOT={root}",
+                )
     elif step_plugin_id == "forward_model":
         if "/data/inputs/forward_merge" not in cmd_script:
             cmd_script = (
@@ -91,5 +99,14 @@ def apply_workflow_nir_input_root_command_overrides(
         cmd_script = cmd_script.replace(
             "export NIR_INPUT_ROOT=/data/inputs",
             "export NIR_INPUT_ROOT=/data/inputs/source_merge",
+        )
+    elif step_plugin_id == "roi_feature_extraction":
+        if "/data/inputs/roi_merge" not in cmd_script:
+            cmd_script = (
+                "# NIR workflow chain: /data/inputs/roi_merge\n" + cmd_script
+            )
+        cmd_script = cmd_script.replace(
+            "export NIR_INPUT_ROOT=/data/inputs",
+            "export NIR_INPUT_ROOT=/data/inputs/roi_merge",
         )
     return cmd_script

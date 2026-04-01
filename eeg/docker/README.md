@@ -12,11 +12,11 @@ Images live under `docker/eeg-mne-*`, `docker/eeg-roi-feature-extraction`, and `
 | `docker/eeg-mne-legacy-to-bids` | `phindagijimana321/eeg-legacy-to-bids-mne:1.0.0` | Flat EEG (EDF/BDF/BrainVision/FIF) → BIDS; optional `metadata/channels.tsv` |
 
 **Legacy → BIDS and HPC:** The `eeg_legacy_to_bids` plugin pulls this image from Docker Hub (or your registry). **Build and push** it from `docker/eeg-mne-legacy-to-bids` with the same tag as `plugins/eeg_legacy_to_bids.yaml` before running on a cluster; Apptainer cannot use an image that was never published. Local `docker run` tests work with a locally built tag without pushing.
-| `docker/eeg-mne-spike-detection` | `phindagijimana321/eeg-spike-detection-mne:1.0.0` | Baseline envelope + peak detector |
-| `docker/eeg-mne-coregistration` | `phindagijimana321/eeg-mri-coregistration-mne:1.0.0` | `trans.fif` passthrough or JSON 4×4 → `eeg_to_mri_trans.fif` |
-| `docker/eeg-mne-forward-model` | `phindagijimana321/eeg-forward-model-mne:1.0.0` | `make_forward_solution` (needs `trans`, `src`, BEM sol on input) |
+| `docker/eeg-mne-spike-detection` | `phindagijimana321/eeg-spike-detection-mne:1.0.1` | Baseline envelope + peak detector |
+| `docker/eeg-mne-coregistration` | `phindagijimana321/eeg-mri-coregistration-mne:1.0.2` | `trans.fif` passthrough or JSON 4×4 → `eeg_to_mri_trans.fif` |
+| `docker/eeg-mne-forward-model` | `phindagijimana321/eeg-forward-model-mne:1.0.8` | `make_forward_solution` (needs `trans`, `src`, BEM sol on input) |
 | `docker/eeg-mne-source-localization` | `phindagijimana321/eeg-source-localization-mne:1.0.3` | dSPM inverse (needs `forward_solution.fif`) |
-| `docker/eeg-roi-feature-extraction` | `phindagijimana321/eeg-roi-feature-extraction:1.0.0` | Source NIfTI + `region_labels` + `roi_definitions.json` → ROI JSON |
+| `docker/eeg-roi-feature-extraction` | `phindagijimana321/eeg-roi-feature-extraction:1.0.1` | Source NIfTI + `region_labels` + `roi_definitions.json` → ROI JSON |
 | `docker/eeg-biomarker-scoring` | `phindagijimana321/eeg-biomarker-scoring:1.0.0` | Reads `features/*.json` → biomarker + `viewer_summary.json` |
 
 **Not MNE (later):** Brainstorm, SpikeNet — separate images.

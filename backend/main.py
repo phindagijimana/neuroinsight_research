@@ -52,6 +52,7 @@ _FS_LICENSE_PLUGIN_IDS = {
     "freesurfer_recon",
     "freesurfer_longitudinal",
     "freesurfer_longitudinal_stats",
+    "bem_source_space",
 }
 
 
@@ -585,6 +586,7 @@ FS_LICENSE_PLUGINS = {
     "freesurfer_recon", "freesurfer_autorecon_volonly", "fastsurfer",
     "fmriprep", "meld_graph", "segmentha_t1", "segmentha_t2",
     "freesurfer_longitudinal", "freesurfer_longitudinal_stats",
+    "bem_source_space",
 }
 
 _HEAVY_SUBMIT_PLUGIN_IDS = {

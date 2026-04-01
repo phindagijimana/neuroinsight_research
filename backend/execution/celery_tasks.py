@@ -320,6 +320,13 @@ def _prepare_volumes(spec_dict: dict, output_dir: Path) -> dict:
                 "bind": "/data/inputs/source_merge",
                 "mode": "rw",
             }
+    elif plugin_id == "roi_feature_extraction":
+        rm = output_dir / "native" / "roi_merge"
+        if rm.is_dir():
+            volumes[str(rm.resolve())] = {
+                "bind": "/data/inputs/roi_merge",
+                "mode": "rw",
+            }
 
     return volumes
 

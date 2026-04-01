@@ -138,6 +138,18 @@ class SLURMBackend(ExecutionBackend):
         except Exception as e:
             logger.warning("Could not resolve work_dir '%s': %s", raw, e)
 
+    def _hpc_neuroinsight_root(self) -> str:
+        """Directory that contains ``jobs/`` on the HPC (NeuroInsight project root).
+
+        ``HPC_WORK_DIR`` may be either the parent of ``neuroinsight`` (legacy) or
+        already the ``.../neuroinsight`` folder (.env.example style). Avoid
+        ``.../neuroinsight/neuroinsight/jobs``.
+        """
+        base = str(PurePosixPath(self.work_dir)).rstrip("/")
+        if base.endswith("/neuroinsight"):
+            return base
+        return str(PurePosixPath(base) / "neuroinsight")
+
     # ------------------------------------------------------------------
     # Connection helpers
     # ------------------------------------------------------------------
@@ -319,7 +331,7 @@ class SLURMBackend(ExecutionBackend):
         self._resolve_work_dir()
 
         # Create remote working directory
-        job_dir = str(PurePosixPath(self.work_dir) / "neuroinsight" / "jobs" / job_id)
+        job_dir = str(PurePosixPath(self._hpc_neuroinsight_root()) / "jobs" / job_id)
         for sub in ("scripts", "logs", "inputs", "outputs/native", "outputs/bundle", "outputs/logs"):
             self._ssh_exec(f"mkdir -p {job_dir}/{sub}")
 
@@ -396,9 +408,16 @@ class SLURMBackend(ExecutionBackend):
         except Exception as e:
             logger.debug("Could not upload stats_converter.py: %s", e)
 
-        # Submit via sbatch
+        # Submit via sbatch (use absolute path — sbatch may not expand ~ in the path)
         try:
-            stdout = self._ssh_exec(f"sbatch {script_path}")
+            abs_script = self._ssh_exec(
+                f'readlink -f "{script_path}" 2>/dev/null || realpath "{script_path}" 2>/dev/null || echo "{script_path}"',
+                check=False,
+                timeout=30,
+            ).strip()
+            if not abs_script.startswith("/"):
+                abs_script = script_path
+            stdout = self._ssh_exec(f'sbatch "{abs_script}"')
             slurm_job_id = self._parse_slurm_job_id(stdout)
             logger.info(f"Submitted job {job_id[:8]} -> SLURM {slurm_job_id}")
         except Exception as e:
@@ -1700,7 +1719,9 @@ class SLURMBackend(ExecutionBackend):
                     lines.append(f'ln -sfn "{job_dir}/outputs/native/eeg_preprocessing/eeg" "$NI_FM/eeg"')
                     lines.append(f'ln -sfn "{job_dir}/outputs/native/eeg_mri_coregistration/coreg" "$NI_FM/coreg"')
                     lines.append(
-                        f'if [ -d "{job_dir}/inputs/input_dir/models" ]; then '
+                        f'if [ -d "{job_dir}/outputs/native/bem_source_space/models" ]; then '
+                        f'ln -sfn "{job_dir}/outputs/native/bem_source_space/models" "$NI_FM/models"; '
+                        f'elif [ -d "{job_dir}/inputs/input_dir/models" ]; then '
                         f'ln -sfn "{job_dir}/inputs/input_dir/models" "$NI_FM/models"; fi'
                     )
                 if step_pid == "source_localization":
