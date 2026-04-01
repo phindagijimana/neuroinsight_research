@@ -6,10 +6,12 @@ LABEL org.opencontainers.image.source="https://github.com/MELDProject/meld_graph
 LABEL org.opencontainers.image.vendor="NeuroInsight"
 LABEL org.opencontainers.image.version="v2.2.4-nir2"
 
-# Upgrade NumPy + h5py together (ABI-aligned wheels; h5py 3.11+ supports numpy 1.26 / 2.x)
-RUN python3 -m pip install --no-cache-dir --upgrade \
+# MELD runs in conda env `meld_graph` (see upstream image). Upgrade NumPy + h5py there
+# explicitly so Docker never targets the wrong interpreter.
+RUN /opt/conda/envs/meld_graph/bin/python -m pip install --no-cache-dir --upgrade \
     "numpy>=1.26.4,<2.3" \
-    "h5py>=3.11.0"
+    "h5py>=3.11.0" \
+ && /opt/conda/envs/meld_graph/bin/python -c "import numpy, h5py; print('numpy', numpy.__version__, 'h5py', h5py.__version__)"
 
 # Install util-linux (flock) and bake MELD cache data into image so runtime
 # execution is deterministic and does not depend on network/downloads.
