@@ -130,8 +130,8 @@ WORKFLOW_ADAPTERS = {
     "wf_cortical_lesion_detection": {
         "dir": os.path.join(ADAPTERS_DIR, "workflows", "cortical_lesion_detection"),
         "image": "neuroinsight/wf-cortical-lesion-detection-pennsieve",
-        "tag": "1.0.0",
-        "base": "freesurfer:7.4.1 + meld_graph:v2.2.4 (multi-stage)",
+        "tag": "1.0.1",
+        "base": "freesurfer:7.4.1 + meld_graph:v2.2.4-nir2 (multi-stage)",
     },
     "wf_fmri_full": {
         "dir": os.path.join(ADAPTERS_DIR, "workflows", "fmri_full"),
