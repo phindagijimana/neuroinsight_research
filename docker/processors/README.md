@@ -25,3 +25,10 @@ MELD_CACHE_SRC=/absolute/path/to/meld_cache ./docker/processors/build_and_push_m
 - `meld_params/fsaverage_sym/surf/lh.inflated`
 - `meld_params/fsaverage_sym/surf/rh.inflated`
 - `models/` (non-empty)
+
+To populate a cache directory on a machine that can download from Figshare (browser or
+unblocked network), run `./docker/scripts/bootstrap_meld_cache.sh /path/to/meld_cache`.
+Some networks return AWS WAF challenges to unattended `curl`; if the script fails, download
+the MELD parameter and model archives from the MELD Graph project documentation or by
+running `get_meld_params()` / `get_model()` inside the upstream `meldproject/meld_graph`
+container on a workstation, then point `MELD_CACHE_SRC` at the resulting tree.
