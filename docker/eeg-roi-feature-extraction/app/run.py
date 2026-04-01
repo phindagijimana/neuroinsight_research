@@ -2,6 +2,9 @@
 """
 NIR roi_feature_extraction — fuse source map (NIfTI) + segmentation into per-ROI features.
 
+Unless NIR_SKIP_ROI_MERGE_PREP is set, builds native/roi_merge from prior-step outputs
+(source_localization, mri_segmentation, optional staged input_dir) before reading inputs.
+
 Inputs (NIR_INPUT_ROOT):
   source/source_map.nii.gz     — required
   segmentation/              — region_labels.nii.gz (FreeSurfer-style ints) and/or
@@ -76,7 +79,6 @@ def _volume_mm3_per_label(label_data: np.ndarray, label_id: int, zooms: tuple[fl
 
 
 def main() -> int:
-    in_root = Path(os.environ.get("NIR_INPUT_ROOT", "/data/input"))
     out_root = Path(os.environ.get("NIR_OUTPUT_ROOT", "/data/output"))
     log_path = out_root / "logs" / "roi_feature_extraction.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -84,6 +86,24 @@ def main() -> int:
         log_path.unlink()
 
     try:
+        skip_prep = os.environ.get("NIR_SKIP_ROI_MERGE_PREP", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        if not skip_prep:
+            from roi_merge_prep import (
+                ensure_multimodal_roi_merge,
+                resolve_job_output_root,
+                resolve_staged_input_files,
+            )
+
+            job_root = resolve_job_output_root()
+            staged = resolve_staged_input_files()
+            _log(f"roi_merge_prep: job_root={job_root} staged_inputs={staged}", log_path)
+            ensure_multimodal_roi_merge(job_root, staged)
+
+        in_root = Path(os.environ.get("NIR_INPUT_ROOT", "/data/input"))
         src_path = in_root / "source" / "source_map.nii.gz"
         roi_path = in_root / "metadata" / "roi_definitions.json"
         seg_dir = in_root / "segmentation"

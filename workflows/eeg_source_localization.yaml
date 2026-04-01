@@ -64,10 +64,15 @@ steps:
     depends_on:
       - spike_detection
 
+  - id: bem_source_space
+    uses: bem_source_space
+    depends_on:
+      - eeg_mri_coregistration
+
   - id: forward_model
     uses: forward_model
     depends_on:
-      - eeg_mri_coregistration
+      - bem_source_space
 
   - id: source_localization
     uses: source_localization
@@ -79,6 +84,7 @@ outputs:
     - "{run_root}/native/eeg_preprocessing"
     - "{run_root}/native/spike_detection"
     - "{run_root}/native/eeg_mri_coregistration"
+    - "{run_root}/native/bem_source_space"
     - "{run_root}/native/forward_model"
     - "{run_root}/native/source_localization"
   bundle:

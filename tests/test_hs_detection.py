@@ -250,6 +250,10 @@ class TestLicenseChecks:
         from backend.main import FS_LICENSE_PLUGINS
         assert "hs_postprocess" not in FS_LICENSE_PLUGINS
 
+    def test_bem_source_space_requires_fs_license(self, mock_settings):
+        from backend.main import FS_LICENSE_PLUGINS
+        assert "bem_source_space" in FS_LICENSE_PLUGINS
+
 
 # ---------------------------------------------------------------------------
 # JSON Schemas

@@ -23,8 +23,8 @@ references:
 
 container:
   runtime: docker
-  image: "phindagijimana321/eeg-forward-model-mne:1.0.7"
-  digest: "sha256:6af86dbaa70ad704f4c1df5e4766f280a71ec16dc49cb147a916f707368c675b"
+  image: "phindagijimana321/eeg-forward-model-mne:1.0.10"
+  digest: "sha256:ad8ee2781cbc95927e3eb6c026c51effc2c97d0909c1778806e6dd51d54b03de"
 
 inputs:
   required: []

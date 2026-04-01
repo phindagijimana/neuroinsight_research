@@ -54,6 +54,44 @@ def _find_first(dir_path: Path, patterns: tuple[str, ...]) -> Path | None:
     return None
 
 
+def _relabeled_auxiliary_channels(ch_name: str) -> str | None:
+    """Match eeg-mne-preprocessing: EDF/FIF often mark EKG/ECG as EEG; forward needs scalp EEG only."""
+    c = ch_name.lower().strip()
+    if any(s in c for s in ("ekg", "ecg", "lead", "cardiac")):
+        return "ecg"
+    if "emg" in c:
+        return "emg"
+    if any(s in c for s in ("eog", "veog", "heog")):
+        return "eog"
+    if any(s in c for s in ("exg", "dc chan", "trigger", "trig", "photo", "pulse")):
+        return "misc"
+    return None
+
+
+def _restrict_to_eeg_channels(raw: mne.io.BaseRaw, log_fp: Path) -> mne.io.BaseRaw:
+    """Same intent as eeg_preprocessing: remove EKG/ECG/EMG/EOG mis-typed as EEG.
+
+    Use drop_channels (not set_channel_types): average-reference projectors block
+    relabeling while projectors are still attached.
+    """
+    to_drop: list[str] = []
+    for i, name in enumerate(raw.ch_names):
+        if mne.channel_type(raw.info, i) != "eeg":
+            continue
+        if _relabeled_auxiliary_channels(name) is not None:
+            to_drop.append(name)
+    if to_drop:
+        raw.drop_channels(to_drop)
+        _log(f"Dropped mis-typed EEG/aux channels: {to_drop}", log_fp)
+    picks = mne.pick_types(raw.info, eeg=True, exclude=[])
+    if len(picks) == 0:
+        raise RuntimeError(
+            "No EEG channels after aux cleanup; check channel labels or types."
+        )
+    raw.pick(picks)
+    return raw
+
+
 def main() -> int:
     in_root = Path(os.environ.get("NIR_INPUT_ROOT", "/data/input"))
     out_root = Path(os.environ.get("NIR_OUTPUT_ROOT", "/data/output"))
@@ -78,6 +116,8 @@ def main() -> int:
             raise FileNotFoundError(f"Missing {raw_path}")
         # Preload so montage updates channel locations in-place for forward.
         raw = mne.io.read_raw_fif(raw_path, preload=True, verbose="ERROR")
+        # Align with eeg_preprocessing: drop EKG/ECG/EMG/EOG mis-labeled as EEG (older clean_raw.fif).
+        raw = _restrict_to_eeg_channels(raw, log_path)
 
         eeg_picks = mne.pick_types(raw.info, eeg=True, exclude=[])
         if any(
@@ -119,23 +159,29 @@ def main() -> int:
             )
         trans = mne.read_trans(trans_path)
 
-        models_dir = in_root / "models"
-        models_dir.mkdir(parents=True, exist_ok=True)
+        # Optional BEM/src on disk (staging). Do not mkdir under in_root: forward_merge is
+        # often a read-only Singularity bind without models/.
+        models_dir_in = in_root / "models"
+        models_dir: Path | None = models_dir_in if models_dir_in.is_dir() else None
 
-        src_path = models_dir / "src.fif"
-        if not src_path.is_file():
-            found = _find_first(models_dir, ("*-src.fif", "*src.fif"))
-            src_path = found
+        src_path: Path | None = None
+        if models_dir is not None:
+            src_path = models_dir / "src.fif"
+            if not src_path.is_file():
+                found = _find_first(models_dir, ("*-src.fif", "*src.fif"))
+                src_path = found
         src = None
         if src_path is not None and Path(src_path).is_file():
             src = mne.read_source_spaces(src_path)
 
-        bem_path = models_dir / "bem_sol.fif"
-        if not bem_path.is_file():
-            bem_path = _find_first(
-                models_dir,
-                ("*-bem-sol.fif", "*bem-sol.fif", "bem_sol.fif"),
-            )
+        bem_path: Path | None = None
+        if models_dir is not None:
+            bem_path = models_dir / "bem_sol.fif"
+            if not bem_path.is_file():
+                bem_path = _find_first(
+                    models_dir,
+                    ("*-bem-sol.fif", "*bem-sol.fif", "bem_sol.fif"),
+                )
         bem = None
         if bem_path is not None and Path(bem_path).is_file():
             bem = mne.read_bem_solution(str(bem_path))

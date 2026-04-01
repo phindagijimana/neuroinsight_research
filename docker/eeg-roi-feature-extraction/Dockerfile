@@ -13,6 +13,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
+COPY app/roi_merge_prep.py /app/roi_merge_prep.py
 COPY app/run.py /app/run.py
 
 ENV NIR_INPUT_ROOT=/data/input NIR_OUTPUT_ROOT=/data/output
