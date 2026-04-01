@@ -12,7 +12,7 @@ See `required-images.yaml` for the complete plugin/workflow image mapping.
 
 `nir2` bakes MELD params/models into the image for deterministic runtime.
 
-The Dockerfile upgrades **NumPy** and **h5py** in the upstream **`meld_graph`** conda env (`/opt/conda/envs/meld_graph/bin/python -m pip`, pins `numpy>=1.26.4,<2.3`, `h5py>=3.11.0`) so HDF5 wheels match the runtime interpreter. Pennsieve MELD Dockerfiles under `adapters/pennsieve/` use the same step.
+The Dockerfile upgrades **NumPy** and **h5py** in the upstream **`meld_graph`** conda env (`/opt/conda/envs/meld_graph/bin/python -m pip`, pins `numpy>=1.26.4,<2.0`, `h5py>=3.11.0`) so HDF5 wheels match the runtime interpreter. Pennsieve MELD Dockerfiles under `adapters/pennsieve/` use the same step.
 
 Build and push it with:
 

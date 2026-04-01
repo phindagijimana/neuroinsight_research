@@ -7,7 +7,7 @@ LABEL description="Cortical Lesion Detection workflow for Pennsieve (FreeSurfer 
 LABEL org.pennsieve.processor="true"
 
 RUN /opt/conda/envs/meld_graph/bin/python -m pip install --no-cache-dir --upgrade \
-    "numpy>=1.26.4,<2.3" \
+    "numpy>=1.26.4,<2.0" \
     "h5py>=3.11.0" \
  && /opt/conda/envs/meld_graph/bin/python -c "import numpy, h5py; print('numpy', numpy.__version__, 'h5py', h5py.__version__)"
 
