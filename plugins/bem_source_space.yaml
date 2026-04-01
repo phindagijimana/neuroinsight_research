@@ -24,7 +24,7 @@ references:
 container:
   runtime: docker
   image: "phindagijimana321/eeg-bem-source-space-mne:1.0.0"
-  digest: ""
+  digest: "sha256:bb7eb200417eaa9d1b72ed3253baaf7513c23b51ffdfdee587bc7205398a3793"
 
 inputs:
   required: []
