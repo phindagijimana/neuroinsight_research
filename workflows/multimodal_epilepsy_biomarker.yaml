@@ -2,14 +2,46 @@
 # Full nine-step chain: EEG branch (incl. BEM/source space), structural MRI, ROI fusion, scoring.
 id: multimodal_epilepsy_biomarker
 name: "Multimodal Epilepsy Biomarker"
-version: "1.0.0"
+version: "1.0.1"
 type: workflow
 domain: eeg_imaging
 
 description: >
   Combines EEG source localization with FreeSurfer vol-only segmentation,
   extracts ROI-level multimodal features, and produces biomarker summaries
-  (laterality, concordance, viewer-ready JSON).
+  (laterality, concordance, viewer-ready JSON). Container images and digests
+  below match plugins/ at this workflow version for reproducible HPC pulls.
+
+# Manifest digests (linux/amd64) for each step’s plugin container; keep in sync
+# with plugins/*.yaml container.image and container.digest.
+pinned_plugin_containers:
+  - plugin_id: eeg_preprocessing
+    image: "phindagijimana321/eeg-preprocessing-mne:1.0.3"
+    digest: "sha256:ba517d60cf14998b2bc908cc21fb11cc6441eeb0dff55c62da187b4e3bab0b01"
+  - plugin_id: spike_detection
+    image: "phindagijimana321/eeg-spike-detection-mne:1.0.1"
+    digest: "sha256:89a2e5c524efdbfe7a456e4d61847980978306bf36564e7bd496fd1bf9153713"
+  - plugin_id: eeg_mri_coregistration
+    image: "phindagijimana321/eeg-mri-coregistration-mne:1.0.2"
+    digest: "sha256:8250c5091045978e0761dcb34bfa954a3fa2ce5f0b7c0fbaa2271634fe677636"
+  - plugin_id: bem_source_space
+    image: "phindagijimana321/eeg-bem-source-space-mne:1.0.0"
+    digest: "sha256:bb7eb200417eaa9d1b72ed3253baaf7513c23b51ffdfdee587bc7205398a3793"
+  - plugin_id: forward_model
+    image: "phindagijimana321/eeg-forward-model-mne:1.0.10"
+    digest: "sha256:ad8ee2781cbc95927e3eb6c026c51effc2c97d0909c1778806e6dd51d54b03de"
+  - plugin_id: source_localization
+    image: "phindagijimana321/eeg-source-localization-mne:1.0.3"
+    digest: "sha256:1ee9d575de99953a657bbfd431205518bf3faafae695ecc1ebe3df0e47df1c8d"
+  - plugin_id: mri_segmentation
+    image: "phindagijimana321/freesurfer-autorecon-volonly:7.4.1"
+    digest: "sha256:dce99940b0f1e606c6457ea5e2e36a9f5f0ca4da1b2fd612cd97f5d69623c684"
+  - plugin_id: roi_feature_extraction
+    image: "phindagijimana321/eeg-roi-feature-extraction:1.0.1"
+    digest: "sha256:fd4218fc7a83ffc6d57e3949590b7b700c4195c8dd8f4b04425258312cd6d2e9"
+  - plugin_id: biomarker_scoring
+    image: "phindagijimana321/eeg-biomarker-scoring:1.0.0"
+    digest: "sha256:8d20a3d922b99ee273c7e2cf59c77f47d9cc4c4913564756c91cef277e1d32c0"
 
 developer_contract: >
   Workflows only orchestrate plugins. T1 for mri_segmentation should be staged
