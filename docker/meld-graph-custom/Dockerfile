@@ -9,7 +9,7 @@ LABEL org.opencontainers.image.version="v2.2.4-nir2"
 # MELD runs in conda env `meld_graph` (see upstream image). Upgrade NumPy + h5py there
 # explicitly so Docker never targets the wrong interpreter.
 RUN /opt/conda/envs/meld_graph/bin/python -m pip install --no-cache-dir --upgrade \
-    "numpy>=1.26.4,<2.3" \
+    "numpy>=1.26.4,<2.0" \
     "h5py>=3.11.0" \
  && /opt/conda/envs/meld_graph/bin/python -c "import numpy, h5py; print('numpy', numpy.__version__, 'h5py', h5py.__version__)"
 
