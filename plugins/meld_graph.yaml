@@ -31,8 +31,9 @@ references:
 container:
   runtime: docker
   image: "phindagijimana321/meld_graph:v2.2.4-nir2"
-  # HPC: pull with `apptainer pull docker://phindagijimana321/meld_graph:v2.2.4-nir2`
-  # Result: meld_graph_v2.2.4-nir2.sif
+  digest: "sha256:e0b970262accbc4d3616526c565b972fd0939397d0958fa00e89716d369e5cd3"
+  # HPC: `apptainer pull docker://phindagijimana321/meld_graph@sha256:e0b970262accbc4d3616526c565b972fd0939397d0958fa00e89716d369e5cd3`
+  # Result: meld_graph_sha256-e0b970262accbc4d3616526c565b972fd0939397d0958fa00e89716d369e5cd3.sif
 
 inputs:
   required:

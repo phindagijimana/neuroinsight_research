@@ -1,14 +1,15 @@
 # Workflow 9: Focal Cortical Lesion Detection (Epilepsy Research)
 id: cortical_lesion_detection
 name: "Focal Cortical Lesion Detection"
-version: "1.0.0"
+version: "1.0.1"
 type: workflow
 domain: epilepsy
 
 description: >
   Epilepsy research workflow: FreeSurfer recon-all followed by MELD Graph
   focal cortical dysplasia detection. Produces lesion probability maps and
-  detection metrics.
+  detection metrics. MELD step uses plugin meld_graph (NeuroInsight image
+  phindagijimana321/meld_graph:v2.2.4-nir2 with pinned digest).
 
 developer_contract: >
   Workflows only orchestrate plugins. No direct execution steps allowed.
