@@ -14,7 +14,8 @@ Images live under `docker/eeg-mne-*`, `docker/eeg-roi-feature-extraction`, and `
 **Legacy → BIDS and HPC:** The `eeg_legacy_to_bids` plugin pulls this image from Docker Hub (or your registry). **Build and push** it from `docker/eeg-mne-legacy-to-bids` with the same tag as `plugins/eeg_legacy_to_bids.yaml` before running on a cluster; Apptainer cannot use an image that was never published. Local `docker run` tests work with a locally built tag without pushing.
 | `docker/eeg-mne-spike-detection` | `phindagijimana321/eeg-spike-detection-mne:1.0.1` | Baseline envelope + peak detector |
 | `docker/eeg-mne-coregistration` | `phindagijimana321/eeg-mri-coregistration-mne:1.0.2` | `trans.fif` passthrough or JSON 4×4 → `eeg_to_mri_trans.fif` |
-| `docker/eeg-mne-forward-model` | `phindagijimana321/eeg-forward-model-mne:1.0.8` | `make_forward_solution` (needs `trans`, `src`, BEM sol on input) |
+| `docker/eeg-mne-bem-source-space` | `phindagijimana321/eeg-bem-source-space-mne:1.0.0` | Watershed BEM + volume `src.fif` from T1 (before `forward_model`) |
+| `docker/eeg-mne-forward-model` | `phindagijimana321/eeg-forward-model-mne:1.0.10` | `make_forward_solution` (needs `trans`, `src`, BEM sol on input) |
 | `docker/eeg-mne-source-localization` | `phindagijimana321/eeg-source-localization-mne:1.0.3` | dSPM inverse (needs `forward_solution.fif`) |
 | `docker/eeg-roi-feature-extraction` | `phindagijimana321/eeg-roi-feature-extraction:1.0.1` | Source NIfTI + `region_labels` + `roi_definitions.json` → ROI JSON |
 | `docker/eeg-biomarker-scoring` | `phindagijimana321/eeg-biomarker-scoring:1.0.0` | Reads `features/*.json` → biomarker + `viewer_summary.json` |
@@ -43,35 +44,39 @@ Images live under `docker/eeg-mne-*`, `docker/eeg-roi-feature-extraction`, and `
 
 ## Build and push (`phindagijimana321`)
 
+Tags must match **`plugins/*.yaml`** (single canonical line per image). Example:
+
 ```bash
 export REGISTRY=phindagijimana321
-export VER=1.0.0
 
-docker build -t ${REGISTRY}/eeg-preprocessing-mne:${VER} \
+docker build -t ${REGISTRY}/eeg-preprocessing-mne:1.0.3 \
   -f docker/eeg-mne-preprocessing/Dockerfile docker/eeg-mne-preprocessing
-docker build -t ${REGISTRY}/eeg-legacy-to-bids-mne:${VER} \
+docker build -t ${REGISTRY}/eeg-legacy-to-bids-mne:1.0.0 \
   -f docker/eeg-mne-legacy-to-bids/Dockerfile docker/eeg-mne-legacy-to-bids
-docker build -t ${REGISTRY}/eeg-spike-detection-mne:${VER} \
+docker build -t ${REGISTRY}/eeg-spike-detection-mne:1.0.1 \
   -f docker/eeg-mne-spike-detection/Dockerfile docker/eeg-mne-spike-detection
-docker build -t ${REGISTRY}/eeg-mri-coregistration-mne:${VER} \
+docker build -t ${REGISTRY}/eeg-mri-coregistration-mne:1.0.2 \
   -f docker/eeg-mne-coregistration/Dockerfile docker/eeg-mne-coregistration
-docker build -t ${REGISTRY}/eeg-forward-model-mne:${VER} \
+docker build -t ${REGISTRY}/eeg-bem-source-space-mne:1.0.0 \
+  -f docker/eeg-mne-bem-source-space/Dockerfile docker/eeg-mne-bem-source-space
+docker build -t ${REGISTRY}/eeg-forward-model-mne:1.0.10 \
   -f docker/eeg-mne-forward-model/Dockerfile docker/eeg-mne-forward-model
-docker build -t ${REGISTRY}/eeg-source-localization-mne:${VER} \
+docker build -t ${REGISTRY}/eeg-source-localization-mne:1.0.3 \
   -f docker/eeg-mne-source-localization/Dockerfile docker/eeg-mne-source-localization
-docker build -t ${REGISTRY}/eeg-roi-feature-extraction:${VER} \
+docker build -t ${REGISTRY}/eeg-roi-feature-extraction:1.0.1 \
   -f docker/eeg-roi-feature-extraction/Dockerfile docker/eeg-roi-feature-extraction
-docker build -t ${REGISTRY}/eeg-biomarker-scoring:${VER} \
+docker build -t ${REGISTRY}/eeg-biomarker-scoring:1.0.0 \
   -f docker/eeg-biomarker-scoring/Dockerfile docker/eeg-biomarker-scoring
 
-docker push ${REGISTRY}/eeg-preprocessing-mne:${VER}
-docker push ${REGISTRY}/eeg-legacy-to-bids-mne:${VER}
-docker push ${REGISTRY}/eeg-spike-detection-mne:${VER}
-docker push ${REGISTRY}/eeg-mri-coregistration-mne:${VER}
-docker push ${REGISTRY}/eeg-forward-model-mne:${VER}
-docker push ${REGISTRY}/eeg-source-localization-mne:${VER}
-docker push ${REGISTRY}/eeg-roi-feature-extraction:${VER}
-docker push ${REGISTRY}/eeg-biomarker-scoring:${VER}
+docker push ${REGISTRY}/eeg-preprocessing-mne:1.0.3
+docker push ${REGISTRY}/eeg-legacy-to-bids-mne:1.0.0
+docker push ${REGISTRY}/eeg-spike-detection-mne:1.0.1
+docker push ${REGISTRY}/eeg-mri-coregistration-mne:1.0.2
+docker push ${REGISTRY}/eeg-bem-source-space-mne:1.0.0
+docker push ${REGISTRY}/eeg-forward-model-mne:1.0.10
+docker push ${REGISTRY}/eeg-source-localization-mne:1.0.3
+docker push ${REGISTRY}/eeg-roi-feature-extraction:1.0.1
+docker push ${REGISTRY}/eeg-biomarker-scoring:1.0.0
 ```
 
 Log in first: `docker login`.

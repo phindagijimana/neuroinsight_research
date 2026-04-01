@@ -21,6 +21,7 @@ declare -A KEEP=(
   [phindagijimana321/eeg-legacy-to-bids-mne]=1.0.0
   [phindagijimana321/eeg-spike-detection-mne]=1.0.1
   [phindagijimana321/eeg-mri-coregistration-mne]=1.0.2
+  [phindagijimana321/eeg-bem-source-space-mne]=1.0.0
   [phindagijimana321/eeg-forward-model-mne]=1.0.10
   [phindagijimana321/eeg-source-localization-mne]=1.0.3
   [phindagijimana321/eeg-roi-feature-extraction]=1.0.1
