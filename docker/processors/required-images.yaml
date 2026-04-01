@@ -57,6 +57,17 @@ plugins:
     target: phindagijimana321/xcp_d:0.6.1
 
 workflows:
+  multimodal_epilepsy_biomarker:
+    plugins:
+      - eeg_preprocessing
+      - spike_detection
+      - eeg_mri_coregistration
+      - bem_source_space
+      - forward_model
+      - source_localization
+      - mri_segmentation
+      - roi_feature_extraction
+      - biomarker_scoring
   fmri_full:
     plugins: [fmriprep, xcpd]
   diffusion_full:

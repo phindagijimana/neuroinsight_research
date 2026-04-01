@@ -26,6 +26,7 @@ references:
 container:
   runtime: docker
   image: "phindagijimana321/eeg-preprocessing-mne:1.0.3"
+  digest: "sha256:ba517d60cf14998b2bc908cc21fb11cc6441eeb0dff55c62da187b4e3bab0b01"
 
 inputs:
   required: []
