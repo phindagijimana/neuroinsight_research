@@ -79,7 +79,9 @@ docker push ${REGISTRY}/eeg-roi-feature-extraction:1.0.1
 docker push ${REGISTRY}/eeg-biomarker-scoring:1.0.0
 ```
 
-Log in first: `docker login`.
+Log in first: `docker login`, or set `DOCKERHUB_USER` and `DOCKERHUB_TOKEN` when using `./docker/scripts/build_push_eeg_and_meld.sh`.
+
+**One-shot build + push (EEG stack; optional MELD when `MELD_CACHE_SRC` is set):** from repo root run `./docker/scripts/build_push_eeg_and_meld.sh`. The BEM image is built **last**; it needs network access to CentOS mirrors (`dnf` inside `freesurfer/freesurfer:7.4.1`). If that step fails, other EEG tags still build and push; use `SKIP_BEM_SOURCE_SPACE=1` to skip BEM entirely.
 
 ## Runtime layout (bind-mount)
 
