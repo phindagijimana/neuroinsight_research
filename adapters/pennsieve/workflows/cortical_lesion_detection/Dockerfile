@@ -6,6 +6,10 @@ LABEL maintainer="NeuroInsight Research"
 LABEL description="Cortical Lesion Detection workflow for Pennsieve (FreeSurfer recon-all + MELD Graph)"
 LABEL org.pennsieve.processor="true"
 
+RUN python3 -m pip install --no-cache-dir --upgrade \
+    "numpy>=1.26.4,<2.3" \
+    "h5py>=3.11.0"
+
 # Copy FreeSurfer binaries and data from the FreeSurfer image
 COPY --from=freesurfer /usr/local/freesurfer /usr/local/freesurfer
 

@@ -12,6 +12,8 @@ See `required-images.yaml` for the complete plugin/workflow image mapping.
 
 `nir2` bakes MELD params/models into the image for deterministic runtime.
 
+The Dockerfile also upgrades **NumPy** and **h5py** (`numpy>=1.26.4,<2.3`, `h5py>=3.11.0`) on top of the upstream image for aligned HDF5 wheels. Pennsieve MELD Dockerfiles under `adapters/pennsieve/` use the same `pip` step.
+
 Build and push it with:
 
 ```bash
