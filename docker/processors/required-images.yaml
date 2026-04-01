@@ -34,6 +34,9 @@ plugins:
   eeg_roi_feature_extraction:
     source: phindagijimana321/eeg-roi-feature-extraction:1.0.1
     target: phindagijimana321/eeg-roi-feature-extraction:1.0.1
+  bem_source_space:
+    source: phindagijimana321/eeg-bem-source-space-mne:1.0.0
+    target: phindagijimana321/eeg-bem-source-space-mne:1.0.0
   meld_graph:
     source: phindagijimana321/meld_graph:v2.2.4-nir2
     target: phindagijimana321/meld_graph:v2.2.4-nir2
