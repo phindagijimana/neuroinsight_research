@@ -517,6 +517,13 @@ cmd_install() {
             sed_i "s|CHANGEME_minio_access_key|${minio_key}|g" .env
             sed_i "s|CHANGEME_minio_secret_key|${minio_secret}|g" .env
             sed_i "s|CHANGEME_secret_key_at_least_32_characters_long|${secret_key}|g" .env
+            # Keep DB URL password in sync even if .env.example doesn't use placeholder tokens.
+            local pg_user="${POSTGRES_USER:-neuroinsight}"
+            local pg_db="${POSTGRES_DB:-neuroinsight}"
+            _update_env_var "POSTGRES_PASSWORD" "$pg_pass"
+            _update_env_var "DATABASE_URL" "postgresql://${pg_user}:${pg_pass}@127.0.0.1:${POSTGRES_PORT:-5432}/${pg_db}"
+            # Refresh shell env so subsequent infra setup uses the same generated secrets.
+            set -a; source .env 2>/dev/null || true; set +a
             success "Created .env with generated random passwords"
         else
             warn "No .env or .env.example found"
@@ -1408,6 +1415,11 @@ preflight_checks() {
             sed_i "s|CHANGEME_minio_access_key|${minio_key}|g" "$SCRIPT_DIR/.env"
             sed_i "s|CHANGEME_minio_secret_key|${minio_secret}|g" "$SCRIPT_DIR/.env"
             sed_i "s|CHANGEME_secret_key_at_least_32_characters_long|${secret_key}|g" "$SCRIPT_DIR/.env"
+            # Keep DB URL password in sync even if .env.example doesn't use placeholder tokens.
+            local pg_user="${POSTGRES_USER:-neuroinsight}"
+            local pg_db="${POSTGRES_DB:-neuroinsight}"
+            _update_env_var "POSTGRES_PASSWORD" "$pg_pass"
+            _update_env_var "DATABASE_URL" "postgresql://${pg_user}:${pg_pass}@127.0.0.1:${POSTGRES_PORT:-5432}/${pg_db}"
             # Reload newly created .env
             set -a; source "$SCRIPT_DIR/.env" 2>/dev/null || true; set +a
             FRONTEND_PORT="${FRONTEND_PORT:-3000}"
@@ -1795,7 +1807,7 @@ _regenerate_env_passwords() {
         # Update DATABASE_URL with new password
         local pg_user="${POSTGRES_USER:-neuroinsight}"
         local pg_db="${POSTGRES_DB:-neuroinsight}"
-        _update_env_var "DATABASE_URL" "postgresql://${pg_user}:${pg_pass}@localhost:${POSTGRES_PORT:-5432}/${pg_db}"
+        _update_env_var "DATABASE_URL" "postgresql://${pg_user}:${pg_pass}@127.0.0.1:${POSTGRES_PORT:-5432}/${pg_db}"
         set -a; source "$SCRIPT_DIR/.env" 2>/dev/null || true; set +a
         info "Regenerated service passwords for clean start"
     fi
@@ -1806,7 +1818,7 @@ _infra_update_env() {
     local pg_pass="${POSTGRES_PASSWORD:-neuroinsight_secure_password}"
     local pg_db="${POSTGRES_DB:-neuroinsight}"
     _update_env_var "POSTGRES_PORT" "$POSTGRES_PORT"
-    _update_env_var "DATABASE_URL" "postgresql://${pg_user}:${pg_pass}@localhost:${POSTGRES_PORT}/${pg_db}"
+    _update_env_var "DATABASE_URL" "postgresql://${pg_user}:${pg_pass}@127.0.0.1:${POSTGRES_PORT}/${pg_db}"
     _update_env_var "REDIS_PORT" "$REDIS_PORT"
     _update_env_var "MINIO_PORT" "$MINIO_PORT"
     set -a; source "$SCRIPT_DIR/.env" 2>/dev/null || true; set +a

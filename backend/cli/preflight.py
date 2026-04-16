@@ -448,7 +448,8 @@ def check_infrastructure(result: PreflightResult) -> None:
     _header("Infrastructure services")
 
     # PostgreSQL
-    pg_host = os.environ.get("POSTGRES_HOST", "localhost")
+    # Default 127.0.0.1: on macOS, "localhost" may resolve to ::1 while Docker publishes Postgres on 127.0.0.1 only.
+    pg_host = os.environ.get("POSTGRES_HOST", "127.0.0.1")
     pg_port = int(os.environ.get("POSTGRES_PORT", "5432"))
     if _tcp_reachable(pg_host, pg_port):
         result.ok(f"PostgreSQL  ({pg_host}:{pg_port})")
@@ -457,7 +458,7 @@ def check_infrastructure(result: PreflightResult) -> None:
         _info("Start with: ./research infra up")
 
     # Redis
-    redis_host = os.environ.get("REDIS_HOST", "localhost")
+    redis_host = os.environ.get("REDIS_HOST", "127.0.0.1")
     redis_port = int(os.environ.get("REDIS_PORT", "6379"))
     if _tcp_reachable(redis_host, redis_port):
         result.ok(f"Redis  ({redis_host}:{redis_port})")
@@ -465,7 +466,7 @@ def check_infrastructure(result: PreflightResult) -> None:
         result.fail(f"Redis not reachable ({redis_host}:{redis_port})")
 
     # MinIO
-    minio_host = os.environ.get("MINIO_HOST", "localhost")
+    minio_host = os.environ.get("MINIO_HOST", "127.0.0.1")
     minio_port = int(os.environ.get("MINIO_PORT", "9000"))
     if _tcp_reachable(minio_host, minio_port):
         result.ok(f"MinIO  ({minio_host}:{minio_port})")

@@ -60,7 +60,7 @@ class Settings(BaseSettings):
 
     # -- Database --
     database_url: str = Field(
-        default="postgresql://neuroinsight:neuroinsight_secure_password@localhost:5432/neuroinsight",
+        default="postgresql://neuroinsight:neuroinsight_secure_password@127.0.0.1:5432/neuroinsight",
         description="SQLAlchemy database URL (postgresql:// or sqlite://)",
     )
 
