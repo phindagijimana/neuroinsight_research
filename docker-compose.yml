@@ -20,6 +20,8 @@ services:
       dockerfile: Dockerfile
     container_name: neuroinsight-app
     restart: unless-stopped
+    # Host port for the API container (default 3001). The full-stack UI is nginx on
+    # FRONTEND_PORT (default 3000) — use http://localhost:3000 unless you changed FRONTEND_PORT.
     ports:
       - "127.0.0.1:${APP_PORT:-3001}:8000"
     environment:
@@ -70,6 +72,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (min 32 chars)}
     volumes:
       - app-data:/home/neuroinsight/app/data
       - /var/run/docker.sock:/var/run/docker.sock
@@ -133,7 +136,7 @@ services:
     volumes:
       - miniodata:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 3s
       retries: 10
