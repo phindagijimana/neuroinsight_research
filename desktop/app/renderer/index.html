@@ -22,6 +22,8 @@
       <div id="licenseBadge" class="badge badge-muted">License: checking…</div>
     </header>
 
+    <div id="startupBanner" class="banner banner-muted">Running startup checks…</div>
+
     <main class="grid">
       <!-- Backend -->
       <section class="card">
@@ -42,7 +44,7 @@
       <!-- Preflight -->
       <section class="card">
         <h2>Preflight</h2>
-        <p class="meta">Docker, Python, Celery, ports, disk, keychain.</p>
+        <p id="platformLine" class="meta">Platform: …</p>
         <div class="actions">
           <button id="btnPreflight">Run checks</button>
         </div>
@@ -77,6 +79,7 @@
         <p class="meta">Export a support bundle (status, preflight, logs).</p>
         <div class="actions">
           <button id="btnDiagnostics">Export bundle</button>
+          <button id="btnRevealBundle" disabled>Show in folder</button>
         </div>
         <p id="diagnosticsDetail" class="meta"></p>
       </section>

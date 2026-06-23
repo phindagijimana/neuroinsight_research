@@ -170,18 +170,39 @@ async function runPreflight() {
     },
   };
 
+  // Blockers prevent the backend from running at all; warnings mean degraded
+  // (but usable) behavior. Keeping these distinct gives deterministic startup
+  // gating across Linux/macOS/Windows.
+  const blockers = [];
   const warnings = [];
-  if (!checks.docker.ok) warnings.push("Docker not detected.");
-  if (!checks.python.ok) warnings.push("Python runtime not detected.");
-  if (!checks.celery.ok) warnings.push("Celery Python package import failed.");
-  if (!checks.keychain.ok) warnings.push("OS keychain backend not detected.");
+
+  if (!checks.python.ok) blockers.push("Python runtime not detected — the backend cannot start.");
+
+  if (!checks.docker.ok) {
+    warnings.push("Docker not detected — local job execution is unavailable (remote/HPC still work).");
+  }
+  if (!checks.celery.ok) warnings.push("Celery Python package import failed — job processing may not work.");
+  if (!checks.keychain.ok) warnings.push("OS keychain backend not detected — credentials use the encrypted fallback.");
   if (checks.disk.ok && checks.disk.freeGB < 20) warnings.push("Low free disk space (<20GB).");
   if (checks.ports.p3000_open && checks.ports.p3001_open) {
-    warnings.push("Both desktop candidate ports (3000 and 3001) are already in use.");
+    warnings.push("Both default desktop ports (3000 and 3001) are in use — a free port will be auto-selected.");
+  }
+
+  const ready = blockers.length === 0;
+  let summary;
+  if (!ready) {
+    summary = `${blockers.length} blocker(s) — backend cannot start.`;
+  } else if (warnings.length) {
+    summary = `Ready with ${warnings.length} warning(s).`;
+  } else {
+    summary = "All checks passed.";
   }
 
   return {
-    ok: warnings.length === 0,
+    ok: blockers.length === 0 && warnings.length === 0,
+    ready,
+    summary,
+    blockers,
     warnings,
     checks,
     generatedAt: new Date().toISOString(),
