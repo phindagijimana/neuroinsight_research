@@ -19,6 +19,7 @@ import Eye from '../components/icons/Eye';
 import JobProgressBar from '../components/JobProgressBar';
 import SlurmQueueMonitor from '../components/SlurmQueueMonitor';
 import type { ViewerTab } from '../utils/viewerQuery';
+import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 
 const SAMPLE_VIEWER_TABS: ViewerTab[] = ['eeg', 'imaging', 'eeg-brain'];
 
@@ -28,6 +29,7 @@ interface JobsPageProps {
 }
 
 const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) => {
+  const { eegEnabled } = useFeatureFlags();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [jobsLoading, setJobsLoading] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
@@ -197,7 +199,11 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
     });
   }, [jobs]);
 
-  const hasSampleJobs = useMemo(() => jobs.some((j) => j.is_sample_job), [jobs]);
+  // Sample jobs are EEG demos — only surface them when the EEG feature is on.
+  const hasSampleJobs = useMemo(
+    () => eegEnabled && jobs.some((j) => j.is_sample_job),
+    [jobs, eegEnabled]
+  );
 
   const getStatusIcon = (status: string) => {
     switch (status) {

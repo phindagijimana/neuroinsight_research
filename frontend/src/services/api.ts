@@ -119,6 +119,21 @@ export const apiService = {
   },
 
   /**
+   * Get public client configuration and feature flags.
+   * The frontend reads this once on load to decide which feature areas to show
+   * (e.g. EEG/multimodal UI is hidden when features.eeg_enabled is false).
+   */
+  async getConfig(): Promise<{
+    app_name: string;
+    app_version: string;
+    environment: string;
+    features: { eeg_enabled: boolean };
+  }> {
+    const response = await api.get('/api/config');
+    return response.data;
+  },
+
+  /**
    * Get host system resource capabilities (CPU, RAM, GPU).
    * Used to show realistic limits in the resource selector.
    */

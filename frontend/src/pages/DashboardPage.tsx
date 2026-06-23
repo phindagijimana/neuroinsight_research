@@ -17,6 +17,7 @@ import Eye from '../components/icons/Eye';
 import Activity from '../components/icons/Activity';
 import Download from '../components/icons/Download';
 import type { ViewerTab } from '../utils/viewerQuery';
+import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 
 const VIEWER_TABS: ViewerTab[] = ['eeg', 'imaging', 'eeg-brain'];
 
@@ -45,6 +46,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
   setSelectedJobId,
   setActivePage,
 }) => {
+  const { eegEnabled } = useFeatureFlags();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
@@ -260,7 +262,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                   )}
                 </div>
               </div>
-              {selectedJob.is_sample_job && selectedJob.status === 'completed' && (
+              {eegEnabled && selectedJob.is_sample_job && selectedJob.status === 'completed' && (
                 <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
                   Open in Viewer picks the right mode for this sample (Signal View or Multimodal View). Use{' '}
                   <strong>Show files</strong> in the Viewer if you want to open the demo FIF or NIfTI

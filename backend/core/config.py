@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     app_version: str = Field(default="1.0.0", description="Semantic version")
     environment: str = Field(default="development", description="Runtime environment: development, staging, production")
 
+    # -- Feature flags --
+    # When false, EEG and multimodal (EEG+imaging) plugins/workflows are excluded
+    # from the registry and the EEG UI is hidden — the platform focuses on imaging.
+    eeg_enabled: bool = Field(default=False, description="Enable EEG and multimodal (eeg_imaging) plugins, workflows, and UI")
+
     # -- API Server --
     api_host: str = Field(default="0.0.0.0", description="API server bind address")
     api_port: int = Field(default=3000, ge=1024, le=65535, description="API server port")
