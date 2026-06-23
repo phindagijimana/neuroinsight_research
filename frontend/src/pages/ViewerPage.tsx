@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../services/api';
+import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import type { Job } from '../types';
 import NiivueViewer from '../components/NiivueViewer';
 import EegViewerPanel from '../components/EegViewerPanel';
@@ -41,6 +42,7 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
   setSelectedJobId,
   viewerNavEpoch = 0,
 }) => {
+  const { eegEnabled } = useFeatureFlags();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,6 +76,14 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
     const t = parseViewerTabFromSearch(window.location.search) ?? 'imaging';
     setViewerTab(t);
   }, [viewerNavEpoch]);
+
+  // When EEG is disabled, the Signal/Multimodal tabs are hidden — force any
+  // EEG-only tab (e.g. from a stale deep link) back to the Imaging view.
+  useEffect(() => {
+    if (!eegEnabled && (viewerTab === 'eeg' || viewerTab === 'eeg-brain')) {
+      commitViewerTab('imaging');
+    }
+  }, [eegEnabled, viewerTab, commitViewerTab]);
 
   useEffect(() => {
     fetchJobs();
@@ -228,7 +238,9 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Viewer</h1>
                 <p className="text-gray-600">
-                  Signal View (time series), Imaging View (Niivue), or Multimodal View (combined)
+                  {eegEnabled
+                    ? 'Signal View (time series), Imaging View (Niivue), or Multimodal View (combined)'
+                    : 'Imaging View (Niivue)'}
                 </p>
               </div>
             </div>
@@ -242,9 +254,9 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
           </div>
 
           <div className="flex flex-wrap gap-2 mt-4">
-            {tabBtn('eeg', 'Signal View')}
+            {eegEnabled && tabBtn('eeg', 'Signal View')}
             {tabBtn('imaging', 'Imaging View')}
-            {tabBtn('eeg-brain', 'Multimodal View')}
+            {eegEnabled && tabBtn('eeg-brain', 'Multimodal View')}
           </div>
         </div>
 
@@ -418,7 +430,9 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
             <p className="text-gray-600">
               {completedJobs.length === 0
                 ? 'Complete a processing job first, then view results here.'
-                : 'Select a job, show files, and open a NIfTI / MGZ file — or switch to Signal View.'}
+                : eegEnabled
+                ? 'Select a job, show files, and open a NIfTI / MGZ file — or switch to Signal View.'
+                : 'Select a job, show files, and open a NIfTI / MGZ file.'}
             </p>
           </div>
         )}

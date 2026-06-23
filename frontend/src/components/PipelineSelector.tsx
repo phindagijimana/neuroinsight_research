@@ -7,7 +7,11 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Zap, GitBranch, CheckCircle, AlertTriangle } from 'lucide-react';
 import { apiService } from '../services/api';
+import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import type { Pipeline } from '../types';
+
+// Categories hidden from the catalog when the EEG feature is disabled.
+const EEG_CATEGORIES: PipelineCategory[] = ['eeg', 'multimodal'];
 
 interface PipelineSelectorProps {
   onPipelineSelect: (pipeline: Pipeline | null) => void;
@@ -384,6 +388,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   selectedPipeline,
   onExecutionSelect,
 }) => {
+  const { eegEnabled } = useFeatureFlags();
   const [mode, setMode] = useState<SelectionMode>('workflows');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -400,9 +405,11 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
     hint: string;
   } | null>(null);
 
-  // Decide which data source to use
-  const activePlugins = usingLiveData ? livePlugins : MOCK_PLUGINS;
-  const activeWorkflows = usingLiveData ? liveWorkflows : MOCK_WORKFLOWS;
+  // Decide which data source to use. When EEG is disabled, drop EEG/multimodal
+  // categories so the offline (mock) catalog matches the imaging-only backend.
+  const categoryAllowed = (c: PipelineCategory) => eegEnabled || !EEG_CATEGORIES.includes(c);
+  const activePlugins = (usingLiveData ? livePlugins : MOCK_PLUGINS).filter(p => categoryAllowed(p.category));
+  const activeWorkflows = (usingLiveData ? liveWorkflows : MOCK_WORKFLOWS).filter(w => categoryAllowed(w.category));
   const userSelectablePlugins = activePlugins.filter(p => p.user_selectable !== false);
 
   useEffect(() => {

@@ -108,12 +108,16 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"Startup stale-job reap failed: {e}")
 
-    try:
-        from backend.services.sample_eeg_jobs import ensure_sample_eeg_jobs
+    # Sample EEG demo jobs are only seeded when the EEG feature is enabled.
+    if settings.eeg_enabled:
+        try:
+            from backend.services.sample_eeg_jobs import ensure_sample_eeg_jobs
 
-        ensure_sample_eeg_jobs()
-    except Exception as e:
-        logger.warning(f"Sample EEG demo jobs not installed: {e}")
+            ensure_sample_eeg_jobs()
+        except Exception as e:
+            logger.warning(f"Sample EEG demo jobs not installed: {e}")
+    else:
+        logger.info("EEG feature disabled — skipping sample EEG demo jobs")
 
     # Auto-reconnect to HPC if a previous session config is persisted
     try:
@@ -287,6 +291,23 @@ def health_check():
         "version": settings.app_version,
         "environment": settings.environment,
         "services": services,
+    }
+
+
+@app.get("/api/config")
+def get_app_config():
+    """Public client configuration, including feature flags.
+
+    The frontend reads this once on load to decide which feature areas to show
+    (e.g. EEG/multimodal UI is hidden when ``eeg_enabled`` is false).
+    """
+    return {
+        "app_name": settings.app_name,
+        "app_version": settings.app_version,
+        "environment": settings.environment,
+        "features": {
+            "eeg_enabled": settings.eeg_enabled,
+        },
     }
 
 

@@ -13,11 +13,16 @@ Key design:
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Iterable, Set
 
 import yaml
 
 logger = logging.getLogger(__name__)
+
+# Domains tagged as EEG or multimodal (EEG + imaging). When the EEG feature is
+# disabled, plugins/workflows with these domains are excluded at load time so the
+# platform focuses on imaging only.
+EEG_DOMAINS = frozenset({"eeg", "eeg_imaging"})
 
 
 @dataclass
@@ -146,14 +151,17 @@ class WorkflowDefinition:
 class PluginWorkflowRegistry:
     """Registry that loads and manages plugins and workflows."""
 
-    def __init__(self, plugins_dir, workflows_dir):
+    def __init__(self, plugins_dir, workflows_dir, excluded_domains: Optional[Iterable[str]] = None):
         self.plugins_dir = Path(plugins_dir)
         self.workflows_dir = Path(workflows_dir)
+        self.excluded_domains: Set[str] = set(excluded_domains or ())
         self.plugins: Dict[str, PluginDefinition] = {}
         self.workflows: Dict[str, WorkflowDefinition] = {}
         self._load_plugins()
         self._load_workflows()
         self._validate_workflows()
+        if self.excluded_domains:
+            logger.info(f"Excluding domains from registry: {sorted(self.excluded_domains)}")
         logger.info(
             f"PluginWorkflowRegistry initialized: "
             f"{len(self.plugins)} plugins, {len(self.workflows)} workflows"
@@ -173,6 +181,11 @@ class PluginWorkflowRegistry:
                     continue
                 # Skip non-plugin types
                 if data.get("type") != "plugin":
+                    continue
+
+                # Skip plugins in excluded domains (e.g. EEG when the feature is off)
+                if data.get("domain", "") in self.excluded_domains:
+                    logger.debug(f"Skipping plugin {yaml_file.stem} (excluded domain: {data.get('domain')})")
                     continue
 
                 plugin_id = data.get("id", yaml_file.stem)
@@ -242,6 +255,11 @@ class PluginWorkflowRegistry:
                 if not data or not isinstance(data, dict):
                     continue
                 if data.get("type") != "workflow":
+                    continue
+
+                # Skip workflows in excluded domains (e.g. EEG when the feature is off)
+                if data.get("domain", "") in self.excluded_domains:
+                    logger.debug(f"Skipping workflow {yaml_file.stem} (excluded domain: {data.get('domain')})")
                     continue
 
                 wf_id = data.get("id", yaml_file.stem)
@@ -432,5 +450,14 @@ def get_plugin_workflow_registry(plugins_dir=None, workflows_dir=None) -> Plugin
             plugins_dir = Path(__file__).parent.parent.parent / "plugins"
         if workflows_dir is None:
             workflows_dir = Path(__file__).parent.parent.parent / "workflows"
-        _pw_registry = PluginWorkflowRegistry(plugins_dir, workflows_dir)
+        # Exclude EEG / multimodal domains unless the EEG feature is enabled.
+        excluded_domains: Set[str] = set()
+        try:
+            from backend.core.config import get_settings
+            if not get_settings().eeg_enabled:
+                excluded_domains = set(EEG_DOMAINS)
+        except Exception as e:  # pragma: no cover - defensive: never block registry load on config
+            logger.warning(f"Could not read EEG feature flag, defaulting to imaging-only: {e}")
+            excluded_domains = set(EEG_DOMAINS)
+        _pw_registry = PluginWorkflowRegistry(plugins_dir, workflows_dir, excluded_domains=excluded_domains)
     return _pw_registry
