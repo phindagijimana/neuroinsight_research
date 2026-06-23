@@ -11,6 +11,11 @@ build/
 .pytest_cache/
 .coverage
 
+# Desktop app signing assets live in build/ — keep them tracked (the generic
+# build/ rule above is for Python/build output, not these source files).
+!desktop/app/build/
+!desktop/app/build/**
+
 # Virtual environments
 venv/
 .venv/
