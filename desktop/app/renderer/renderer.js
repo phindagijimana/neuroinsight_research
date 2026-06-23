@@ -149,18 +149,42 @@ async function runPreflight(silent) {
 // ---- License -------------------------------------------------------------
 async function refreshLicense() {
   const status = await nir.license.status();
+  const enf = await nir.license.enforcement();
   const badge = $("licenseBadge");
   const detail = $("licenseDetail");
+  const modeEl = $("licenseMode");
+  const warn = $("licenseWarn");
+
+  modeEl.textContent = `Mode: ${enf.mode}${enf.allowFullFeatures ? "" : " (limited)"}`;
+
   if (status.valid) {
     badge.className = "badge badge-ok";
-    badge.textContent = `License: ${status.planTier || "active"}`;
-    detail.textContent = `Valid · org ${status.organizationId || "—"} · ${
+    badge.textContent = `License: ${status.planTier || "active"}${status.inGrace ? " (grace)" : ""}`;
+    const exp = status.expiresAt ? new Date(status.expiresAt).toLocaleDateString() : "—";
+    detail.textContent = `Valid · org ${status.organizationId || "—"} · expires ${exp} · ${
       status.daysRemaining
-    } days remaining · ${status.featureCount || 0} feature(s).`;
+    } day(s) · ${status.featureCount || 0} feature(s).`;
   } else {
-    badge.className = "badge badge-warn";
-    badge.textContent = "License: none";
+    badge.className = enf.mode === "unlicensed" ? "badge badge-muted" : "badge badge-warn";
+    badge.textContent = enf.mode === "unlicensed" ? "License: community" : "License: invalid";
     detail.textContent = status.reason || "No valid license imported.";
+  }
+
+  // Warnings: grace period, expiring soon, or limited (enforced) mode.
+  if (status.inGrace) {
+    warn.hidden = false;
+    warn.className = "inlinewarn";
+    warn.textContent = `Offline grace: ${status.graceDaysRemaining} day(s) left — renew to avoid losing access.`;
+  } else if (!enf.allowFullFeatures) {
+    warn.hidden = false;
+    warn.className = "inlinewarn bad";
+    warn.textContent = `Limited mode — ${enf.reason || "valid license required"}. Opening the app is disabled.`;
+  } else if (status.valid && status.expiringSoon) {
+    warn.hidden = false;
+    warn.className = "inlinewarn";
+    warn.textContent = `License expires in ${status.daysRemaining} day(s) — plan your renewal.`;
+  } else {
+    warn.hidden = true;
   }
 }
 
@@ -169,6 +193,61 @@ async function importLicense() {
   if (res.ok) toast("License imported.");
   else toast(res.error || "License import failed.");
   refreshLicense();
+}
+
+async function importLicenseText() {
+  const text = window.prompt("Paste the license token JSON ({ payload, signature }):");
+  if (!text) return;
+  const res = await nir.license.importText(text);
+  if (res.ok) toast("License imported.");
+  else toast(res.error || "License import failed.");
+  refreshLicense();
+}
+
+// ---- Credential vault ----------------------------------------------------
+async function refreshCredsBackend() {
+  const st = await nir.creds.status();
+  $("credsBackend").textContent = `Backend: ${st.backend} (service ${st.serviceName})`;
+}
+
+async function credSet() {
+  const name = $("credKey").value.trim();
+  const value = $("credValue").value;
+  if (!name || !value) {
+    toast("Enter a namespaced key and value.");
+    return;
+  }
+  const res = await nir.creds.set(name, value);
+  $("credsDetail").textContent = res.ok
+    ? `Saved "${name}" via ${res.backend}.`
+    : `Error: ${res.error || "save failed"}`;
+  $("credValue").value = "";
+}
+
+async function credGet() {
+  const name = $("credKey").value.trim();
+  if (!name) {
+    toast("Enter a key to retrieve.");
+    return;
+  }
+  const res = await nir.creds.get(name);
+  if (!res.ok) {
+    $("credsDetail").textContent = `Error: ${res.error}`;
+  } else if (res.value == null) {
+    $("credsDetail").textContent = `No value stored for "${name}".`;
+  } else {
+    $("credsDetail").textContent = `"${name}" is set (${res.value.length} chars) via ${res.backend}. Value not displayed.`;
+  }
+}
+
+async function credDelete() {
+  const name = $("credKey").value.trim();
+  if (!name) {
+    toast("Enter a key to delete.");
+    return;
+  }
+  const res = await nir.creds.delete(name);
+  $("credsDetail").textContent = res.ok ? `Deleted "${name}".` : `Error: ${res.error}`;
 }
 
 // ---- App lock ------------------------------------------------------------
@@ -232,6 +311,10 @@ function init() {
   $("btnRefresh").addEventListener("click", refreshStatus);
   $("btnPreflight").addEventListener("click", () => runPreflight(false));
   $("btnImportLicense").addEventListener("click", importLicense);
+  $("btnImportLicenseText").addEventListener("click", importLicenseText);
+  $("btnCredSet").addEventListener("click", credSet);
+  $("btnCredGet").addEventListener("click", credGet);
+  $("btnCredDelete").addEventListener("click", credDelete);
   $("btnDiagnostics").addEventListener("click", exportDiagnostics);
   $("btnRevealBundle").addEventListener("click", revealBundle);
 
@@ -248,6 +331,7 @@ function init() {
   refreshStatus();
   refreshLicense();
   refreshLock();
+  refreshCredsBackend();
   // Auto-run preflight on load so startup state (banner + Start gating) is set.
   runPreflight(true);
 }

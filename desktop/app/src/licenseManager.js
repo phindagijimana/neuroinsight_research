@@ -198,12 +198,43 @@ function computeLicenseStatus(licenseObj) {
     };
   }
 
+  const DAY_MS = 24 * 60 * 60 * 1000;
   const msRemaining = exp - now;
-  const daysRemaining = Math.floor(msRemaining / (24 * 60 * 60 * 1000));
+  const daysRemaining = Math.floor(msRemaining / DAY_MS);
+
   if (msRemaining < 0) {
+    // Past expiry — honor an offline grace period (institutional outages, late
+    // renewal). Within grace the license stays valid but flagged; beyond it the
+    // license is expired.
+    const graceDays = Number.isInteger(payload.offline_grace_days)
+      ? payload.offline_grace_days
+      : 0;
+    const graceEnds = exp + graceDays * DAY_MS;
+    if (graceDays > 0 && now <= graceEnds) {
+      const graceDaysRemaining = Math.ceil((graceEnds - now) / DAY_MS);
+      const status = {
+        present: true,
+        valid: true,
+        inGrace: true,
+        expiringSoon: true,
+        reason: `License expired but within ${graceDays}-day offline grace period — renew soon.`,
+        payload,
+        expiresAt: payload.expires_at,
+        daysRemaining,
+        graceDaysRemaining,
+        planTier: payload.plan_tier,
+        organizationId: payload.organization_id,
+        featureCount: Array.isArray(payload.features) ? payload.features.length : 0,
+        keyConfigured: true,
+        lastValidatedAt: new Date().toISOString(),
+      };
+      writeJson(licenseStatePath, { lastValidatedAt: status.lastValidatedAt });
+      return status;
+    }
     return {
       present: true,
       valid: false,
+      inGrace: false,
       reason: "License expired.",
       payload,
       expiresAt: payload.expires_at,
@@ -213,9 +244,12 @@ function computeLicenseStatus(licenseObj) {
     };
   }
 
+  const EXPIRY_WARN_DAYS = 14;
   const status = {
     present: true,
     valid: true,
+    inGrace: false,
+    expiringSoon: daysRemaining <= EXPIRY_WARN_DAYS,
     reason: null,
     payload,
     expiresAt: payload.expires_at,
@@ -228,6 +262,41 @@ function computeLicenseStatus(licenseObj) {
   };
   writeJson(licenseStatePath, { lastValidatedAt: status.lastValidatedAt });
   return status;
+}
+
+/**
+ * Enforcement policy derived from the current license + whether a verification
+ * key is configured.
+ *   - unlicensed: no public key configured -> community/dev mode, full features
+ *   - active:     valid license -> full features
+ *   - grace:      expired-but-in-grace -> full features, renew-soon warning
+ *   - expired/invalid/missing: a key IS configured but the license is not valid
+ *                 -> limited mode (gated features)
+ */
+function getEnforcement() {
+  requireInit();
+  const keyConfigured = !!loadPublicKey();
+  if (!keyConfigured) {
+    return {
+      keyConfigured: false,
+      mode: "unlicensed",
+      allowFullFeatures: true,
+      reason: "No license public key configured — running in unlicensed/community mode.",
+    };
+  }
+  const status = getLicenseStatus();
+  if (status.valid && status.inGrace) {
+    return { keyConfigured: true, mode: "grace", allowFullFeatures: true, reason: status.reason };
+  }
+  if (status.valid) {
+    return { keyConfigured: true, mode: "active", allowFullFeatures: true, reason: null };
+  }
+  return {
+    keyConfigured: true,
+    mode: status.present ? "expired" : "missing",
+    allowFullFeatures: false,
+    reason: status.reason || "No valid license.",
+  };
 }
 
 function importLicenseObject(obj) {
@@ -330,6 +399,7 @@ function tryAutoImportFromCandidates(candidatePaths) {
 module.exports = {
   initLicenseManager,
   getLicenseStatus,
+  getEnforcement,
   importLicenseFromText,
   importLicenseFromFile,
   getLicensePaths,

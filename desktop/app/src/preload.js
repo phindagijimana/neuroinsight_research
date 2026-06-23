@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld("nir", {
   },
   license: {
     status: () => invoke("license:status"),
+    enforcement: () => invoke("license:enforcement"),
     importText: (text) => invoke("license:importText", text),
     importFile: () => invoke("license:importFile"),
   },
