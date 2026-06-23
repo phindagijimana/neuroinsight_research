@@ -43,6 +43,28 @@ The multi-platform workflow detects signing secret availability per platform:
 - Windows: `Get-AuthenticodeSignature` must report `Valid`.
 - macOS: `codesign -dv` and `xcrun stapler validate` must pass.
 
+### Automated trust check (`verify_trust.js`)
+
+The release workflow runs `desktop/ops/verify_trust.js` after checksum
+verification. It reports each artifact as SIGNED / UNSIGNED and:
+
+```bash
+# warn-only (unsigned allowed — internal/pilot fallback)
+node desktop/ops/verify_trust.js desktop/dist macos
+# enforce (CI passes --require-signed automatically when signing secrets exist)
+node desktop/ops/verify_trust.js desktop/dist macos --require-signed
+```
+
+- macOS: `codesign --verify --deep --strict`, `spctl --assess`, and
+  `xcrun stapler validate` (notarization staple).
+- Windows: `Get-AuthenticodeSignature` (runs on Windows runners).
+- Linux: integrity is checksum-only (no signing in this track).
+
+The signing config lives in `desktop/app/package.json` (`build.mac.hardenedRuntime`
++ `entitlements`, `build.win`) with notarization handled by the env-gated
+`desktop/app/build/notarize.js` afterSign hook — a no-op without Apple creds, so
+the unsigned fallback build always succeeds.
+
 ## User-facing verification
 
 - Integrity: `shasum -a 256 -c desktop-release-sha256-<platform>.txt`

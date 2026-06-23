@@ -12,7 +12,10 @@
     "dist": "electron-builder",
     "dist:linux": "electron-builder --linux AppImage deb",
     "dist:mac": "electron-builder --mac dmg",
-    "dist:win": "electron-builder --win nsis"
+    "dist:win": "electron-builder --win nsis",
+    "dist:linux:ci": "electron-builder --linux AppImage deb --publish never",
+    "dist:mac:ci": "electron-builder --mac dmg --publish never",
+    "dist:win:ci": "electron-builder --win nsis --publish never"
   },
   "devDependencies": {
     "electron": "^31.0.0",
@@ -36,14 +39,20 @@
       "category": "Science",
       "icon": "assets/icon.png"
     },
+    "afterSign": "build/notarize.js",
     "mac": {
       "target": ["dmg"],
       "category": "public.app-category.medical",
-      "icon": "assets/icon.icns"
+      "icon": "assets/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "win": {
       "target": ["nsis"],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.ico",
+      "signingHashAlgorithms": ["sha256"]
     }
   }
 }
