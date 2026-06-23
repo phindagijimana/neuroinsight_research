@@ -12,6 +12,9 @@ contextBridge.exposeInMainWorld("nir", {
   preflight: {
     run: () => invoke("preflight:run"),
   },
+  platform: {
+    summary: () => invoke("platform:summary"),
+  },
   backend: {
     start: () => invoke("backend:start"),
     stop: () => invoke("backend:stop"),
@@ -50,5 +53,6 @@ contextBridge.exposeInMainWorld("nir", {
   },
   diagnostics: {
     export: () => invoke("diagnostics:export"),
+    reveal: (filePath) => invoke("diagnostics:reveal", filePath),
   },
 });

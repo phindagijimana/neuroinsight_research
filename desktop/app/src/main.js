@@ -100,8 +100,28 @@ function registerIpc() {
   };
 
   // Preflight & diagnostics
-  ipcMain.handle("preflight:run", wrap(() => preflight.runPreflight()));
+  ipcMain.handle(
+    "preflight:run",
+    wrap(async () => {
+      const report = await preflight.runPreflight();
+      try {
+        desktopState.updateSettings({ lastPreflightAt: report.generatedAt, lastPreflightReady: report.ready });
+      } catch (_e) {
+        // non-fatal
+      }
+      return report;
+    })
+  );
   ipcMain.handle("diagnostics:export", wrap(() => diagnostics.exportDiagnosticsBundle()));
+  ipcMain.handle(
+    "diagnostics:reveal",
+    wrap((filePath) => {
+      if (!filePath) return { ok: false, error: "No path to reveal." };
+      shell.showItemInFolder(filePath);
+      return { ok: true };
+    })
+  );
+  ipcMain.handle("platform:summary", wrap(() => platformAdapter.getPlatformSummary()));
 
   // Backend lifecycle
   ipcMain.handle("backend:start", wrap(() => backendManager.start()));
@@ -213,17 +233,35 @@ app.whenReady().then(() => {
   tryAutoImportLicense();
   createWindow();
 
-  // Optionally auto-start the backend if the user enabled it.
-  try {
-    const settings = desktopState.readSettings();
-    if (settings.autoOpenOnStart) {
-      backendManager.start().then((r) => {
-        desktopState.appendLog("backend_autostart", { ok: r.ok });
+  // Startup preflight: run once, record the result, and only auto-start the
+  // backend when the environment is actually ready (no blockers).
+  preflight
+    .runPreflight()
+    .then((report) => {
+      desktopState.appendLog("startup_preflight", {
+        ready: report.ready,
+        summary: report.summary,
+        blockers: report.blockers,
       });
-    }
-  } catch (_e) {
-    // non-fatal
-  }
+      try {
+        desktopState.updateSettings({
+          lastPreflightAt: report.generatedAt,
+          lastPreflightReady: report.ready,
+        });
+      } catch (_e) {
+        // non-fatal
+      }
+
+      const settings = desktopState.readSettings();
+      if (settings.autoOpenOnStart && report.ready) {
+        backendManager.start().then((r) => {
+          desktopState.appendLog("backend_autostart", { ok: r.ok });
+        });
+      } else if (settings.autoOpenOnStart && !report.ready) {
+        desktopState.appendLog("backend_autostart_skipped", { reason: "preflight blockers", blockers: report.blockers });
+      }
+    })
+    .catch((e) => desktopState.appendLog("startup_preflight_error", { error: String(e) }));
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

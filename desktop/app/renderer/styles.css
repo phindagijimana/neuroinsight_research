@@ -79,6 +79,30 @@ body {
   color: #fff;
 }
 
+.banner {
+  margin: 0;
+  padding: 10px 24px;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+.banner-ok {
+  background: #dcfce7;
+  color: var(--ok);
+}
+.banner-warn {
+  background: #fef3c7;
+  color: var(--warn);
+}
+.banner-bad {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.banner-muted {
+  background: #eef2f7;
+  color: var(--muted);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

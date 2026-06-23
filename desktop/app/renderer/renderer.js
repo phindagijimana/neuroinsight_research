@@ -6,6 +6,10 @@
 const nir = window.nir;
 const $ = (id) => document.getElementById(id);
 
+// Tracks whether the environment has blockers (gates the Start button) and the
+// most recent diagnostics bundle path (gates the reveal button).
+const state = { preflightReady: true, lastBundlePath: null };
+
 function toast(msg) {
   const el = $("toast");
   el.textContent = msg;
@@ -45,11 +49,23 @@ async function refreshStatus() {
   $("runtimeInfo").textContent = JSON.stringify(runtime, null, 2);
 }
 
+function applyStartGate() {
+  // The Start button is disabled while preflight reports blockers.
+  $("btnStart").disabled = !state.preflightReady;
+  $("btnStart").title = state.preflightReady
+    ? ""
+    : "Resolve preflight blockers before starting the backend.";
+}
+
 async function startBackend() {
+  if (!state.preflightReady) {
+    toast("Cannot start: resolve preflight blockers first.");
+    return;
+  }
   $("btnStart").disabled = true;
   toast("Starting backend…");
   const res = await nir.backend.start();
-  $("btnStart").disabled = false;
+  applyStartGate();
   if (res.ok) {
     toast(res.backend && res.backend.reused ? "Backend already running." : "Backend started.");
   } else {
@@ -71,11 +87,28 @@ async function openUI() {
 }
 
 // ---- Preflight -----------------------------------------------------------
-async function runPreflight() {
+function renderBanner(report) {
+  const banner = $("startupBanner");
+  const parts = [report.summary || ""];
+  if (report.blockers && report.blockers.length) parts.push(report.blockers.join(" "));
+  if (report.warnings && report.warnings.length) parts.push(report.warnings.join(" "));
+  banner.textContent = parts.filter(Boolean).join(" — ");
+  if (!report.ready) banner.className = "banner banner-bad";
+  else if (report.warnings && report.warnings.length) banner.className = "banner banner-warn";
+  else banner.className = "banner banner-ok";
+}
+
+async function runPreflight(silent) {
   $("btnPreflight").disabled = true;
-  toast("Running preflight…");
+  if (!silent) toast("Running preflight…");
   const report = await nir.preflight.run();
   $("btnPreflight").disabled = false;
+
+  // Gate the Start button + update the startup banner.
+  state.preflightReady = !!report.ready;
+  applyStartGate();
+  renderBanner(report);
+
   const list = $("preflightList");
   list.innerHTML = "";
 
@@ -102,10 +135,14 @@ async function runPreflight() {
     li.append(n, v);
     list.appendChild(li);
   }
-  if (report.warnings && report.warnings.length) {
-    toast(`${report.warnings.length} warning(s) — see list.`);
-  } else {
-    toast("Preflight passed.");
+  if (!silent) {
+    if (!report.ready) {
+      toast(`${report.blockers.length} blocker(s) — see banner.`);
+    } else if (report.warnings && report.warnings.length) {
+      toast(`${report.warnings.length} warning(s) — see list.`);
+    } else {
+      toast("Preflight passed.");
+    }
   }
 }
 
@@ -164,10 +201,26 @@ async function exportDiagnostics() {
   toast("Exporting diagnostics…");
   const res = await nir.diagnostics.export();
   if (res.ok) {
+    state.lastBundlePath = res.path;
     $("diagnosticsDetail").textContent = `Saved: ${res.path}`;
+    $("btnRevealBundle").disabled = false;
     toast("Diagnostics exported.");
   } else {
     toast(res.error || "Export failed.");
+  }
+}
+
+async function revealBundle() {
+  if (!state.lastBundlePath) return;
+  await nir.diagnostics.reveal(state.lastBundlePath);
+}
+
+async function loadPlatform() {
+  try {
+    const p = await nir.platform.summary();
+    $("platformLine").textContent = `Platform: ${p.os} / ${p.arch}`;
+  } catch (_e) {
+    $("platformLine").textContent = "Platform: unknown";
   }
 }
 
@@ -177,9 +230,10 @@ function init() {
   $("btnStop").addEventListener("click", stopBackend);
   $("btnOpenUI").addEventListener("click", openUI);
   $("btnRefresh").addEventListener("click", refreshStatus);
-  $("btnPreflight").addEventListener("click", runPreflight);
+  $("btnPreflight").addEventListener("click", () => runPreflight(false));
   $("btnImportLicense").addEventListener("click", importLicense);
   $("btnDiagnostics").addEventListener("click", exportDiagnostics);
+  $("btnRevealBundle").addEventListener("click", revealBundle);
 
   $("btnLockEnable").addEventListener("click", () => lockAction(nir.lock.enable, "App lock enabled."));
   $("btnLockUnlock").addEventListener("click", () => lockAction(nir.lock.unlock, "Unlocked."));
@@ -190,9 +244,12 @@ function init() {
     toast("Locked.");
   });
 
+  loadPlatform();
   refreshStatus();
   refreshLicense();
   refreshLock();
+  // Auto-run preflight on load so startup state (banner + Start gating) is set.
+  runPreflight(true);
 }
 
 document.addEventListener("DOMContentLoaded", init);
