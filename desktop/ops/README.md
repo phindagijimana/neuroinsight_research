@@ -6,6 +6,8 @@ This directory contains packaging/release utilities for NIR Desktop.
 
 - `PILOT_CHECKLIST.md` - single execution doc (checklist + cadence + evidence log)
 - `GO_LIVE_RECOMMENDATION_TEMPLATE.md` - single decision doc for phase exit
+- `SUPPORT_SOP.md` - support SOP + incident workflow (severity, SLAs, escalation, rollback)
+- `LICENSING_OPERATIONS.md` - billing/licensing operational playbook (issue/renew/revoke)
 - `pilot_smoke_test.sh` - quick pre-pilot validation script
 - `SIGNING_AND_TRUST.md` - Phase 6 signing/notarization setup and trust checks
 - `PHASE7_RELIABILITY_GATE.md` - Phase 7 go/conditional/no-go gate definition
