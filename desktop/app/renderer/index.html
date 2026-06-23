@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuroInsight Research — Desktop</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">NIR</span>
+        <div>
+          <h1>NeuroInsight Research</h1>
+          <p class="subtitle">Desktop control center</p>
+        </div>
+      </div>
+      <div id="licenseBadge" class="badge badge-muted">License: checking…</div>
+    </header>
+
+    <main class="grid">
+      <!-- Backend -->
+      <section class="card">
+        <h2>Backend</h2>
+        <div class="statusline">
+          <span id="backendDot" class="dot dot-off"></span>
+          <span id="backendStatus">Unknown</span>
+        </div>
+        <p id="backendMeta" class="meta"></p>
+        <div class="actions">
+          <button id="btnStart" class="primary">Start backend</button>
+          <button id="btnStop">Stop backend</button>
+          <button id="btnOpenUI" class="primary" disabled>Open NIR UI</button>
+          <button id="btnRefresh">Refresh</button>
+        </div>
+      </section>
+
+      <!-- Preflight -->
+      <section class="card">
+        <h2>Preflight</h2>
+        <p class="meta">Docker, Python, Celery, ports, disk, keychain.</p>
+        <div class="actions">
+          <button id="btnPreflight">Run checks</button>
+        </div>
+        <ul id="preflightList" class="checks"></ul>
+      </section>
+
+      <!-- License -->
+      <section class="card">
+        <h2>License</h2>
+        <p id="licenseDetail" class="meta">No license imported.</p>
+        <div class="actions">
+          <button id="btnImportLicense">Import license file…</button>
+        </div>
+      </section>
+
+      <!-- Security / App lock -->
+      <section class="card">
+        <h2>App lock</h2>
+        <p id="lockDetail" class="meta">Loading…</p>
+        <div class="actions row">
+          <input id="pinInput" type="password" placeholder="PIN (min 6)" />
+          <button id="btnLockEnable">Enable</button>
+          <button id="btnLockUnlock">Unlock</button>
+          <button id="btnLockNow">Lock now</button>
+          <button id="btnLockDisable">Disable</button>
+        </div>
+      </section>
+
+      <!-- Diagnostics -->
+      <section class="card">
+        <h2>Diagnostics</h2>
+        <p class="meta">Export a support bundle (status, preflight, logs).</p>
+        <div class="actions">
+          <button id="btnDiagnostics">Export bundle</button>
+        </div>
+        <p id="diagnosticsDetail" class="meta"></p>
+      </section>
+
+      <!-- Runtime info -->
+      <section class="card">
+        <h2>Runtime</h2>
+        <pre id="runtimeInfo" class="code">…</pre>
+      </section>
+    </main>
+
+    <div id="toast" class="toast"></div>
+    <script src="renderer.js"></script>
+  </body>
+</html>

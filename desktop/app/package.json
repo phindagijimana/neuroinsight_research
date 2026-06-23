@@ -1,0 +1,48 @@
+{
+  "name": "nir-desktop-app",
+  "version": "0.1.0",
+  "description": "NeuroInsight Research Desktop — thin Electron orchestration client",
+  "private": true,
+  "main": "src/main.js",
+  "author": "NeuroInsight Research Team",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:linux": "electron-builder --linux AppImage deb",
+    "build:mac": "electron-builder --mac dmg",
+    "build:win": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "org.neuroinsight.desktop",
+    "productName": "NeuroInsight Research",
+    "directories": {
+      "output": "../dist"
+    },
+    "files": [
+      "src/**/*",
+      "renderer/**/*",
+      "config/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Science",
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.medical",
+      "icon": "assets/icon.icns"
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/icon.ico"
+    }
+  }
+}
