@@ -134,6 +134,13 @@ function registerIpc() {
   ipcMain.handle(
     "backend:openUI",
     wrap(async () => {
+      // Enforce licensing policy: in a licensed build (key configured) an
+      // expired/invalid license drops to limited mode and cannot open the UI.
+      // Unlicensed/community mode (no key) and active/grace licenses are allowed.
+      const enf = licenseManager.getEnforcement();
+      if (!enf.allowFullFeatures) {
+        return { ok: false, error: enf.reason || "A valid license is required to open the app." };
+      }
       const status = await backendManager.getStatus();
       if (!status.backend.healthy) {
         return { ok: false, error: "Backend is not healthy yet. Start it first." };
@@ -173,6 +180,7 @@ function registerIpc() {
 
   // License
   ipcMain.handle("license:status", wrap(() => licenseManager.getLicenseStatus()));
+  ipcMain.handle("license:enforcement", wrap(() => licenseManager.getEnforcement()));
   ipcMain.handle("license:importText", wrap((text) => licenseManager.importLicenseFromText(text)));
   ipcMain.handle(
     "license:importFile",

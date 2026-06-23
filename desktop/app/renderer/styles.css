@@ -218,6 +218,20 @@ input[type="text"] {
   font-weight: 600;
 }
 
+.inlinewarn {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #fef3c7;
+  color: var(--warn);
+}
+.inlinewarn.bad {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
 .code {
   background: #0b1f3a;
   color: #d1e3ff;

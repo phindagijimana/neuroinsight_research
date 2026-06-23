@@ -54,10 +54,29 @@
       <!-- License -->
       <section class="card">
         <h2>License</h2>
+        <p id="licenseMode" class="meta">Mode: …</p>
         <p id="licenseDetail" class="meta">No license imported.</p>
+        <div id="licenseWarn" class="inlinewarn" hidden></div>
         <div class="actions">
           <button id="btnImportLicense">Import license file…</button>
+          <button id="btnImportLicenseText">Paste token…</button>
         </div>
+      </section>
+
+      <!-- Credential vault -->
+      <section class="card">
+        <h2>Credential vault</h2>
+        <p id="credsBackend" class="meta">Backend: …</p>
+        <div class="actions row">
+          <input id="credKey" type="text" placeholder="namespaced.key (e.g. pennsieve.api_key)" />
+          <input id="credValue" type="password" placeholder="secret value" />
+        </div>
+        <div class="actions">
+          <button id="btnCredSet">Save</button>
+          <button id="btnCredGet">Retrieve</button>
+          <button id="btnCredDelete">Delete</button>
+        </div>
+        <p id="credsDetail" class="meta"></p>
       </section>
 
       <!-- Security / App lock -->
