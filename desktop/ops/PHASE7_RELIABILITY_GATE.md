@@ -37,7 +37,37 @@ cutover planning.
 ## CLI gate check
 
 ```bash
+# human-readable
 node desktop/ops/evaluate_pilot_gate.js desktop/ops/pilot_reliability_report.json
+# machine-readable (for capture/automation)
+node desktop/ops/evaluate_pilot_gate.js desktop/ops/pilot_reliability_report.json --json
 ```
 
 The script exits non-zero for `no_go`.
+
+## Capturing the decision into the go-live record
+
+```bash
+node desktop/ops/capture_gate_result.js desktop/ops/pilot_reliability_report.json
+```
+
+Writes `pilot_gate_result.json` (machine-readable) and `GO_LIVE_DECISION.md`
+(a stamp to paste into `GO_LIVE_RECOMMENDATION_TEMPLATE.md` under "Reliability
+Evidence"). Set `NIR_GATE_TIMESTAMP` to record the evaluation time. Exits
+non-zero on `no_go`.
+
+## CI enforcement (blocks GA)
+
+`.github/workflows/desktop_reliability_gate.yml` runs the gate automatically.
+Until a real `pilot_reliability_report.json` is committed it skips cleanly; once
+present it fails the check on `no_go`, so **unresolved P0/P1 defects block GA
+advancement**. The decision artifacts are uploaded for the go-live review.
+
+## How to produce the report
+
+1. Copy `pilot_reliability_report.template.json` to
+   `pilot_reliability_report.json` and fill it with real pilot evidence
+   (per-OS evidence, diagnostics samples, failure-recovery drill, defect counts).
+2. Run the gate / capture commands above.
+3. Paste `GO_LIVE_DECISION.md` into the go-live recommendation and attach
+   `pilot_gate_result.json`.
