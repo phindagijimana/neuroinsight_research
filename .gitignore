@@ -50,6 +50,9 @@ singularity_cache/
 *.swo
 *~
 
+# Claude Code (local session data)
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db

@@ -1852,9 +1852,17 @@ _infra_up_quiet() {
         compose_output=$(_compose up -d 2>&1)
         echo "$compose_output" | tail -5
 
-        # Check for port conflict in the output
+        # Check for port conflict in the output. Docker reports this in a few
+        # different formats depending on version/platform, e.g.:
+        #   "... port TCP 127.0.0.1:5433 ..."                       (older)
+        #   "Bind for 0.0.0.0:5433 failed: port is already allocated" (newer)
+        #   "... address already in use ..." with the addr elsewhere
         local conflict_port
         conflict_port=$(echo "$compose_output" | sed -n 's/.*port TCP 127\.0\.0\.1:\([0-9]*\).*/\1/p' | head -1)
+        if [ -z "$conflict_port" ]; then
+            # Newer Docker: "Bind for <addr>:<port> failed: port is already allocated"
+            conflict_port=$(echo "$compose_output" | sed -n 's/.*[Bb]ind for [0-9.:]*:\([0-9]*\) failed.*/\1/p' | head -1)
+        fi
 
         if [ -z "$conflict_port" ]; then
             # No port conflict -- wait for services to accept connections
