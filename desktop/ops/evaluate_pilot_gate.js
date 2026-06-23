@@ -89,8 +89,11 @@ function evaluate(report) {
 
 function main() {
   const repoRoot = path.resolve(__dirname, "..", "..");
-  const reportPath = process.argv[2]
-    ? path.resolve(process.argv[2])
+  const args = process.argv.slice(2);
+  const asJson = args.includes("--json");
+  const positionals = args.filter((a) => !a.startsWith("--"));
+  const reportPath = positionals[0]
+    ? path.resolve(positionals[0])
     : path.join(repoRoot, "desktop", "ops", "pilot_reliability_report.json");
 
   if (!fs.existsSync(reportPath)) {
@@ -99,14 +102,31 @@ function main() {
   const report = readReport(reportPath);
   const result = evaluate(report);
 
-  process.stdout.write(
-    `Pilot reliability gate result: ${result.decision}\n` +
-      `- report: ${reportPath}\n` +
-      `- failures: ${result.failures.length}\n` +
-      `- warnings: ${result.warnings.length}\n`
-  );
-  for (const f of result.failures) process.stdout.write(`  FAIL: ${f}\n`);
-  for (const w of result.warnings) process.stdout.write(`  WARN: ${w}\n`);
+  if (asJson) {
+    process.stdout.write(
+      JSON.stringify(
+        {
+          decision: result.decision,
+          failures: result.failures,
+          warnings: result.warnings,
+          thresholds: THRESHOLDS,
+          report: reportPath,
+          build_tag: report.build_tag || null,
+        },
+        null,
+        2
+      ) + "\n"
+    );
+  } else {
+    process.stdout.write(
+      `Pilot reliability gate result: ${result.decision}\n` +
+        `- report: ${reportPath}\n` +
+        `- failures: ${result.failures.length}\n` +
+        `- warnings: ${result.warnings.length}\n`
+    );
+    for (const f of result.failures) process.stdout.write(`  FAIL: ${f}\n`);
+    for (const w of result.warnings) process.stdout.write(`  WARN: ${w}\n`);
+  }
 
   if (result.decision === "no_go") process.exit(2);
 }
@@ -114,4 +134,6 @@ function main() {
 if (require.main === module) {
   main();
 }
+
+module.exports = { evaluate, THRESHOLDS };
 
