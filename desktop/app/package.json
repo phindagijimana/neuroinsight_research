@@ -8,10 +8,11 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder",
-    "build:linux": "electron-builder --linux AppImage deb",
-    "build:mac": "electron-builder --mac dmg",
-    "build:win": "electron-builder --win nsis"
+    "check": "for f in src/*.js renderer/*.js; do node --check \"$f\" || exit 1; done",
+    "dist": "electron-builder",
+    "dist:linux": "electron-builder --linux AppImage deb",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:win": "electron-builder --win nsis"
   },
   "devDependencies": {
     "electron": "^31.0.0",
