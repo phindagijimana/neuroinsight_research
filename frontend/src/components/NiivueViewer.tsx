@@ -35,10 +35,16 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
   const nvRef = useRef<Niivue | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const isHippo = isHippocampalPipeline(pipelineName);
-  const [sliceType, setSliceType] = useState<number>(isHippo ? 1 : 4); // coronal for hippo, multi-planar otherwise
+  // Niivue slice types: 0=Axial 1=Coronal 2=Sagittal 3=Multi-planar(4-up) 4=3D Render.
+  const [sliceType, setSliceType] = useState<number>(isHippo ? 1 : 3); // 4-up by default
   const [opacity, setOpacity] = useState(isHippo ? 0.65 : 0.5);
   const [colormap, setColormap] = useState('gray');
   const [showCrosshair, setShowCrosshair] = useState(true);
+  // Cursor readout (voxel coords + intensity) and window/level (display range).
+  const [location, setLocation] = useState<{ vox?: number[]; mm?: number[]; values?: Array<{ value: number }> } | null>(null);
+  const [winRange, setWinRange] = useState<{ min: number; max: number } | null>(null);
+  const [winMin, setWinMin] = useState<number | null>(null);
+  const [winMax, setWinMax] = useState<number | null>(null);
 
   // Initialize Niivue
   useEffect(() => {
@@ -69,6 +75,9 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
 
     nv.attachToCanvas(canvasRef.current);
     nv.setSliceType(sliceType);
+    // Live cursor readout (voxel coords + intensity), like ITK-SNAP / Slicer.
+    (nv as unknown as { onLocationChange: (d: unknown) => void }).onLocationChange = (d) =>
+      setLocation(d as { vox?: number[]; mm?: number[]; values?: Array<{ value: number }> });
     nvRef.current = nv;
 
     return () => {
@@ -110,7 +119,15 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
         }
 
         await (nvRef.current as Niivue).loadVolumes(volumeList as never);
-        
+
+        // Seed window/level from the base volume's display range.
+        const vol = (nvRef.current as unknown as { volumes: Array<{ cal_min: number; cal_max: number; global_min: number; global_max: number }> }).volumes[0];
+        if (vol) {
+          setWinRange({ min: vol.global_min, max: vol.global_max });
+          setWinMin(vol.cal_min);
+          setWinMax(vol.cal_max);
+        }
+
         if (onLoad) onLoad();
       } catch (error) {
         console.error('Failed to load volumes:', error);
@@ -135,6 +152,18 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
       nvRef.current.setOpacity(1, opacity);
     }
   }, [opacity]);
+
+  // Apply window/level (display range) to the base volume.
+  useEffect(() => {
+    const nv = nvRef.current as unknown as {
+      volumes: Array<{ cal_min: number; cal_max: number }>;
+      updateGLVolume: () => void;
+    } | null;
+    if (!nv || !nv.volumes[0] || winMin === null || winMax === null || winMin >= winMax) return;
+    nv.volumes[0].cal_min = winMin;
+    nv.volumes[0].cal_max = winMax;
+    nv.updateGLVolume();
+  }, [winMin, winMax]);
 
   // Update crosshair visibility
   useEffect(() => {
@@ -171,12 +200,11 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
               onChange={(e) => setSliceType(Number(e.target.value))}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#003d7a] focus:border-transparent"
             >
+              <option value={3}>Multi-planar (4-up)</option>
               <option value={0}>Axial</option>
               <option value={1}>Coronal</option>
               <option value={2}>Sagittal</option>
-              <option value={3}>3D Render</option>
-              <option value={4}>Multi-planar (PACS)</option>
-              <option value={5}>Mosaic</option>
+              <option value={4}>3D Render</option>
             </select>
           </div>
 
@@ -232,6 +260,40 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
           </div>
         </div>
 
+        {/* Window / Level (display range) */}
+        {winRange && winMin !== null && winMax !== null && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Window Min: {winMin.toFixed(1)}
+              </label>
+              <input
+                type="range"
+                min={winRange.min}
+                max={winRange.max}
+                step={(winRange.max - winRange.min) / 200 || 1}
+                value={winMin}
+                onChange={(e) => setWinMin(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Window Max: {winMax.toFixed(1)}
+              </label>
+              <input
+                type="range"
+                min={winRange.min}
+                max={winRange.max}
+                step={(winRange.max - winRange.min) / 200 || 1}
+                value={winMax}
+                onChange={(e) => setWinMax(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="flex gap-2 mt-4 flex-wrap">
           <button
@@ -285,6 +347,24 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
           ref={canvasRef}
           style={{ width: '100%', height: `${canvasHeightPx}px` }}
         />
+      </div>
+
+      {/* Cursor readout — voxel coords + intensity (ITK-SNAP / Slicer style) */}
+      <div className="bg-gray-900 text-gray-200 rounded-lg px-4 py-2 text-xs font-mono flex flex-wrap gap-x-6 gap-y-1">
+        <span>
+          Voxel:{' '}
+          {location?.vox ? `(${location.vox.slice(0, 3).map((v) => Math.round(v)).join(', ')})` : '—'}
+        </span>
+        <span>
+          mm:{' '}
+          {location?.mm ? `(${location.mm.slice(0, 3).map((v) => v.toFixed(1)).join(', ')})` : '—'}
+        </span>
+        <span>
+          Intensity:{' '}
+          {location?.values && location.values[0] && typeof location.values[0].value === 'number'
+            ? location.values[0].value.toFixed(2)
+            : '—'}
+        </span>
       </div>
 
       {/* Instructions */}
