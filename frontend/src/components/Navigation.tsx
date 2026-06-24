@@ -1,6 +1,6 @@
 /**
  * Navigation Component
- * Adapted from NeuroInsight for NeuroInsight Research
+ * Adapted from NeuroInsight for NeuroInsight
  */
 
 import React from 'react';
@@ -22,7 +22,7 @@ const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) =>
               <Brain className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">NeuroInsight Research</h1>
+              <h1 className="text-2xl font-bold text-gray-900">NeuroInsight</h1>
               <p className="text-xs text-gray-500">Neuroimaging Platform</p>
             </div>
           </div>

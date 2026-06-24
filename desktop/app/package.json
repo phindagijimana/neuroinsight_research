@@ -1,10 +1,10 @@
 {
   "name": "nir-desktop-app",
   "version": "0.1.0",
-  "description": "NeuroInsight Research Desktop — thin Electron orchestration client",
+  "description": "NeuroInsight Desktop — thin Electron orchestration client",
   "private": true,
   "main": "src/main.js",
-  "author": "NeuroInsight Research Team",
+  "author": "NeuroInsight Team",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
@@ -28,7 +28,7 @@
   },
   "build": {
     "appId": "org.neuroinsight.desktop",
-    "productName": "NeuroInsight Research",
+    "productName": "NeuroInsight",
     "directories": {
       "output": "../dist"
     },

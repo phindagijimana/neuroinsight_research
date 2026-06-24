@@ -393,7 +393,7 @@ function init() {
   runPreflight(true).then(() => {
     if (notice) {
       const banner = $("startupBanner");
-      banner.textContent = `Couldn't open the workspace automatically: ${notice} — fix below, then “Open NIR UI”.`;
+      banner.textContent = `Couldn't open the workspace automatically: ${notice} — fix below, then “Open NeuroInsight”.`;
       banner.className = "banner banner-bad";
       toast(notice);
     }

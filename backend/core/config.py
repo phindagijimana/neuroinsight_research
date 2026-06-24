@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     """
 
     # -- Application --
-    app_name: str = Field(default="NeuroInsight Research", description="Application display name")
+    app_name: str = Field(default="NeuroInsight", description="Application display name")
     app_version: str = Field(default="1.0.0", description="Semantic version")
     environment: str = Field(default="development", description="Runtime environment: development, staging, production")
 

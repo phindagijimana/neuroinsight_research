@@ -111,7 +111,7 @@ function createWindow({ show = true } = {}) {
     y: typeof saved.y === "number" ? saved.y : undefined,
     minWidth: 880,
     minHeight: 600,
-    title: "NeuroInsight Research",
+    title: "NeuroInsight",
     backgroundColor: "#0b1f3a",
     show,
     webPreferences: {
@@ -320,7 +320,7 @@ function buildAppMenu() {
         click: () => navigateToControl(),
       },
       {
-        label: "Open NIR UI",
+        label: "Open NeuroInsight",
         accelerator: "CmdOrCtrl+Shift+O",
         click: async () => {
           const res = await navigateToNIR();
@@ -399,7 +399,7 @@ function buildAppMenu() {
       },
       { type: "separator" },
       {
-        label: "NeuroInsight Research on GitHub",
+        label: "NeuroInsight on GitHub",
         click: () => shell.openExternal("https://github.com/phindagijimana/neuroinsight_research"),
       },
     ],
