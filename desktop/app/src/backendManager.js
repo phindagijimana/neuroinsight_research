@@ -13,12 +13,27 @@ const path = require("path");
 const http = require("http");
 const { spawn } = require("child_process");
 const platformAdapter = require("./platformAdapter");
+const containerManager = require("./containerManager");
 
 const DEFAULT_PORT = 3001;
 const PORT_SCAN_LIMIT = 10; // try DEFAULT_PORT .. DEFAULT_PORT+10
 
 let cfg = null;
+// When NIR_RUNTIME=container (or settings.runtimeMode), the backend runs as the
+// all-in-one Docker container and every call delegates to containerManager.
+let containerMode = false;
 const procs = { backend: null, celery: null };
+
+function detectMode() {
+  if (process.env.NIR_RUNTIME) return process.env.NIR_RUNTIME;
+  try {
+    const s = require("./desktopState").readSettings();
+    if (s && s.runtimeMode) return s.runtimeMode;
+  } catch (_e) {
+    // desktopState not initialized yet / no setting — fall through
+  }
+  return "process";
+}
 
 function isWindows() {
   return process.platform === "win32";
@@ -64,6 +79,10 @@ function ensureDir(dir) {
 
 function init({ stateDir, repoDir } = {}) {
   if (!stateDir) throw new Error("backendManager.init requires { stateDir }");
+  containerMode = detectMode() === "container";
+  if (containerMode) {
+    containerManager.init({ stateDir, repoDir });
+  }
   const runtimeDir = path.join(stateDir, "runtime");
   ensureDir(runtimeDir);
   const resolvedRepo = repoDir || resolveRepoDir();
@@ -220,6 +239,7 @@ function spawnLogged(name, command, args, logFile) {
 }
 
 async function startBackend() {
+  if (containerMode) return containerManager.start();
   const c = requireInit();
   // Prefer the venv backend when the repo is present — it serves the SPA and
   // Celery fully. The bundled self-contained binary is the fallback that removes
@@ -314,6 +334,7 @@ function startCelery() {
 }
 
 async function start() {
+  if (containerMode) return containerManager.start();
   const backend = await startBackend();
   let celery = { ok: false, skipped: true };
   if (backend.ok) {
@@ -348,6 +369,7 @@ function killByPidFile(pidFile, child) {
 }
 
 function stopBackend() {
+  if (containerMode) return containerManager.stopBackend();
   const c = requireInit();
   const killed = killByPidFile(c.pidFiles.backend, procs.backend);
   procs.backend = null;
@@ -362,12 +384,14 @@ function stopCelery() {
 }
 
 function stopAll() {
+  if (containerMode) return containerManager.stopAll();
   const b = stopBackend();
   const ce = stopCelery();
   return { ok: true, backend: b, celery: ce };
 }
 
 async function getStatus() {
+  if (containerMode) return containerManager.getStatus();
   const c = requireInit();
   const backendPid = procs.backend ? procs.backend.pid : readPid(c.pidFiles.backend);
   const celeryPid = procs.celery ? procs.celery.pid : readPid(c.pidFiles.celery);
@@ -391,6 +415,7 @@ async function getStatus() {
 }
 
 function getRuntimeInfo() {
+  if (containerMode) return containerManager.getRuntimeInfo();
   const c = requireInit();
   return {
     repoDir: c.repoDir,
