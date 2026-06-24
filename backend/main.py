@@ -1506,9 +1506,14 @@ def list_jobs(status: Optional[str] = None, limit: int = 100, db: Session = Depe
     query = query.order_by(Job.submitted_at.desc()).limit(limit)
     jobs = query.all()
     payload = []
-    from backend.services.sample_eeg_jobs import SAMPLE_JOB_DISPLAY
+    from backend.services.sample_eeg_jobs import SAMPLE_JOB_DISPLAY, SAMPLE_JOB_IDS
+
+    # EEG demo jobs must not leak into the imaging-only experience.
+    hide_samples = not settings.eeg_enabled
 
     for job in jobs:
+        if hide_samples and job.id in SAMPLE_JOB_IDS:
+            continue
         item = job.to_dict()
         item["progress"] = quantize_progress(item.get("progress", 0))
         item.update(_build_job_display_fields(job))
