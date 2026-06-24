@@ -12,7 +12,7 @@ psql -h 127.0.0.1 -U neuroinsight -d postgres -tAc "SELECT 1 FROM pg_database WH
   || createdb -h 127.0.0.1 -U neuroinsight neuroinsight
 
 echo "[api] waiting for redis…"
-until redis-cli -h 127.0.0.1 -a nirredis ping >/dev/null 2>&1; do sleep 1; done
+until redis-cli -h 127.0.0.1 -a "$REDIS_PASSWORD" ping >/dev/null 2>&1; do sleep 1; done
 echo "[api] waiting for minio…"
 until curl -sf http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1; do sleep 1; done
 
