@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline';" />
+    <title>NeuroInsight Research</title>
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: #0b1f3a;
+        color: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        overflow: hidden;
+      }
+      .wrap {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        -webkit-user-select: none;
+      }
+      .logo {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 22px;
+        letter-spacing: 1px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+      }
+      .sub {
+        margin: 0;
+        font-size: 12px;
+        opacity: 0.7;
+      }
+      .spinner {
+        width: 22px;
+        height: 22px;
+        border: 3px solid rgba(255, 255, 255, 0.2);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      #status {
+        font-size: 12px;
+        opacity: 0.85;
+        min-height: 16px;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="logo">NIR</div>
+      <div>
+        <h1 style="text-align:center">NeuroInsight Research</h1>
+        <p class="sub" style="text-align:center">Neuroimaging Platform</p>
+      </div>
+      <div class="spinner"></div>
+      <div id="status">Starting…</div>
+    </div>
+    <script>
+      window.setStatus = function (t) {
+        var el = document.getElementById("status");
+        if (el) el.textContent = t;
+      };
+    </script>
+  </body>
+</html>

@@ -221,14 +221,15 @@ function spawnLogged(name, command, args, logFile) {
 
 async function startBackend() {
   const c = requireInit();
-  // A bundled self-contained backend removes the Python/venv requirement.
-  if (!c.backendBin) {
-    if (!c.pythonCmd) {
-      return { ok: false, error: "No bundled backend and no Python runtime found (install python3 or set NIR_DESKTOP_PYTHON)." };
-    }
-    if (!backendEntryExists()) {
-      return { ok: false, error: `backend/main.py not found under ${c.repoDir} (set NIR_REPO_DIR).` };
-    }
+  // Prefer the venv backend when the repo is present — it serves the SPA and
+  // Celery fully. The bundled self-contained binary is the fallback that removes
+  // the Python/venv requirement for distribution.
+  const venvOk = !!(c.pythonCmd && backendEntryExists());
+  if (!venvOk && !c.backendBin) {
+    return {
+      ok: false,
+      error: "No backend available — install the venv (./research install) or ship the bundled backend.",
+    };
   }
 
   // Already healthy? Reuse.
@@ -244,13 +245,13 @@ async function startBackend() {
 
   let cmd;
   let args;
-  if (c.backendBin) {
-    cmd = c.backendBin;
-    args = ["--host", "127.0.0.1", "--port", String(c.port)];
-  } else {
+  if (venvOk) {
     const parts = String(c.pythonCmd).split(/\s+/);
     cmd = parts[0];
     args = [...parts.slice(1), "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", String(c.port)];
+  } else {
+    cmd = c.backendBin;
+    args = ["--host", "127.0.0.1", "--port", String(c.port)];
   }
 
   fs.appendFileSync(
