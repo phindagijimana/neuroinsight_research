@@ -169,3 +169,24 @@ test.describe("smooth launch (default flow)", () => {
     await expect(page.getByText(/native-open\.nii\.gz/)).toBeVisible({ timeout: 20_000 });
   });
 });
+
+test.describe("container runtime (all-in-one)", () => {
+  test.skip(process.env.NIR_E2E_CONTAINER !== "1", "set NIR_E2E_CONTAINER=1 (needs Docker + built nir-allinone image)");
+  let app;
+
+  test.afterAll(async () => {
+    if (app) await app.close();
+  });
+
+  test("launches the all-in-one container and lands in the workspace", async () => {
+    app = await launch({
+      NIR_RUNTIME: "container",
+      NIR_DESKTOP_BACKEND_PORT: "8814",
+      NIR_DATA_DIR: path.join(os.tmpdir(), "nir-e2e-ctr"),
+    });
+    // First container run (init + migrations) can take a while.
+    const page = await pageWithSelector(app, "#nir-desktop-statusbar", 180_000);
+    await expect(page.locator("#nir-desktop-statusbar")).toBeVisible();
+    expect(page.url()).toMatch(/127\.0\.0\.1:\d+|localhost:\d+/);
+  });
+});

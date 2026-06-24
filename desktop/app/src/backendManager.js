@@ -333,8 +333,8 @@ function startCelery() {
   }
 }
 
-async function start() {
-  if (containerMode) return containerManager.start();
+async function start(opts) {
+  if (containerMode) return containerManager.start(opts);
   const backend = await startBackend();
   let celery = { ok: false, skipped: true };
   if (backend.ok) {

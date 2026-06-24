@@ -320,7 +320,7 @@ function buildAppMenu() {
         click: () => navigateToControl(),
       },
       {
-        label: "Open NeuroInsight",
+        label: "Open Workspace",
         accelerator: "CmdOrCtrl+Shift+O",
         click: async () => {
           const res = await navigateToNIR();
@@ -632,7 +632,7 @@ async function runStartupSequence() {
 
   // The container engine may pull a multi-GB image on first run.
   setSplashStatus(process.env.NIR_RUNTIME === "container" ? "Starting engine (first run may download)…" : "Starting engine…");
-  const start = await backendManager.start();
+  const start = await backendManager.start({ onProgress: (m) => setSplashStatus(m) });
   desktopState.appendLog("backend_autostart", { ok: start.ok });
   if (!start.ok) {
     const err = (start.backend && start.backend.error) || start.error || "Backend failed to start.";

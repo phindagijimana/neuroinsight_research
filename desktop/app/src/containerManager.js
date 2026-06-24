@@ -144,15 +144,39 @@ function buildRunArgs(c) {
   return args;
 }
 
-async function start() {
+// Stream `docker pull` and report human progress (first run downloads ~1.8 GB).
+function pullImage(image, onProgress) {
+  return new Promise((resolve) => {
+    let done = 0;
+    const child = spawn("docker", ["pull", image]);
+    const handle = (buf) => {
+      for (const line of buf.toString().split(/\r?\n/)) {
+        if (!line.trim()) continue;
+        if (/Pull complete/.test(line)) {
+          done += 1;
+          if (onProgress) onProgress(`Downloading engine… ${done} layers ready`);
+        } else if (/^Status: Downloaded|^Status: Image is up to date/.test(line) && onProgress) {
+          onProgress("Engine downloaded.");
+        }
+      }
+    };
+    child.stdout.on("data", handle);
+    child.stderr.on("data", handle);
+    child.on("error", () => resolve({ ok: false }));
+    child.on("close", (code) => resolve({ ok: code === 0 }));
+  });
+}
+
+async function start(opts = {}) {
   const c = requireInit();
   if (!dockerAvailable()) {
     return { ok: false, error: "Docker is not available — install/start Docker Desktop." };
   }
   if (!imageExists(c.image)) {
-    // Try to pull (published image); local dev images won't pull and will error clearly.
-    const pull = docker(["pull", c.image], { timeout: 600000 });
-    if (pull.status !== 0) {
+    // Pull the published image, streaming progress to the caller (splash).
+    if (opts.onProgress) opts.onProgress("Downloading engine image (first run)…");
+    const pull = await pullImage(c.image, opts.onProgress);
+    if (!pull.ok) {
       return {
         ok: false,
         error: `Image ${c.image} not found locally and pull failed. Build it with docker/allinone or set NIR_IMAGE.`,
