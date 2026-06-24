@@ -281,7 +281,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
       {showPlatformTabs && (
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1.5">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Data Source</h3>
+            <h3 className="text-xs font-semibold text-gray-500 tracking-wider">Data Source</h3>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {TABS.map((tab) => {
@@ -306,7 +306,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
       {/* Row 2: Compute Source -- Local / Remote / HPC */}
       <div className={showPlatformTabs ? 'mb-2' : 'mb-3'}>
         <div className="flex items-center justify-between mb-1.5">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Compute Source</h3>
+          <h3 className="text-xs font-semibold text-gray-500 tracking-wider">Compute Source</h3>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {backendTabs.map((tab) => {

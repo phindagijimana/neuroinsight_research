@@ -277,7 +277,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
               ].map((s) => (
                 <div key={s.label} className="flex min-w-[4.5rem] items-baseline gap-2">
                   <span className={`text-lg font-semibold tabular-nums ${s.valueClass}`}>{s.value}</span>
-                  <span className="text-xs font-medium uppercase tracking-wide text-gray-400">{s.label}</span>
+                  <span className="text-xs font-medium tracking-wide text-gray-400">{s.label}</span>
                 </div>
               ))}
             </div>
@@ -291,7 +291,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
 
         {hasSampleJobs && (
           <div className="mb-6 rounded-xl border border-emerald-100/80 bg-emerald-50/50 px-4 py-3 sm:px-5 sm:py-3.5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-800/90">Sample EEG demos</h3>
+            <h3 className="text-xs font-semibold tracking-wide text-emerald-800/90">Sample EEG demos</h3>
             <p className="text-sm text-emerald-900/85 mt-1 leading-relaxed">
               Synthetic data jobs below open the Viewer: <span className="font-medium">EEG preprocessing</span> → Signal View;{' '}
               <span className="font-medium">EEG source localization</span> → Multimodal View.
@@ -306,9 +306,9 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
               <h2 className="text-lg font-semibold text-gray-900 tracking-tight">Jobs</h2>
               <p className="text-sm text-gray-500 mt-0.5">
                 {lastRefreshTime ? (
-                  <>Updated {formatDate(lastRefreshTime.toISOString())} · completed jobs open in Dashboard</>
+                  <>Updated {formatDate(lastRefreshTime.toISOString())} · completed jobs open in Results</>
                 ) : (
-                  'Completed jobs open in Dashboard'
+                  'Completed jobs open in Results'
                 )}
               </p>
             </div>
@@ -329,7 +329,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
           ) : jobs.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600">No jobs yet. Process some data to get started!</p>
+              <p className="text-gray-600">No jobs yet — submit a job to see it here.</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">

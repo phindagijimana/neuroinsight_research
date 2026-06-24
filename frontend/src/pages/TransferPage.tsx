@@ -502,7 +502,7 @@ function TransferPage() {
       {/* Active transfers queue */}
       {activeTransfers.length > 0 && (
         <div className="mt-3 space-y-2">
-          <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Active Transfers</h3>
+          <h3 className="text-xs font-semibold text-gray-600 tracking-wider">Active Transfers</h3>
           {activeTransfers.map(t => (
             <div key={t.id} className="flex items-center gap-3">
               <span className="text-[10px] text-gray-500 whitespace-nowrap">
@@ -524,7 +524,7 @@ function TransferPage() {
       {/* Transfer history */}
       {showHistory && recentTransfers.length > 0 && (
         <div className="mt-3 bg-white rounded-lg border border-gray-200 p-3 max-h-40 overflow-y-auto">
-          <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Recent Transfers</h3>
+          <h3 className="text-xs font-semibold text-gray-600 tracking-wider mb-2">Recent Transfers</h3>
           <div className="divide-y divide-gray-50">
             {recentTransfers.slice(0, 20).map((t: any) => (
               <div key={t.id} className="py-1.5 flex items-center justify-between text-[11px]">

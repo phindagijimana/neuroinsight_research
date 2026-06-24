@@ -374,7 +374,7 @@ export const StatsViewer: React.FC<StatsViewerProps> = ({ jobId, pipelineName })
                                 <th
                                   key={ci}
                                   onClick={() => handleSort(csv.filename, ci)}
-                                  className="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap"
+                                  className="px-3 py-2 text-left text-xs font-semibold text-gray-700 tracking-wider cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap"
                                 >
                                   <span className="inline-flex items-center gap-1">
                                     {header.replace(/_/g, ' ')}
@@ -466,7 +466,7 @@ export const StatsViewer: React.FC<StatsViewerProps> = ({ jobId, pipelineName })
                 <thead className="sticky top-0 bg-white">
                   <tr className="border-b border-gray-200">
                     {Object.keys(section.table[0]).map((header, i) => (
-                      <th key={i} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      <th key={i} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 tracking-wider">
                         {header.replace(/_/g, ' ')}
                       </th>
                     ))}

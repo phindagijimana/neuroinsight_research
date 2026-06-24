@@ -60,7 +60,7 @@ const EegBrainFusionPanel: React.FC<EegBrainFusionPanelProps> = ({
       )}
 
       <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
-        <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+        <h3 className="text-xs font-semibold text-gray-700 tracking-wide mb-2">
           Signal View
         </h3>
         <EegViewerPanel
@@ -74,7 +74,7 @@ const EegBrainFusionPanel: React.FC<EegBrainFusionPanelProps> = ({
 
       {linkCortex && jobId && (
         <div>
-          <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+          <h3 className="text-xs font-semibold text-gray-700 tracking-wide mb-2">
             Cortical source (linked time)
           </h3>
           <CorticalSourceViewer jobId={jobId} timeIndex={linkTimeIndex} heightPx={300} />
@@ -87,7 +87,7 @@ const EegBrainFusionPanel: React.FC<EegBrainFusionPanelProps> = ({
       )}
 
       <div>
-        <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+        <h3 className="text-xs font-semibold text-gray-700 tracking-wide mb-2">
           Imaging View
         </h3>
         <NiivueViewer

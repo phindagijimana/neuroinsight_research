@@ -132,7 +132,7 @@ const InputFormatSection: React.FC<{ inputFormat?: InputFormat }> = ({ inputForm
 
   return (
     <div>
-      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+      <h3 className="text-xs font-semibold text-gray-500 tracking-wide mb-3 flex items-center gap-1.5">
         <FolderTree className="w-4 h-4" />
         Input Data Format
       </h3>
@@ -216,7 +216,7 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <Box className="w-4 h-4 text-[#003d7a]" />
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Container</span>
+            <span className="text-xs font-semibold text-gray-500 tracking-wide">Container</span>
           </div>
           <p className="text-sm text-gray-800 font-mono break-all">{plugin.container_image}</p>
           <p className="text-xs text-gray-400 mt-1">Runtime: {plugin.container_runtime || 'docker'}</p>
@@ -225,7 +225,7 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <Cpu className="w-4 h-4 text-[#003d7a]" />
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Default Resources</span>
+            <span className="text-xs font-semibold text-gray-500 tracking-wide">Default Resources</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {plugin.resources?.cpus && (
@@ -253,7 +253,7 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
       {/* Inputs */}
       {plugin.inputs && (plugin.inputs.required?.length > 0 || plugin.inputs.optional?.length > 0) && (
         <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+          <h3 className="text-xs font-semibold text-gray-500 tracking-wide mb-3 flex items-center gap-1.5">
             <HardDrive className="w-4 h-4" />
             Inputs
           </h3>
@@ -285,7 +285,7 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
       {/* Parameters */}
       {plugin.parameters && plugin.parameters.length > 0 && (
         <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+          <h3 className="text-xs font-semibold text-gray-500 tracking-wide mb-3 flex items-center gap-1.5">
             <Clock className="w-4 h-4" />
             Parameters
           </h3>
@@ -313,14 +313,14 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
       {/* Authors & References */}
       {plugin.authors && plugin.authors.length > 0 && (
         <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Authors</h3>
+          <h3 className="text-xs font-semibold text-gray-500 tracking-wide mb-2">Authors</h3>
           <p className="text-sm text-gray-600">{plugin.authors.join(', ')}</p>
         </div>
       )}
 
       {plugin.references && plugin.references.length > 0 && (
         <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+          <h3 className="text-xs font-semibold text-gray-500 tracking-wide mb-2 flex items-center gap-1.5">
             <Shield className="w-4 h-4" />
             References
           </h3>
@@ -379,7 +379,7 @@ const WorkflowDetail: React.FC<{ workflow: WorkflowDoc }> = ({ workflow }) => {
       {/* Pipeline Steps */}
       {workflow.steps && workflow.steps.length > 0 && (
         <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+          <h3 className="text-xs font-semibold text-gray-500 tracking-wide mb-3 flex items-center gap-1.5">
             <GitBranch className="w-4 h-4" />
             Pipeline Steps
           </h3>
@@ -410,7 +410,7 @@ const WorkflowDetail: React.FC<{ workflow: WorkflowDoc }> = ({ workflow }) => {
       {/* Inputs */}
       {workflow.inputs && (workflow.inputs.required?.length > 0 || workflow.inputs.optional?.length > 0) && (
         <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+          <h3 className="text-xs font-semibold text-gray-500 tracking-wide mb-3 flex items-center gap-1.5">
             <HardDrive className="w-4 h-4" />
             Inputs
           </h3>
@@ -442,7 +442,7 @@ const WorkflowDetail: React.FC<{ workflow: WorkflowDoc }> = ({ workflow }) => {
       {/* Validation */}
       {workflow.validation?.preflight_checks && workflow.validation.preflight_checks.length > 0 && (
         <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+          <h3 className="text-xs font-semibold text-gray-500 tracking-wide mb-2 flex items-center gap-1.5">
             <Shield className="w-4 h-4" />
             Preflight Validation
           </h3>
