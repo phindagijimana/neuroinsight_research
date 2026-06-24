@@ -140,7 +140,7 @@ const InputFormatSection: React.FC<{ inputFormat?: InputFormat }> = ({ inputForm
         {/* Format name & description */}
         {inputFormat.format_name && (
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-[#003d7a]">{inputFormat.format_name}</span>
+            <span className="text-sm font-semibold text-navy-600">{inputFormat.format_name}</span>
           </div>
         )}
         {inputFormat.description && (
@@ -215,7 +215,7 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Box className="w-4 h-4 text-[#003d7a]" />
+            <Box className="w-4 h-4 text-navy-600" />
             <span className="text-xs font-semibold text-gray-500 tracking-wide">Container</span>
           </div>
           <p className="text-sm text-gray-800 font-mono break-all">{plugin.container_image}</p>
@@ -224,7 +224,7 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
 
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Cpu className="w-4 h-4 text-[#003d7a]" />
+            <Cpu className="w-4 h-4 text-navy-600" />
             <span className="text-xs font-semibold text-gray-500 tracking-wide">Default Resources</span>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -292,7 +292,7 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
           <div className="space-y-2">
             {plugin.parameters.map((param: any, i: number) => (
               <div key={i} className="bg-white border border-gray-200 rounded-lg px-3 py-2.5 flex items-start gap-3">
-                <code className="text-sm font-mono text-[#003d7a] font-medium whitespace-nowrap">{param.name}</code>
+                <code className="text-sm font-mono text-navy-600 font-medium whitespace-nowrap">{param.name}</code>
                 <div className="flex-1 min-w-0">
                   {param.description && <p className="text-xs text-gray-500">{param.description}</p>}
                 </div>
@@ -336,7 +336,7 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
       <div>
         <button
           onClick={() => setShowYaml(!showYaml)}
-          className="flex items-center gap-1.5 text-sm text-[#003d7a] hover:text-[#002b55] font-medium transition"
+          className="flex items-center gap-1.5 text-sm text-navy-600 hover:text-navy-800 font-medium transition"
         >
           <FileText className="w-4 h-4" />
           {showYaml ? 'Hide YAML Definition' : 'View Full YAML Definition'}
@@ -386,7 +386,7 @@ const WorkflowDetail: React.FC<{ workflow: WorkflowDoc }> = ({ workflow }) => {
           <div className="space-y-2">
             {workflow.steps.map((step: any, i: number) => (
               <div key={i} className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-3">
-                <div className="w-7 h-7 rounded-full bg-[#003d7a] text-white text-xs flex items-center justify-center flex-shrink-0 font-bold">
+                <div className="w-7 h-7 rounded-full bg-navy-600 text-white text-xs flex items-center justify-center flex-shrink-0 font-bold">
                   {i + 1}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -449,7 +449,7 @@ const WorkflowDetail: React.FC<{ workflow: WorkflowDoc }> = ({ workflow }) => {
           <ul className="text-sm text-gray-700 space-y-1.5">
             {workflow.validation.preflight_checks.map((check: string, i: number) => (
               <li key={i} className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-[#003d7a] rounded-full flex-shrink-0"></span>
+                <span className="w-1.5 h-1.5 bg-navy-600 rounded-full flex-shrink-0"></span>
                 <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{check}</code>
               </li>
             ))}
@@ -461,7 +461,7 @@ const WorkflowDetail: React.FC<{ workflow: WorkflowDoc }> = ({ workflow }) => {
       <div>
         <button
           onClick={() => setShowYaml(!showYaml)}
-          className="flex items-center gap-1.5 text-sm text-[#003d7a] hover:text-[#002b55] font-medium transition"
+          className="flex items-center gap-1.5 text-sm text-navy-600 hover:text-navy-800 font-medium transition"
         >
           <FileText className="w-4 h-4" />
           {showYaml ? 'Hide YAML Definition' : 'View Full YAML Definition'}
@@ -567,7 +567,7 @@ const DocsPage: React.FC<DocsPageProps> = () => {
       {/* Header */}
       <div className="mb-6 flex-shrink-0">
         <div className="flex items-center gap-3 mb-1">
-          <FileText className="w-7 h-7 text-[#003d7a]" />
+          <FileText className="w-7 h-7 text-navy-600" />
           <h1 className="text-2xl font-bold text-gray-900">Documentation</h1>
         </div>
         <p className="text-gray-500 text-sm ml-10">
@@ -644,7 +644,7 @@ const DocsPage: React.FC<DocsPageProps> = () => {
               onClick={() => handleTabSwitch('plugins')}
               className={`flex-1 px-4 py-3 text-sm font-medium transition flex items-center justify-center gap-1.5 ${
                 activeTab === 'plugins'
-                  ? 'text-[#003d7a] border-b-2 border-[#003d7a] bg-navy-50/50'
+                  ? 'text-navy-600 border-b-2 border-navy-600 bg-navy-50/50'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
@@ -655,7 +655,7 @@ const DocsPage: React.FC<DocsPageProps> = () => {
               onClick={() => handleTabSwitch('workflows')}
               className={`flex-1 px-4 py-3 text-sm font-medium transition flex items-center justify-center gap-1.5 ${
                 activeTab === 'workflows'
-                  ? 'text-[#003d7a] border-b-2 border-[#003d7a] bg-navy-50/50'
+                  ? 'text-navy-600 border-b-2 border-navy-600 bg-navy-50/50'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
@@ -673,7 +673,7 @@ const DocsPage: React.FC<DocsPageProps> = () => {
                 placeholder={`Search ${activeTab}...`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#003d7a] focus:border-[#003d7a] outline-none"
+                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-navy-600 focus:border-navy-600 outline-none"
               />
             </div>
           </div>
@@ -691,15 +691,15 @@ const DocsPage: React.FC<DocsPageProps> = () => {
                     onClick={() => setSelectedId(plugin.id)}
                     className={`w-full text-left px-4 py-3 border-b border-gray-50 transition ${
                       selectedId === plugin.id
-                        ? 'bg-navy-50 border-l-[3px] border-l-[#003d7a]'
+                        ? 'bg-navy-50 border-l-[3px] border-l-navy-600'
                         : 'hover:bg-gray-50 border-l-[3px] border-l-transparent'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className={`text-sm font-medium ${selectedId === plugin.id ? 'text-[#003d7a]' : 'text-gray-800'}`}>
+                      <span className={`text-sm font-medium ${selectedId === plugin.id ? 'text-navy-600' : 'text-gray-800'}`}>
                         {plugin.name}
                       </span>
-                      <ChevronRight className={`w-4 h-4 flex-shrink-0 ${selectedId === plugin.id ? 'text-[#003d7a]' : 'text-gray-300'}`} />
+                      <ChevronRight className={`w-4 h-4 flex-shrink-0 ${selectedId === plugin.id ? 'text-navy-600' : 'text-gray-300'}`} />
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${domainColor(plugin.domain)}`}>
@@ -725,15 +725,15 @@ const DocsPage: React.FC<DocsPageProps> = () => {
                     onClick={() => setSelectedId(workflow.id)}
                     className={`w-full text-left px-4 py-3 border-b border-gray-50 transition ${
                       selectedId === workflow.id
-                        ? 'bg-navy-50 border-l-[3px] border-l-[#003d7a]'
+                        ? 'bg-navy-50 border-l-[3px] border-l-navy-600'
                         : 'hover:bg-gray-50 border-l-[3px] border-l-transparent'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className={`text-sm font-medium ${selectedId === workflow.id ? 'text-[#003d7a]' : 'text-gray-800'}`}>
+                      <span className={`text-sm font-medium ${selectedId === workflow.id ? 'text-navy-600' : 'text-gray-800'}`}>
                         {workflow.name}
                       </span>
-                      <ChevronRight className={`w-4 h-4 flex-shrink-0 ${selectedId === workflow.id ? 'text-[#003d7a]' : 'text-gray-300'}`} />
+                      <ChevronRight className={`w-4 h-4 flex-shrink-0 ${selectedId === workflow.id ? 'text-navy-600' : 'text-gray-300'}`} />
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${domainColor(workflow.domain)}`}>
@@ -778,11 +778,11 @@ const DocsPage: React.FC<DocsPageProps> = () => {
         <h4 className="text-sm font-semibold text-gray-700 mb-2">Quick Reference</h4>
         <div className="space-y-2 text-sm text-gray-600">
           <div className="flex gap-2">
-            <span className="font-semibold text-[#003d7a] min-w-[72px]">Plugin:</span>
+            <span className="font-semibold text-navy-600 min-w-[72px]">Plugin:</span>
             <span>Single neuroimaging tool running one container. Use for individual processing steps or full control.</span>
           </div>
           <div className="flex gap-2">
-            <span className="font-semibold text-[#003d7a] min-w-[72px]">Workflow:</span>
+            <span className="font-semibold text-navy-600 min-w-[72px]">Workflow:</span>
             <span>Sequence of plugins working together. Manages dependencies automatically. Recommended for complete analysis pipelines.</span>
           </div>
           <div className="flex gap-2 pt-2 border-t border-gray-200">
@@ -796,7 +796,7 @@ const DocsPage: React.FC<DocsPageProps> = () => {
           <div className="space-y-1.5 text-sm text-gray-600">
             {TSC_HIDDEN_PLUGIN_NOTES.map((item) => (
               <div key={item.id} className="flex gap-2">
-                <span className="font-semibold text-[#003d7a] min-w-[220px]">{item.name}:</span>
+                <span className="font-semibold text-navy-600 min-w-[220px]">{item.name}:</span>
                 <span>{item.purpose}</span>
               </div>
             ))}

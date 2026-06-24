@@ -88,7 +88,7 @@ export const TransferProgress: React.FC<TransferProgressProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-[#003d7a]" />
+          <Icon className="h-4 w-4 text-navy-600" />
           <h3 className="text-sm font-semibold text-gray-700">
             {direction === 'download' ? 'Downloading Data' : 'Uploading Results'}
           </h3>
@@ -116,7 +116,7 @@ export const TransferProgress: React.FC<TransferProgressProps> = ({
             className={`h-full rounded-full transition-all duration-500 ${
               isDone ? 'bg-green-500' :
               isFailed ? 'bg-red-500' :
-              'bg-[#003d7a]'
+              'bg-navy-600'
             }`}
             style={{ width: `${Math.min(percent, 100)}%` }}
           />
@@ -127,7 +127,7 @@ export const TransferProgress: React.FC<TransferProgressProps> = ({
       <div className="flex items-center gap-2 text-xs">
         {isActive && (
           <>
-            <Loader2 className="h-3.5 w-3.5 text-[#003d7a] animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 text-navy-600 animate-spin" />
             <span className="text-gray-600">
               {status?.status === 'pending' ? 'Preparing transfer...' :
                status?.status === 'transferring' ? 'Transferring data...' :

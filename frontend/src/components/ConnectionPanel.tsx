@@ -353,7 +353,7 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
           <button
             onClick={handleConnect}
             disabled={connecting}
-            className="w-full px-3 py-1.5 text-xs bg-[#003d7a] text-white rounded hover:bg-[#002b55] disabled:bg-gray-300 font-medium transition flex items-center justify-center gap-1.5"
+            className="w-full px-3 py-1.5 text-xs bg-navy-600 text-white rounded hover:bg-navy-800 disabled:bg-gray-300 font-medium transition flex items-center justify-center gap-1.5"
           >
             {connecting ? (<><Loader2 className="h-3 w-3 animate-spin" />Connecting...</>) : (
               <><Wifi className="h-3 w-3" />Connect to {platformLabel}</>

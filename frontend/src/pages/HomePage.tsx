@@ -23,7 +23,7 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, onOpenLocal }) => {
         <div className="max-w-3xl">
           <div className="space-y-6">
             <h2 className="text-5xl font-bold text-gray-900 leading-tight">
-              <span className="text-[#003d7a]">Run neuroimaging pipelines, anywhere</span>
+              <span className="text-navy-600">Run neuroimaging pipelines, anywhere</span>
             </h2>
 
             <p className="text-lg text-gray-600 leading-relaxed">
@@ -40,7 +40,7 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, onOpenLocal }) => {
               ].map((feature, idx) => (
                 <div key={idx} className="flex items-center gap-3">
                   <div className="bg-navy-100 p-2 rounded-lg">
-                    <feature.icon className="w-5 h-5 text-[#003d7a]" />
+                    <feature.icon className="w-5 h-5 text-navy-600" />
                   </div>
                   <span className="text-gray-700">{feature.text}</span>
                 </div>
@@ -50,13 +50,13 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, onOpenLocal }) => {
             <div className="pt-6 flex flex-wrap items-center gap-3">
               <button
                 onClick={() => setActivePage('jobs')}
-                className="group flex items-center gap-2 bg-[#003d7a] text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-[#002b55] transition shadow-lg hover:shadow-xl"
+                className="group flex items-center gap-2 bg-navy-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-navy-800 transition shadow-lg hover:shadow-xl"
               >
                 New Job
                 <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition" />
               </button>
               {onOpenLocal && (
-                <label className="flex items-center gap-2 bg-white text-[#003d7a] px-6 py-4 rounded-xl font-semibold text-lg border border-navy-100 hover:bg-navy-50 transition cursor-pointer shadow-sm">
+                <label className="flex items-center gap-2 bg-white text-navy-600 px-6 py-4 rounded-xl font-semibold text-lg border border-navy-100 hover:bg-navy-50 transition cursor-pointer shadow-sm">
                   <Brain className="w-5 h-5" />
                   Open Imaging File
                   <input

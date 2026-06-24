@@ -178,7 +178,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
       {/* Header + customize toggle */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-          <Settings2 className="h-4 w-4 text-[#003d7a]" />
+          <Settings2 className="h-4 w-4 text-navy-600" />
           Resource Configuration
         </h3>
         <label className="flex items-center gap-2 text-xs">
@@ -189,7 +189,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
               setUseCustom(e.target.checked);
               if (!e.target.checked) resetToProfile(activeProfile);
             }}
-            className="rounded border-gray-300 text-[#003d7a] focus:ring-[#003d7a]"
+            className="rounded border-gray-300 text-navy-600 focus:ring-navy-600"
           />
           <span className="text-gray-600">Customize</span>
         </label>
@@ -228,7 +228,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
                 onClick={() => resetToProfile(name)}
                 className={`px-2.5 py-1 text-xs rounded-md border transition-all ${
                   activeProfile === name
-                    ? 'bg-[#003d7a] text-white border-[#003d7a]'
+                    ? 'bg-navy-600 text-white border-navy-600'
                     : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
                 }`}
               >
@@ -261,7 +261,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
         <div className="space-y-3">
           {/* Memory */}
           <SliderField
-            icon={<HardDrive className="h-4 w-4 text-[#003d7a]" />}
+            icon={<HardDrive className="h-4 w-4 text-navy-600" />}
             label="Memory (GB)"
             value={resources.memory_gb}
             min={1} max={limits.maxMemGb} step={1}
@@ -274,7 +274,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
 
           {/* CPUs */}
           <SliderField
-            icon={<Cpu className="h-4 w-4 text-[#003d7a]" />}
+            icon={<Cpu className="h-4 w-4 text-navy-600" />}
             label="CPU Cores"
             value={resources.cpus}
             min={1} max={limits.maxCpus} step={1}
@@ -287,7 +287,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
 
           {/* Time */}
           <SliderField
-            icon={<Clock className="h-4 w-4 text-[#003d7a]" />}
+            icon={<Clock className="h-4 w-4 text-navy-600" />}
             label="Time Limit (hours)"
             value={resources.time_hours}
             min={1} max={168} step={1}
@@ -298,7 +298,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
           {/* GPU — always visible, disabled if not available */}
           <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-md">
             <div className="flex items-center gap-2">
-              <Zap className={`h-4 w-4 ${limits.gpuAvail ? 'text-[#003d7a]' : 'text-gray-300'}`} />
+              <Zap className={`h-4 w-4 ${limits.gpuAvail ? 'text-navy-600' : 'text-gray-300'}`} />
               <span className="text-sm text-gray-700">GPU Acceleration</span>
             </div>
             <div className="flex items-center gap-2">
@@ -310,7 +310,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
                 checked={resources.gpu}
                 disabled={!limits.gpuAvail}
                 onChange={(e) => update('gpu', e.target.checked)}
-                className="rounded border-gray-300 text-[#003d7a] focus:ring-[#003d7a] disabled:opacity-40"
+                className="rounded border-gray-300 text-navy-600 focus:ring-navy-600 disabled:opacity-40"
               />
             </div>
           </div>
@@ -341,14 +341,14 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
               {/* Parallel toggle */}
               <div className="flex items-center justify-between py-1.5 px-3 bg-navy-50/50 rounded-md">
                 <div className="flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-[#003d7a]" />
+                  <Layers className="h-4 w-4 text-navy-600" />
                   <span className="text-sm text-gray-700">Enable Parallelization</span>
                 </div>
                 <input
                   type="checkbox"
                   checked={resources.parallel}
                   onChange={(e) => update('parallel', e.target.checked)}
-                  className="rounded border-gray-300 text-[#003d7a] focus:ring-[#003d7a]"
+                  className="rounded border-gray-300 text-navy-600 focus:ring-navy-600"
                 />
               </div>
 
@@ -373,7 +373,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
                   {/* OMP threads */}
                   {para?.supports_openmp && (
                     <SliderField
-                      icon={<Layers className="h-4 w-4 text-[#003d7a]" />}
+                      icon={<Layers className="h-4 w-4 text-navy-600" />}
                       label="OpenMP Threads"
                       value={resources.omp_nthreads}
                       min={1}
@@ -450,7 +450,7 @@ const Row: React.FC<{
 }> = ({ icon, label, value, accent }) => (
   <div className="flex items-center justify-between py-1.5 px-3 bg-navy-50/60 rounded-md">
     <div className="flex items-center gap-2">
-      {React.cloneElement(icon, { className: `h-4 w-4 ${accent ? 'text-navy-500' : 'text-[#003d7a]'}` })}
+      {React.cloneElement(icon, { className: `h-4 w-4 ${accent ? 'text-navy-500' : 'text-navy-600'}` })}
       <span className="text-sm text-gray-700">{label}</span>
     </div>
     <span className={`text-sm font-medium ${accent ? 'text-navy-600' : 'text-gray-900'}`}>{value}</span>
@@ -480,7 +480,7 @@ const SliderField: React.FC<{
         min={min} max={max} step={step}
         value={Math.min(value, max)}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="flex-1 h-1.5 accent-[#003d7a] cursor-pointer"
+        className="flex-1 h-1.5 accent-navy-600 cursor-pointer"
       />
       <input
         type="number"
@@ -490,7 +490,7 @@ const SliderField: React.FC<{
           const v = Number(e.target.value);
           if (!isNaN(v) && v >= min) onChange(v);
         }}
-        className={`w-16 px-2 py-1 text-sm text-center border rounded-md focus:outline-none focus:ring-1 focus:ring-[#003d7a] ${
+        className={`w-16 px-2 py-1 text-sm text-center border rounded-md focus:outline-none focus:ring-1 focus:ring-navy-600 ${
           warn ? 'border-navy-400 bg-navy-50' : 'border-gray-300'
         }`}
       />
@@ -513,7 +513,7 @@ const TextInput: React.FC<{
       value={value}
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#003d7a]"
+      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-navy-600"
     />
   </div>
 );

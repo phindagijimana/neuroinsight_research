@@ -343,7 +343,7 @@ const EegViewerPanel: React.FC<EegViewerPanelProps> = ({
   if (loading) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-8 flex items-center justify-center gap-3">
-        <Activity className="w-6 h-6 text-[#003d7a] animate-spin" />
+        <Activity className="w-6 h-6 text-navy-600 animate-spin" />
         <span className="text-gray-600">Loading EEG preview…</span>
       </div>
     );
@@ -412,7 +412,7 @@ const EegViewerPanel: React.FC<EegViewerPanelProps> = ({
               type="button"
               onClick={() => commitViewerStyle('modern')}
               className={`px-2.5 py-1 font-medium border-l border-gray-200 ${
-                !classic ? 'bg-[#003d7a] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+                !classic ? 'bg-navy-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
             >
               Color
@@ -462,7 +462,7 @@ const EegViewerPanel: React.FC<EegViewerPanelProps> = ({
                 value={sliderVal}
                 disabled={panMax <= 0}
                 onChange={(e) => setTOffset(Number(e.target.value))}
-                className="w-full accent-[#003d7a] disabled:opacity-40"
+                className="w-full accent-navy-600 disabled:opacity-40"
                 aria-label="Pan along recording"
               />
             </div>
@@ -502,7 +502,7 @@ const EegViewerPanel: React.FC<EegViewerPanelProps> = ({
             aria-label="Signal time series; use arrow keys to step time when focused"
             onMouseDown={() => chartFocusRef.current?.focus()}
             onKeyDown={onChartKeyDown}
-            className="outline-none focus:ring-2 focus:ring-[#003d7a]/40 rounded"
+            className="outline-none focus:ring-2 focus:ring-navy-600/40 rounded"
             style={{ width: '100%', height: chartHeight }}
           >
             <ResponsiveContainer width="100%" height="100%">

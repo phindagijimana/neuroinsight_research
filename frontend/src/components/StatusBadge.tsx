@@ -15,7 +15,7 @@ type Status = 'completed' | 'running' | 'pending' | 'failed' | 'cancelled' | str
 
 const STYLES: Record<string, { cls: string; label: string }> = {
   completed: { cls: 'text-green-700 bg-green-100 border-green-200', label: 'Completed' },
-  running: { cls: 'text-[#003d7a] bg-navy-100 border-navy-200', label: 'Running' },
+  running: { cls: 'text-navy-600 bg-navy-100 border-navy-200', label: 'Running' },
   pending: { cls: 'text-navy-600 bg-navy-50 border-navy-200', label: 'Pending' },
   failed: { cls: 'text-red-700 bg-red-100 border-red-200', label: 'Failed' },
   cancelled: { cls: 'text-gray-600 bg-gray-100 border-gray-200', label: 'Cancelled' },

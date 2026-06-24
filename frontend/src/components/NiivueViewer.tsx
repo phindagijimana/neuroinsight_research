@@ -259,7 +259,7 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
             <select
               value={sliceType}
               onChange={(e) => setSliceType(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#003d7a] focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 focus:border-transparent"
             >
               <option value={3}>Multi-planar (4-up)</option>
               <option value={0}>Axial</option>
@@ -277,7 +277,7 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
             <select
               value={colormap}
               onChange={(e) => setColormap(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#003d7a] focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 focus:border-transparent"
             >
               <option value="gray">Grayscale</option>
               <option value="jet">Jet</option>
@@ -296,7 +296,7 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
             <select
               value={mouseMode}
               onChange={(e) => setMouseMode(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#003d7a] focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 focus:border-transparent"
             >
               <option value={1}>Window / Level</option>
               <option value={2}>Measure</option>
@@ -314,7 +314,7 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
                 type="checkbox"
                 checked={showCrosshair}
                 onChange={(e) => setShowCrosshair(e.target.checked)}
-                className="w-4 h-4 text-[#003d7a] rounded focus:ring-[#003d7a]"
+                className="w-4 h-4 text-navy-600 rounded focus:ring-navy-600"
               />
               <span className="text-sm text-gray-700">Show</span>
             </label>
@@ -417,7 +417,7 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
           </button>
           <button
             onClick={handleScreenshot}
-            className="px-4 py-2 bg-[#003d7a] text-white rounded-lg hover:bg-[#002b55] transition"
+            className="px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-800 transition"
           >
             Save Screenshot
           </button>

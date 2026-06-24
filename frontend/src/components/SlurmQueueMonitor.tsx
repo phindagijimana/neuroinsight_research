@@ -29,7 +29,7 @@ interface SlurmQueueMonitorProps {
 }
 
 const stateColors: Record<string, string> = {
-  RUNNING: 'bg-navy-100 text-[#003d7a]',
+  RUNNING: 'bg-navy-100 text-navy-600',
   PENDING: 'bg-navy-50 text-navy-600',
   COMPLETING: 'bg-navy-100 text-navy-700',
   FAILED: 'bg-red-100 text-red-800',
@@ -81,7 +81,7 @@ const SlurmQueueMonitor: React.FC<SlurmQueueMonitorProps> = ({
     <div className="rounded-2xl border border-gray-200/90 bg-white/90 p-4 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-semibold tracking-wide text-gray-500 flex items-center gap-1.5">
-          <Server className="h-4 w-4 text-[#003d7a]" />
+          <Server className="h-4 w-4 text-navy-600" />
           SLURM queue
         </h3>
         <div className="flex items-center gap-2">

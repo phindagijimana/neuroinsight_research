@@ -293,9 +293,9 @@ function App() {
       onDrop={handleDrop}
     >
       {isDragging && (
-        <div className="fixed inset-0 z-50 bg-[#003d7a]/70 flex items-center justify-center pointer-events-none">
-          <div className="bg-white rounded-2xl px-10 py-8 text-center shadow-2xl border-2 border-dashed border-[#003d7a]">
-            <p className="text-2xl font-bold text-[#003d7a] mb-1">Drop to view</p>
+        <div className="fixed inset-0 z-50 bg-navy-600/70 flex items-center justify-center pointer-events-none">
+          <div className="bg-white rounded-2xl px-10 py-8 text-center shadow-2xl border-2 border-dashed border-navy-600">
+            <p className="text-2xl font-bold text-navy-600 mb-1">Drop to view</p>
             <p className="text-gray-600">Release a NIfTI (.nii/.nii.gz) or MGZ file to open it in the Viewer</p>
           </div>
         </div>

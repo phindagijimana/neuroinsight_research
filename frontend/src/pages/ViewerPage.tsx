@@ -230,7 +230,7 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
       onClick={() => commitViewerTab(id)}
       className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
         viewerTab === id
-          ? 'bg-[#003d7a] text-white shadow-sm'
+          ? 'bg-navy-600 text-white shadow-sm'
           : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
       }`}
     >
@@ -244,7 +244,7 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
         <div className="mb-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-2">
             <div className="flex items-center gap-3">
-              <Eye className="w-8 h-8 text-[#003d7a]" />
+              <Eye className="w-8 h-8 text-navy-600" />
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Viewer</h1>
                 <p className="text-gray-600">
@@ -351,8 +351,8 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
         {!loading && viewerTab === 'imaging' && effectiveImageUrl && (
           <div className="space-y-6">
             {localVolume && (
-              <div className="bg-[#003d7a]/10 border border-[#003d7a]/20 rounded-lg px-4 py-2.5 text-sm text-gray-700">
-                Viewing local file <span className="font-medium text-[#003d7a]">{localVolume.name}</span> — opened in place, not uploaded.
+              <div className="bg-navy-600/10 border border-navy-600/20 rounded-lg px-4 py-2.5 text-sm text-gray-700">
+                Viewing local file <span className="font-medium text-navy-600">{localVolume.name}</span> — opened in place, not uploaded.
               </div>
             )}
             <NiivueViewer
@@ -366,7 +366,7 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
               <div className="flex flex-wrap gap-3">
                 <button
                   onClick={handleDownloadVolume}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#003d7a] text-white rounded-lg hover:bg-[#002b55] transition text-sm"
+                  className="flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-800 transition text-sm"
                 >
                   <Download className="w-4 h-4" />
                   Download Volume
@@ -374,7 +374,7 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
                 {segmentationUrl && (
                   <button
                     onClick={handleDownloadSegmentation}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#003d7a] text-white rounded-lg hover:bg-[#002b55] transition text-sm"
+                    className="flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-800 transition text-sm"
                   >
                     <Download className="w-4 h-4" />
                     Download Segmentation
@@ -408,7 +408,7 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
               <div className="flex flex-wrap gap-3">
                 <button
                   onClick={handleDownloadVolume}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#003d7a] text-white rounded-lg hover:bg-[#002b55] transition text-sm"
+                  className="flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-800 transition text-sm"
                 >
                   <Download className="w-4 h-4" />
                   Download Volume
@@ -416,7 +416,7 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
                 {segmentationUrl && (
                   <button
                     onClick={handleDownloadSegmentation}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#003d7a] text-white rounded-lg hover:bg-[#002b55] transition text-sm"
+                    className="flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-800 transition text-sm"
                   >
                     <Download className="w-4 h-4" />
                     Download Segmentation
@@ -465,14 +465,14 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
         )}
 
         {viewerReady && imageUrl && viewerTab === 'imaging' && (
-          <div className="mt-6 py-3 px-4 bg-[#003d7a]/10 border border-[#003d7a]/20 rounded-lg text-center text-sm text-gray-700">
-            <span className="font-medium text-[#003d7a]">L/R</span> markers indicate patient
+          <div className="mt-6 py-3 px-4 bg-navy-600/10 border border-navy-600/20 rounded-lg text-center text-sm text-gray-700">
+            <span className="font-medium text-navy-600">L/R</span> markers indicate patient
             orientation. Use files to load a different volume.
           </div>
         )}
 
         {viewerTab === 'eeg-brain' && imageUrl && (
-          <div className="mt-6 py-3 px-4 bg-[#003d7a]/10 border border-[#003d7a]/20 rounded-lg text-center text-sm text-gray-700">
+          <div className="mt-6 py-3 px-4 bg-navy-600/10 border border-navy-600/20 rounded-lg text-center text-sm text-gray-700">
             Multimodal View: Signal View (MNE preview, first seconds) above; Imaging View (Niivue)
             below — anatomy or source-level maps from your pipeline outputs.
           </div>
