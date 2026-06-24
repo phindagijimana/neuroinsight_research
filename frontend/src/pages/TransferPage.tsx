@@ -397,6 +397,7 @@ function TransferPage() {
                   ? (rightUploadError || 'Pennsieve Agent is not ready for upload')
                   : `Transfer ${leftSelected.length} file(s) to ${rightTab.label}`
             }
+            aria-label={`Transfer selected files to ${rightTab.label}`}
           >
             <ArrowRight className="h-5 w-5" />
           </button>
@@ -405,6 +406,7 @@ function TransferPage() {
             onClick={handleSwapPlatforms}
             className="p-1.5 rounded-full border border-gray-200 text-gray-400 hover:text-[#003d7a] hover:border-[#003d7a] transition"
             title="Swap panes"
+            aria-label="Swap panes"
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
@@ -426,6 +428,7 @@ function TransferPage() {
                   ? (leftUploadError || 'Pennsieve Agent is not ready for upload')
                   : `Transfer ${rightSelected.length} file(s) to ${leftTab.label}`
             }
+            aria-label={`Transfer selected files to ${leftTab.label}`}
           >
             <ArrowLeft className="h-5 w-5" />
           </button>

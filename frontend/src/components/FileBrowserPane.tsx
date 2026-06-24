@@ -303,10 +303,10 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
 
       {/* Toolbar */}
       <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-100 bg-white">
-        <button onClick={navigateUp} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-[#003d7a]" title="Go up">
+        <button onClick={navigateUp} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-[#003d7a]" title="Go up" aria-label="Go up">
           <ArrowUp className="h-3.5 w-3.5" />
         </button>
-        <button onClick={handleRefresh} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-[#003d7a]" title="Refresh">
+        <button onClick={handleRefresh} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-[#003d7a]" title="Refresh" aria-label="Refresh">
           <RefreshCw className="h-3.5 w-3.5" />
         </button>
         {isBackend(platform) && (
@@ -314,6 +314,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
             onClick={() => setShowNewFolder(!showNewFolder)}
             className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-[#003d7a]"
             title="New folder"
+            aria-label="New folder"
           >
             <FolderPlus className="h-3.5 w-3.5" />
           </button>

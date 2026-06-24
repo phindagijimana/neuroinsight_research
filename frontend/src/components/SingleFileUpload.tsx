@@ -202,6 +202,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
             value={manualPath}
             onChange={e => { setManualPath(e.target.value); setSelectedPath(null); setSelectedPrevResult(null); }}
             placeholder={browseMode === 'local' ? './data/sub-001/T1w.nii.gz' : '/scratch/username/sub-001'}
+            aria-label="Subject path"
             className="flex-1 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#003d7a] focus:border-[#003d7a]"
           />
           <button

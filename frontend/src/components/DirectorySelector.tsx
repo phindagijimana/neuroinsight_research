@@ -191,6 +191,7 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
             value={inputDir}
             onChange={(e) => { setInputDir(e.target.value); setDirectoryInfo(null); setBidsSubjects([]); }}
             placeholder={mode === 'local' ? './data/uploads' : '/scratch/username/dataset'}
+            aria-label="Dataset directory path"
             className="flex-1 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#003d7a] focus:border-[#003d7a]"
             onKeyDown={(e) => e.key === 'Enter' && handleBrowseInput()}
           />
