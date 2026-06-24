@@ -124,6 +124,9 @@ async function findUsablePort(preferred) {
 // ---- run args (mirror docker/allinone/run.sh) -----------------------------
 function buildRunArgs(c) {
   const args = ["run", "-d", "--name", c.name, "-p", `127.0.0.1:${c.port}:8000`, "-v", `${c.dataDir}:/data`];
+  // Tell the in-container backend the real host path of /data so sibling job
+  // containers (Docker-out-of-Docker) get host-resolvable bind mounts.
+  args.push("-e", `NIR_HOST_DATA_DIR=${c.dataDir}`);
   if (!isWindows() && fs.existsSync("/var/run/docker.sock")) {
     args.push("-v", "/var/run/docker.sock:/var/run/docker.sock");
   }

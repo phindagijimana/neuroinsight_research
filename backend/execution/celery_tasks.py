@@ -199,6 +199,32 @@ def _resolve_parameters(spec_dict: dict) -> dict:
     return resolved
 
 
+def _dood_translate(volumes: dict) -> dict:
+    """Docker-out-of-Docker host-path translation.
+
+    When the backend itself runs inside the all-in-one container, the host data
+    dir is mounted at DATA_DIR (default /data). A sibling tool container launched
+    via the host docker socket has its bind *sources* resolved by the HOST daemon,
+    so any path under the container DATA_DIR must be rewritten to the real host
+    path (NIR_HOST_DATA_DIR).
+
+    No-op unless NIR_HOST_DATA_DIR is set, so native (./research) and
+    docker-compose deployments are completely unaffected.
+    """
+    host_data = os.getenv("NIR_HOST_DATA_DIR")
+    if not host_data:
+        return volumes
+    data_dir = (os.getenv("DATA_DIR", "/data") or "/data").rstrip("/")
+    host_data = host_data.rstrip("/")
+    translated = {}
+    for src, spec in volumes.items():
+        if src == data_dir or src.startswith(data_dir + "/"):
+            translated[host_data + src[len(data_dir):]] = spec
+        else:
+            translated[src] = spec  # outside the data dir: must already be host-visible
+    return translated
+
+
 def _prepare_volumes(spec_dict: dict, output_dir: Path) -> dict:
     """Prepare Docker volume mappings with smart input-file renaming.
 
@@ -328,7 +354,7 @@ def _prepare_volumes(spec_dict: dict, output_dir: Path) -> dict:
                 "mode": "rw",
             }
 
-    return volumes
+    return _dood_translate(volumes)
 
 
 @shared_task(
