@@ -221,7 +221,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
       case 'completed':
         return <CheckCircle className="w-5 h-5 text-green-600" />;
       case 'running':
-        return <Activity className="w-5 h-5 text-[#003d7a] animate-pulse" />;
+        return <Activity className="w-5 h-5 text-navy-600 animate-pulse" />;
       case 'pending':
         return <Clock className="w-5 h-5 text-navy-400" />;
       case 'failed':
@@ -265,7 +265,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
               {[
                 { label: 'Total', value: stats.total, valueClass: 'text-gray-900' },
                 { label: 'Pending', value: stats.pending, valueClass: 'text-slate-600' },
-                { label: 'Running', value: stats.running, valueClass: 'text-[#003d7a]' },
+                { label: 'Running', value: stats.running, valueClass: 'text-navy-600' },
                 { label: 'Completed', value: stats.completed, valueClass: 'text-emerald-700' },
                 { label: 'Failed', value: stats.failed, valueClass: 'text-red-600' },
               ].map((s) => (
@@ -330,20 +330,20 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2">
                         {getStatusIcon(job.status)}
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium text-gray-900 truncate min-w-0">
                               {job.display_name || job.pipeline_name}
                             </span>
                             {job.is_sample_job && (
-                              <span className="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              <span className="shrink-0 text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
                                 Sample
                               </span>
                             )}
-                            <span className="text-xs px-2 py-0.5 rounded bg-navy-50 text-[#003d7a] border border-navy-200">
+                            <span className="shrink-0 text-xs px-2 py-0.5 rounded bg-navy-50 text-navy-600 border border-navy-200">
                               {job.execution_mode === 'workflow' ? 'Workflow' : 'Plugin'}
                             </span>
-                            <StatusBadge status={job.status} />
+                            <StatusBadge status={job.status} className="shrink-0" />
                           </div>
                           <div className="mt-1 flex items-center gap-4 text-xs text-gray-500">
                             <span>ID: {job.id.slice(0, 8)}</span>
@@ -404,7 +404,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                         <button
                           type="button"
                           onClick={(e) => openSampleInViewer(job, e)}
-                          className="px-2 py-1 text-xs font-medium text-white bg-[#003d7a] rounded-md hover:bg-[#002b55] transition"
+                          className="px-2 py-1 text-xs font-medium text-white bg-navy-600 rounded-md hover:bg-navy-800 transition"
                           title="Open Viewer with the right tab for this sample"
                         >
                           Viewer

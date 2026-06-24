@@ -329,7 +329,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
             return (
               <React.Fragment key={label}>
                 {i > 0 && <ArrowRight className="h-3 w-3 text-gray-300" />}
-                <span className={`px-2 py-1 rounded ${isActive ? 'bg-[#003d7a] text-white font-medium' : isDone ? 'text-green-700 font-medium' : ''}`}>
+                <span className={`px-2 py-1 rounded ${isActive ? 'bg-navy-600 text-white font-medium' : isDone ? 'text-green-700 font-medium' : ''}`}>
                   {label}
                 </span>
               </React.Fragment>
@@ -365,7 +365,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
               <button onClick={resetPlatformFlow} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">
                 <ArrowLeft className="h-3.5 w-3.5 inline mr-1" />Back
               </button>
-              <button onClick={handleStartTransfer} className="flex-1 px-4 py-2 text-sm bg-[#003d7a] text-white rounded-md hover:bg-[#002b55] font-medium">
+              <button onClick={handleStartTransfer} className="flex-1 px-4 py-2 text-sm bg-navy-600 text-white rounded-md hover:bg-navy-800 font-medium">
                 Download & Continue
               </button>
             </div>
@@ -397,7 +397,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
               </div>
               {error && <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">{error}</div>}
               <button onClick={handlePlatformJobSubmit} disabled={!selectedPipeline || submitting}
-                className="w-full py-2.5 px-4 bg-[#003d7a] text-white rounded-md hover:bg-[#002b55] font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                className="w-full py-2.5 px-4 bg-navy-600 text-white rounded-md hover:bg-navy-800 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                 {submitting ? 'Submitting...' : 'Submit Job'}
               </button>
             </div>
@@ -446,7 +446,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
                 <h3 className="text-xs font-semibold tracking-wide text-gray-500 mb-3">Input Mode</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <button onClick={() => setMode('single')}
-                    className={`p-3 rounded-lg border text-left transition-all ${mode === 'single' ? 'border-[#003d7a]/40 bg-white shadow-sm ring-1 ring-[#003d7a]/15' : 'border-gray-200/80 bg-white hover:border-gray-300'}`}>
+                    className={`p-3 rounded-lg border text-left transition-all ${mode === 'single' ? 'border-navy-600/40 bg-white shadow-sm ring-1 ring-navy-600/15' : 'border-gray-200/80 bg-white hover:border-gray-300'}`}>
                     <div className="flex items-center mb-1">
                       <Upload className={`h-4 w-4 mr-1.5 ${mode === 'single' ? 'text-navy-600' : 'text-gray-400'}`} />
                       <span className="text-sm font-medium text-gray-900">Single</span>
@@ -483,7 +483,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
                     />
                     {uploadedFilePath && (
                       <div className="mt-3">
-                        <button onClick={handleSingleFileSubmit} className="w-full py-2 px-4 bg-[#003d7a] text-white rounded-md hover:bg-[#002b55] font-medium text-sm">
+                        <button onClick={handleSingleFileSubmit} className="w-full py-2 px-4 bg-navy-600 text-white rounded-md hover:bg-navy-800 font-medium text-sm">
                           Submit Job
                         </button>
                       </div>

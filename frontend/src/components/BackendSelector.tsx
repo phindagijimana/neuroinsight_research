@@ -589,7 +589,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
 
           <button
             onClick={handlePlatformConnect} disabled={platformConnecting}
-            className="w-full px-3 py-2 text-sm bg-[#003d7a] text-white rounded-md hover:bg-[#002b55] disabled:bg-gray-300 font-medium transition flex items-center justify-center gap-2"
+            className="w-full px-3 py-2 text-sm bg-navy-600 text-white rounded-md hover:bg-navy-800 disabled:bg-gray-300 font-medium transition flex items-center justify-center gap-2"
           >
             {platformConnecting ? (<><Loader2 className="h-4 w-4 animate-spin" /> Connecting...</>) : 'Connect'}
           </button>

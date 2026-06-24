@@ -524,7 +524,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-5 flex items-center justify-center shadow-sm">
         <div className="flex items-center">
-          <Loader2 className="h-6 w-6 animate-spin text-[#003d7a] mr-2" />
+          <Loader2 className="h-6 w-6 animate-spin text-navy-600 mr-2" />
           <span className="text-sm text-gray-500">Loading pipelines…</span>
         </div>
       </div>
@@ -540,7 +540,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
             onClick={() => setMode('plugins')}
             className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
               mode === 'plugins'
-                ? 'bg-[#003d7a] text-white shadow-sm'
+                ? 'bg-navy-600 text-white shadow-sm'
                 : 'bg-slate-100/80 text-gray-700 hover:bg-slate-100'
             }`}
           >
@@ -551,7 +551,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
             onClick={() => setMode('workflows')}
             className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition ${
               mode === 'workflows'
-                ? 'bg-[#003d7a] text-white'
+                ? 'bg-navy-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -581,7 +581,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
           }}
           className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
             mode === 'plugins'
-              ? 'bg-[#003d7a] text-white shadow-sm'
+              ? 'bg-navy-600 text-white shadow-sm'
               : 'bg-slate-100/80 text-gray-700 hover:bg-slate-100'
           }`}
         >
@@ -596,7 +596,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
           }}
           className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
             mode === 'workflows'
-              ? 'bg-[#003d7a] text-white shadow-sm'
+              ? 'bg-navy-600 text-white shadow-sm'
               : 'bg-slate-100/80 text-gray-700 hover:bg-slate-100'
           }`}
         >
@@ -620,7 +620,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
           <select
             value={selectedPluginId || ''}
             onChange={(e) => handlePluginSelect(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#003d7a] focus:border-[#003d7a] text-base"
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-navy-600 text-base"
           >
             {userSelectablePlugins.map((plugin) => (
               <option key={plugin.id} value={plugin.id}>
@@ -640,7 +640,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
           <select
             value={selectedWorkflowId || ''}
             onChange={(e) => handleWorkflowSelect(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#003d7a] focus:border-[#003d7a] text-base"
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-navy-600 text-base"
           >
             {activeWorkflows.map((workflow) => (
               <option key={workflow.id} value={workflow.id}>

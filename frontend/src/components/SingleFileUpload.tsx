@@ -203,7 +203,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
             onChange={e => { setManualPath(e.target.value); setSelectedPath(null); setSelectedPrevResult(null); }}
             placeholder={browseMode === 'local' ? './data/sub-001/T1w.nii.gz' : '/scratch/username/sub-001'}
             aria-label="Subject path"
-            className="flex-1 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#003d7a] focus:border-[#003d7a]"
+            className="flex-1 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-navy-600 focus:border-navy-600"
           />
           <button
             onClick={() => { setBrowserOpen(!browserOpen); setPrevResultsOpen(false); }}
@@ -218,7 +218,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
             type="button"
             className={`px-3 py-1.5 text-xs font-medium border rounded-md flex items-center gap-1 transition ${
               prevResultsOpen
-                ? 'border-[#003d7a] bg-[#003d7a]/5 text-[#003d7a]'
+                ? 'border-navy-600 bg-navy-600/5 text-navy-600'
                 : 'border-gray-300 hover:bg-gray-50 text-gray-700'
             }`}
             title="Use outputs from a completed job"
@@ -229,7 +229,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
           <button
             type="submit"
             disabled={!manualPath.trim()}
-            className="px-3 py-1.5 text-xs font-medium bg-[#003d7a] text-white rounded-md hover:bg-[#002b55] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-xs font-medium bg-navy-600 text-white rounded-md hover:bg-navy-800 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Use Path
           </button>
@@ -238,10 +238,10 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
 
       {/* Previous Results Panel */}
       {prevResultsOpen && (
-        <div className="border border-[#003d7a]/30 rounded-lg overflow-hidden bg-white shadow-sm">
-          <div className="flex items-center gap-2 px-3 py-2 bg-[#003d7a]/5 border-b border-[#003d7a]/10">
-            <History className="h-3.5 w-3.5 text-[#003d7a]" />
-            <span className="text-xs font-semibold text-[#003d7a]">
+        <div className="border border-navy-600/30 rounded-lg overflow-hidden bg-white shadow-sm">
+          <div className="flex items-center gap-2 px-3 py-2 bg-navy-600/5 border-b border-navy-600/10">
+            <History className="h-3.5 w-3.5 text-navy-600" />
+            <span className="text-xs font-semibold text-navy-600">
               Previous Job Results
             </span>
             <span className="text-[10px] text-gray-400 ml-auto">
@@ -254,7 +254,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
           <div className="max-h-52 overflow-y-auto">
             {prevLoading && (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-4 w-4 text-[#003d7a] animate-spin mr-2" />
+                <Loader2 className="h-4 w-4 text-navy-600 animate-spin mr-2" />
                 <span className="text-xs text-gray-500">Loading completed jobs...</span>
               </div>
             )}
@@ -277,7 +277,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
             {!prevLoading && prevResults.map((result) => (
               <div
                 key={`${result.job_id}-${result.plugin_id}`}
-                className="flex items-center px-3 py-2 text-xs hover:bg-[#003d7a]/5 cursor-pointer border-b border-gray-50 group transition"
+                className="flex items-center px-3 py-2 text-xs hover:bg-navy-600/5 cursor-pointer border-b border-gray-50 group transition"
                 onClick={() => selectPreviousResult(result)}
               >
                 <CheckCircle2 className="h-3.5 w-3.5 text-green-500 mr-2 flex-shrink-0" />
@@ -287,7 +287,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
                       {friendlyPipeline(result.job_pipeline)}
                     </span>
                     {result.subject_id && (
-                      <span className="text-[9px] bg-[#003d7a]/10 text-[#003d7a] px-1.5 py-0.5 rounded font-medium flex-shrink-0">
+                      <span className="text-[9px] bg-navy-600/10 text-navy-600 px-1.5 py-0.5 rounded font-medium flex-shrink-0">
                         {result.subject_id}
                       </span>
                     )}
@@ -303,7 +303,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
                   <span className="text-[10px] text-gray-400">{formatDate(result.completed_at)}</span>
                   <button
                     onClick={(e) => { e.stopPropagation(); selectPreviousResult(result); }}
-                    className="text-[10px] text-white bg-[#003d7a] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition"
+                    className="text-[10px] text-white bg-navy-600 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition"
                   >
                     Use
                   </button>
@@ -328,10 +328,10 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
 
       {/* Collapsible File Browser */}
       {browserOpen && (
-        <div className="border border-[#003d7a]/30 rounded-lg overflow-hidden bg-white shadow-sm">
+        <div className="border border-navy-600/30 rounded-lg overflow-hidden bg-white shadow-sm">
           {/* Header */}
           <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
-            <FolderOpen className="h-3.5 w-3.5 text-[#003d7a]" />
+            <FolderOpen className="h-3.5 w-3.5 text-navy-600" />
             <span className="text-xs font-semibold text-gray-700">{modeLabel} File Browser</span>
             <span className="text-[10px] text-gray-400 ml-auto">Click a file to select it, or use a folder</span>
           </div>
@@ -362,7 +362,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
           <div className="max-h-52 overflow-y-auto">
             {loading && (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-4 w-4 text-[#003d7a] animate-spin mr-2" />
+                <Loader2 className="h-4 w-4 text-navy-600 animate-spin mr-2" />
                 <span className="text-xs text-gray-500">Loading...</span>
               </div>
             )}
@@ -398,7 +398,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
                     <FolderOpen className="h-3.5 w-3.5 text-navy-500 mr-2 flex-shrink-0" />
                   )}
                   <span className={`flex-1 truncate ${
-                    isSelected ? 'font-semibold text-[#003d7a]' :
+                    isSelected ? 'font-semibold text-navy-600' :
                     !isFile ? 'font-medium text-gray-800' :
                     nifti ? 'text-green-700' : 'text-gray-600'
                   }`}>
@@ -409,7 +409,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
                   {isFile && (
                     <button
                       onClick={e => { e.stopPropagation(); selectFile(entry); }}
-                      className="text-[10px] text-white bg-[#003d7a] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition"
+                      className="text-[10px] text-white bg-navy-600 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition"
                     >
                       Select
                     </button>
@@ -418,7 +418,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
                     <>
                       <button
                         onClick={(e) => { e.stopPropagation(); selectFolder(entry.path); }}
-                        className="text-[10px] text-white bg-[#003d7a] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition mr-2"
+                        className="text-[10px] text-white bg-navy-600 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition mr-2"
                       >
                         Select
                       </button>
@@ -438,7 +438,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
             <div className="flex gap-2">
               <button
                 onClick={() => selectFolder(browserPath)}
-                className="text-[10px] font-medium text-[#003d7a] hover:underline"
+                className="text-[10px] font-medium text-navy-600 hover:underline"
               >
                 Use current folder
               </button>

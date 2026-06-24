@@ -1,7 +1,7 @@
 /**
  * Button — the one button in the app.
  *
- * Collapses the dozens of inline `bg-[#003d7a] … rounded-md hover:…` variants
+ * Collapses the dozens of inline `bg-navy-600 … rounded-md hover:…` variants
  * (and their drifting sizes/disabled styles) into a single, consistent control.
  * Extra layout utilities (w-full, gap, etc.) can still be passed via className.
  *
@@ -15,7 +15,7 @@ type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 type Size = 'sm' | 'md' | 'lg';
 
 const VARIANT: Record<Variant, string> = {
-  primary: 'bg-[#003d7a] text-white border border-transparent hover:bg-[#002b55]',
+  primary: 'bg-navy-600 text-white border border-transparent hover:bg-navy-800',
   secondary: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
   danger: 'bg-red-600 text-white border border-transparent hover:bg-red-700',
   ghost: 'bg-transparent text-gray-600 border border-transparent hover:bg-gray-100',
@@ -37,7 +37,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       type={type}
-      className={`inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003d7a]/40 disabled:opacity-50 disabled:cursor-not-allowed ${VARIANT[variant]} ${SIZE[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-navy-600/40 disabled:opacity-50 disabled:cursor-not-allowed ${VARIANT[variant]} ${SIZE[size]} ${className}`}
       {...rest}
     >
       {children}

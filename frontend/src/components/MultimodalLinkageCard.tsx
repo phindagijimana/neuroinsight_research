@@ -28,9 +28,9 @@ const MultimodalLinkageCard: React.FC<MultimodalLinkageCardProps> = ({
   const space = manifest.space ?? '—';
 
   return (
-    <div className="rounded-lg border border-[#003d7a]/25 bg-gradient-to-b from-[#003d7a]/[0.06] to-gray-50/80 p-3 space-y-3">
+    <div className="rounded-lg border border-navy-600/25 bg-gradient-to-b from-navy-600/[0.06] to-gray-50/80 p-3 space-y-3">
       <div>
-        <h3 className="text-xs font-semibold text-[#003d7a] tracking-wide">
+        <h3 className="text-xs font-semibold text-navy-600 tracking-wide">
           EEG ↔ MRI (source localization)
         </h3>
         <p className="text-xs text-gray-600 mt-1">
@@ -42,7 +42,7 @@ const MultimodalLinkageCard: React.FC<MultimodalLinkageCardProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-stretch sm:justify-between gap-2 sm:gap-1">
         <div className="flex-1 min-w-0 rounded-md border border-gray-200 bg-white p-2.5 shadow-sm">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-800">
-            <Activity className="w-4 h-4 text-[#003d7a] shrink-0" aria-hidden />
+            <Activity className="w-4 h-4 text-navy-600 shrink-0" aria-hidden />
             EEG (signal)
           </div>
           <p className="text-xs font-mono text-gray-700 truncate mt-1.5" title={eegLabel}>
@@ -50,20 +50,20 @@ const MultimodalLinkageCard: React.FC<MultimodalLinkageCardProps> = ({
           </p>
         </div>
 
-        <div className="hidden sm:flex flex-col items-center justify-center text-[#003d7a] px-0.5 shrink-0">
+        <div className="hidden sm:flex flex-col items-center justify-center text-navy-600 px-0.5 shrink-0">
           <ArrowRight className="w-5 h-5" aria-hidden />
           <span className="text-[10px] text-center text-gray-500 max-w-[4.5rem] leading-tight mt-0.5">
             time → source
           </span>
         </div>
-        <div className="flex sm:hidden flex-row items-center justify-center text-[#003d7a] py-0.5">
+        <div className="flex sm:hidden flex-row items-center justify-center text-navy-600 py-0.5">
           <ArrowDown className="w-5 h-5" aria-hidden />
           <span className="text-[10px] text-gray-500 ml-2">time → source</span>
         </div>
 
         <div className="flex-1 min-w-0 rounded-md border border-gray-200 bg-white p-2.5 shadow-sm">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-800">
-            <Brain className="w-4 h-4 text-[#003d7a] shrink-0" aria-hidden />
+            <Brain className="w-4 h-4 text-navy-600 shrink-0" aria-hidden />
             Cortical source
           </div>
           <p className="text-xs text-gray-600 mt-1.5">
@@ -74,20 +74,20 @@ const MultimodalLinkageCard: React.FC<MultimodalLinkageCardProps> = ({
           </p>
         </div>
 
-        <div className="hidden sm:flex flex-col items-center justify-center text-[#003d7a] px-0.5 shrink-0">
+        <div className="hidden sm:flex flex-col items-center justify-center text-navy-600 px-0.5 shrink-0">
           <ArrowRight className="w-5 h-5" aria-hidden />
           <span className="text-[10px] text-center text-gray-500 max-w-[4.5rem] leading-tight mt-0.5">
             anatomy
           </span>
         </div>
-        <div className="flex sm:hidden flex-row items-center justify-center text-[#003d7a] py-0.5">
+        <div className="flex sm:hidden flex-row items-center justify-center text-navy-600 py-0.5">
           <ArrowDown className="w-5 h-5" aria-hidden />
           <span className="text-[10px] text-gray-500 ml-2">anatomy</span>
         </div>
 
         <div className="flex-1 min-w-0 rounded-md border border-gray-200 bg-white p-2.5 shadow-sm">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-800">
-            <Layers className="w-4 h-4 text-[#003d7a] shrink-0" aria-hidden />
+            <Layers className="w-4 h-4 text-navy-600 shrink-0" aria-hidden />
             MRI (Imaging View)
           </div>
           <p className="text-xs font-mono text-gray-700 truncate mt-1.5" title={mriLabel}>

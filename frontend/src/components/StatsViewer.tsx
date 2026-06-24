@@ -221,7 +221,7 @@ export const StatsViewer: React.FC<StatsViewerProps> = ({ jobId, pipelineName })
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <div className="flex items-center justify-center gap-3">
-          <Activity className="w-5 h-5 text-[#003d7a] animate-spin" />
+          <Activity className="w-5 h-5 text-navy-600 animate-spin" />
           <span className="text-gray-600">Loading statistics...</span>
         </div>
       </div>
@@ -252,7 +252,7 @@ export const StatsViewer: React.FC<StatsViewerProps> = ({ jobId, pipelineName })
         {/* Header with summary */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <BarChart className="w-5 h-5 text-[#003d7a]" />
+            <BarChart className="w-5 h-5 text-navy-600" />
             <div>
               <h3 className="text-sm font-semibold text-gray-900">
                 {pipelineLabel} Statistics
@@ -265,7 +265,7 @@ export const StatsViewer: React.FC<StatsViewerProps> = ({ jobId, pipelineName })
           {csvData.length > 1 && (
             <button
               onClick={handleDownloadAllCSVs}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#003d7a] text-white rounded-md hover:bg-[#002b55] transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-navy-600 text-white rounded-md hover:bg-navy-800 transition"
             >
               <Download className="w-3.5 h-3.5" />
               Download All CSVs
@@ -339,7 +339,7 @@ export const StatsViewer: React.FC<StatsViewerProps> = ({ jobId, pipelineName })
                             value={search}
                             onChange={(e) => setSearchTerms(prev => ({ ...prev, [csv.filename]: e.target.value }))}
                             placeholder="Filter rows..."
-                            className="w-full max-w-xs px-3 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#003d7a] focus:border-[#003d7a]"
+                            className="w-full max-w-xs px-3 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-navy-600 focus:border-navy-600"
                           />
                         </div>
                       )}
@@ -378,8 +378,8 @@ export const StatsViewer: React.FC<StatsViewerProps> = ({ jobId, pipelineName })
                                 >
                                   <span className="inline-flex items-center gap-1">
                                     {header.replace(/_/g, ' ')}
-                                    {sort?.col === ci && sort.dir === 'asc' && <span className="text-[#003d7a]">&#9650;</span>}
-                                    {sort?.col === ci && sort.dir === 'desc' && <span className="text-[#003d7a]">&#9660;</span>}
+                                    {sort?.col === ci && sort.dir === 'asc' && <span className="text-navy-600">&#9650;</span>}
+                                    {sort?.col === ci && sort.dir === 'desc' && <span className="text-navy-600">&#9660;</span>}
                                     {(sort?.col !== ci || sort?.dir === null) && (
                                       <span className="text-gray-300">&#9650;&#9660;</span>
                                     )}
@@ -435,7 +435,7 @@ export const StatsViewer: React.FC<StatsViewerProps> = ({ jobId, pipelineName })
         <div key={idx} className="bg-white rounded-lg border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <BarChart className="w-5 h-5 text-[#003d7a]" />
+              <BarChart className="w-5 h-5 text-navy-600" />
               <h3 className="text-sm font-semibold text-gray-900 capitalize">{section.name}</h3>
             </div>
             <button
@@ -506,7 +506,7 @@ export const StatsViewer: React.FC<StatsViewerProps> = ({ jobId, pipelineName })
                 }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 rounded-md transition"
               >
-                <Download className="w-4 h-4 text-[#003d7a] flex-shrink-0" />
+                <Download className="w-4 h-4 text-navy-600 flex-shrink-0" />
                 <span className="text-gray-700 truncate">{csvPath}</span>
               </button>
             ))}

@@ -152,7 +152,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Database className="h-4 w-4 text-[#003d7a]" />
+          <Database className="h-4 w-4 text-navy-600" />
           <h3 className="text-sm font-semibold text-gray-700">
             {platform === 'pennsieve' ? 'Pennsieve' : 'XNAT'} Data Browser
           </h3>
@@ -169,7 +169,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
         <div className="flex items-center gap-1 text-xs text-gray-500 mb-3 flex-wrap">
           <button
             onClick={() => navigateBreadcrumb(-1)}
-            className="hover:text-[#003d7a] font-medium flex items-center gap-1"
+            className="hover:text-navy-600 font-medium flex items-center gap-1"
           >
             <ArrowLeft className="h-3 w-3" />
             All Datasets
@@ -179,7 +179,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
               <ChevronRight className="h-3 w-3 text-gray-400" />
               <button
                 onClick={() => navigateBreadcrumb(idx)}
-                className={`hover:text-[#003d7a] ${idx === breadcrumbs.length - 1 ? 'font-semibold text-gray-700' : ''}`}
+                className={`hover:text-navy-600 ${idx === breadcrumbs.length - 1 ? 'font-semibold text-gray-700' : ''}`}
               >
                 {crumb.label}
               </button>
@@ -199,7 +199,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 text-[#003d7a] animate-spin mr-2" />
+          <Loader2 className="h-5 w-5 text-navy-600 animate-spin mr-2" />
           <span className="text-sm text-gray-500">Loading...</span>
         </div>
       )}
@@ -216,9 +216,9 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
               onClick={() => browseDataset(ds.id)}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-gray-50 text-left transition group"
             >
-              <HardDrive className="h-4 w-4 text-[#003d7a] flex-shrink-0" />
+              <HardDrive className="h-4 w-4 text-navy-600 flex-shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 truncate group-hover:text-[#003d7a]">
+                <p className="text-sm font-medium text-gray-800 truncate group-hover:text-navy-600">
                   {ds.name}
                 </p>
                 {ds.description && (
@@ -228,7 +228,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
               {ds.size_bytes ? (
                 <span className="text-xs text-gray-400">{formatSize(ds.size_bytes)}</span>
               ) : null}
-              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-[#003d7a]" />
+              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-navy-600" />
             </button>
           ))}
         </div>
@@ -241,7 +241,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
           <div className="flex items-center justify-between mb-2 px-1">
             <button
               onClick={selectAllFiles}
-              className="text-xs text-[#003d7a] hover:underline flex items-center gap-1"
+              className="text-xs text-navy-600 hover:underline flex items-center gap-1"
             >
               {selectedFiles.size === selectableCount && selectableCount > 0 ? (
                 <CheckSquare className="h-3.5 w-3.5" />
@@ -279,7 +279,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
                     className="flex-shrink-0"
                   >
                     {isSelected ? (
-                      <CheckSquare className="h-4 w-4 text-[#003d7a]" />
+                      <CheckSquare className="h-4 w-4 text-navy-600" />
                     ) : (
                       <Square className="h-4 w-4 text-gray-400" />
                     )}
@@ -300,7 +300,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
                   <span
                     className={`flex-1 truncate cursor-pointer ${
                       nifti ? 'text-green-700 font-medium' :
-                      isDir ? 'text-gray-700 hover:text-[#003d7a]' :
+                      isDir ? 'text-gray-700 hover:text-navy-600' :
                       'text-gray-700'
                     }`}
                     onClick={() => isDir ? navigateTo(item) : toggleFileSelection(item.id)}
@@ -318,7 +318,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
                   {isDir && (
                     <button
                       onClick={() => navigateTo(item)}
-                      className="flex-shrink-0 text-gray-400 hover:text-[#003d7a]"
+                      className="flex-shrink-0 text-gray-400 hover:text-navy-600"
                       title="Open"
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -333,7 +333,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
           {selectedFiles.size > 0 && (
             <button
               onClick={handleSubmit}
-              className="mt-3 w-full px-4 py-2.5 bg-[#003d7a] text-white text-sm font-medium rounded-md hover:bg-[#002b55] transition flex items-center justify-center gap-2"
+              className="mt-3 w-full px-4 py-2.5 bg-navy-600 text-white text-sm font-medium rounded-md hover:bg-navy-800 transition flex items-center justify-center gap-2"
             >
               <CheckSquare className="h-4 w-4" />
               Select {selectedFiles.size} Item{selectedFiles.size !== 1 ? 's' : ''} for Processing

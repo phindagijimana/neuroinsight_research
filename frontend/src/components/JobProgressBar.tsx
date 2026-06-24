@@ -34,8 +34,8 @@ const JobProgressBar: React.FC<JobProgressBarProps> = ({
     : isCancelled
     ? 'bg-navy-300'
     : isCompleted
-    ? 'bg-[#003d7a]'
-    : 'bg-[#003d7a]';
+    ? 'bg-navy-600'
+    : 'bg-navy-600';
 
   const trackColor = isFailed ? 'bg-red-50' : 'bg-navy-100/60';
 
@@ -43,7 +43,7 @@ const JobProgressBar: React.FC<JobProgressBarProps> = ({
     ? 'text-red-600'
     : isCancelled
     ? 'text-navy-400'
-    : 'text-[#003d7a]';
+    : 'text-navy-600';
 
   const phaseColor = isFailed
     ? 'text-red-500'
@@ -74,7 +74,7 @@ const JobProgressBar: React.FC<JobProgressBarProps> = ({
         {/* Completed checkmark glow */}
         {isCompleted && (
           <div
-            className="absolute top-0 left-0 h-full rounded-full opacity-20 bg-gradient-to-r from-[#003d7a] to-[#1a6ba0]"
+            className="absolute top-0 left-0 h-full rounded-full opacity-20 bg-gradient-to-r from-navy-600 to-[#1a6ba0]"
             style={{ width: '100%' }}
           />
         )}

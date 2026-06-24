@@ -16,7 +16,7 @@ export const Spinner: React.FC<{ size?: keyof typeof SIZE; className?: string }>
   <span
     role="status"
     aria-label="Loading"
-    className={`inline-block animate-spin rounded-full border-[#003d7a] border-t-transparent ${SIZE[size]} ${className}`}
+    className={`inline-block animate-spin rounded-full border-navy-600 border-t-transparent ${SIZE[size]} ${className}`}
   />
 );
 

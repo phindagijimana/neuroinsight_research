@@ -160,7 +160,7 @@ const FileTreeItem: React.FC<{
             {showViewButton && item.viewInViewer && (
               <button
                 onClick={() => onFileSelect && onFileSelect(item.path)}
-                className="p-1 text-[#003d7a] hover:bg-navy-100 rounded transition"
+                className="p-1 text-navy-600 hover:bg-navy-100 rounded transition"
                 title="View in viewer"
               >
                 <Eye className="w-3.5 h-3.5" />
@@ -259,7 +259,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <div className="flex items-center justify-center gap-3">
-          <Activity className="w-5 h-5 text-[#003d7a] animate-spin" />
+          <Activity className="w-5 h-5 text-navy-600 animate-spin" />
           <span className="text-gray-600">Loading files...</span>
         </div>
       </div>
@@ -291,7 +291,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         {showDownload && (
           <button
             onClick={handleDownloadAll}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-[#003d7a] text-white rounded-md hover:bg-[#002b55] transition"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-navy-600 text-white rounded-md hover:bg-navy-800 transition"
           >
             <Download className="w-4 h-4" />
             Export All

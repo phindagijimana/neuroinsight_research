@@ -218,7 +218,7 @@ const CorticalSourceViewer: React.FC<CorticalSourceViewerProps> = ({
       >
         {!meshReady && (
           <div className="absolute inset-0 flex items-center justify-center gap-2 text-gray-600 text-sm bg-gray-50/90 z-10">
-            <Activity className="w-5 h-5 text-[#003d7a] animate-spin" />
+            <Activity className="w-5 h-5 text-navy-600 animate-spin" />
             Loading cortical mesh…
           </div>
         )}

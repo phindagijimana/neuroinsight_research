@@ -18,7 +18,7 @@ const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) =>
       <div className="max-w-7xl mx-auto px-6 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActivePage('home')}>
-            <div className="bg-[#003d7a] p-2 rounded-lg">
+            <div className="bg-navy-600 p-2 rounded-lg">
               <Brain className="w-8 h-8 text-white" />
             </div>
             <div>
@@ -30,7 +30,7 @@ const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) =>
             <button
               onClick={() => setActivePage('home')}
               className={`transition border-none bg-transparent ${
-                activePage === 'home' ? 'text-[#003d7a] font-semibold' : 'text-gray-600 hover:text-[#003d7a]'
+                activePage === 'home' ? 'text-navy-600 font-semibold' : 'text-gray-600 hover:text-navy-600'
               }`}
             >
               Home
@@ -38,7 +38,7 @@ const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) =>
             <button
               onClick={() => setActivePage('jobs')}
               className={`transition border-none bg-transparent ${
-                activePage === 'jobs' ? 'text-[#003d7a] font-semibold' : 'text-gray-600 hover:text-[#003d7a]'
+                activePage === 'jobs' ? 'text-navy-600 font-semibold' : 'text-gray-600 hover:text-navy-600'
               }`}
             >
               Jobs
@@ -46,7 +46,7 @@ const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) =>
             <button
               onClick={() => setActivePage('dashboard')}
               className={`transition border-none bg-transparent ${
-                activePage === 'dashboard' ? 'text-[#003d7a] font-semibold' : 'text-gray-600 hover:text-[#003d7a]'
+                activePage === 'dashboard' ? 'text-navy-600 font-semibold' : 'text-gray-600 hover:text-navy-600'
               }`}
             >
               Results
@@ -54,7 +54,7 @@ const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) =>
             <button
               onClick={() => setActivePage('viewer')}
               className={`transition border-none bg-transparent ${
-                activePage === 'viewer' ? 'text-[#003d7a] font-semibold' : 'text-gray-600 hover:text-[#003d7a]'
+                activePage === 'viewer' ? 'text-navy-600 font-semibold' : 'text-gray-600 hover:text-navy-600'
               }`}
             >
               Viewer
@@ -62,7 +62,7 @@ const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) =>
             <button
               onClick={() => setActivePage('transfer')}
               className={`transition border-none bg-transparent ${
-                activePage === 'transfer' ? 'text-[#003d7a] font-semibold' : 'text-gray-600 hover:text-[#003d7a]'
+                activePage === 'transfer' ? 'text-navy-600 font-semibold' : 'text-gray-600 hover:text-navy-600'
               }`}
             >
               Transfer
@@ -70,7 +70,7 @@ const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) =>
             <button
               onClick={() => setActivePage('docs')}
               className={`transition border-none bg-transparent ${
-                activePage === 'docs' ? 'text-[#003d7a] font-semibold' : 'text-gray-600 hover:text-[#003d7a]'
+                activePage === 'docs' ? 'text-navy-600 font-semibold' : 'text-gray-600 hover:text-navy-600'
               }`}
             >
               Docs

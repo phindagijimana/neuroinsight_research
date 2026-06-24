@@ -389,7 +389,7 @@ function TransferPage() {
               !rightConnected ||
               (rightPlatform === 'pennsieve' && !rightUploadReady)
             }
-            className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-white hover:bg-[#003d7a] hover:border-[#003d7a] transition disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-white hover:bg-navy-600 hover:border-navy-600 transition disabled:opacity-30 disabled:cursor-not-allowed"
             title={
               !leftConnected || !rightConnected
                 ? 'Connect both platforms first'
@@ -404,7 +404,7 @@ function TransferPage() {
 
           <button
             onClick={handleSwapPlatforms}
-            className="p-1.5 rounded-full border border-gray-200 text-gray-400 hover:text-[#003d7a] hover:border-[#003d7a] transition"
+            className="p-1.5 rounded-full border border-gray-200 text-gray-400 hover:text-navy-600 hover:border-navy-600 transition"
             title="Swap panes"
             aria-label="Swap panes"
           >
@@ -420,7 +420,7 @@ function TransferPage() {
               !rightConnected ||
               (leftPlatform === 'pennsieve' && !leftUploadReady)
             }
-            className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-white hover:bg-[#003d7a] hover:border-[#003d7a] transition disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-white hover:bg-navy-600 hover:border-navy-600 transition disabled:opacity-30 disabled:cursor-not-allowed"
             title={
               !leftConnected || !rightConnected
                 ? 'Connect both platforms first'
@@ -536,7 +536,7 @@ function TransferPage() {
                     t.status === 'completed' ? 'bg-green-500' :
                     t.status === 'failed' ? 'bg-red-500' :
                     t.status === 'cancelled' ? 'bg-gray-400' :
-                    'bg-[#003d7a] animate-pulse'
+                    'bg-navy-600 animate-pulse'
                   }`} />
                   <span className="text-gray-700">{t.platform || t.direction}</span>
                 </div>

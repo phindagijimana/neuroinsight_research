@@ -40,7 +40,7 @@ export const JobSelector: React.FC<JobSelectorProps> = ({
       <select
         value={selectedJobId || ''}
         onChange={(e) => onJobSelect(e.target.value)}
-        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#003d7a] focus:border-[#003d7a] bg-white text-gray-900"
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 focus:border-navy-600 bg-white text-gray-900"
       >
         <option value="">-- Select a completed job --</option>
         {completedJobs.map((job) => (

@@ -41,7 +41,7 @@ const ConfirmCtx = createContext<ConfirmApi | null>(null);
 const TOAST_STYLE: Record<ToastType, { cls: string; icon: React.ReactNode }> = {
   success: { cls: 'border-green-200', icon: <CheckCircle className="w-5 h-5 text-green-600 shrink-0" /> },
   error: { cls: 'border-red-200', icon: <XCircle className="w-5 h-5 text-red-600 shrink-0" /> },
-  info: { cls: 'border-navy-200', icon: <AlertCircle className="w-5 h-5 text-[#003d7a] shrink-0" /> },
+  info: { cls: 'border-navy-200', icon: <AlertCircle className="w-5 h-5 text-navy-600 shrink-0" /> },
 };
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -140,7 +140,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                   className={`px-4 py-2 rounded-md text-sm font-medium text-white transition ${
                     confirmState.danger
                       ? 'bg-red-600 hover:bg-red-700'
-                      : 'bg-[#003d7a] hover:bg-[#002b55]'
+                      : 'bg-navy-600 hover:bg-navy-800'
                   }`}
                 >
                   {confirmState.confirmLabel || 'Confirm'}
