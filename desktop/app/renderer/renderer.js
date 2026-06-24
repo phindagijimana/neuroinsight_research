@@ -6,6 +6,10 @@
 const nir = window.nir;
 const $ = (id) => document.getElementById(id);
 
+// Licensing is deferred for this version (added later). Flip to true to re-enable
+// the License card/badge; enforcement is already permissive in unlicensed mode.
+const LICENSE_ENABLED = false;
+
 // Tracks whether the environment has blockers (gates the Start button) and the
 // most recent diagnostics bundle path (gates the reveal button).
 const state = { preflightReady: true, lastBundlePath: null };
@@ -329,7 +333,15 @@ function init() {
 
   loadPlatform();
   refreshStatus();
-  refreshLicense();
+  if (LICENSE_ENABLED) {
+    refreshLicense();
+  } else {
+    // Hide the license card + header badge while licensing is deferred.
+    const card = $("licenseCard");
+    if (card) card.hidden = true;
+    const badge = $("licenseBadge");
+    if (badge) badge.hidden = true;
+  }
   refreshLock();
   refreshCredsBackend();
   // Auto-run preflight on load so startup state (banner + Start gating) is set.

@@ -249,8 +249,8 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
                 <h1 className="text-3xl font-bold text-gray-900">Viewer</h1>
                 <p className="text-gray-600">
                   {eegEnabled
-                    ? 'Signal View (time series), Imaging View (Niivue), or Multimodal View (combined)'
-                    : 'Imaging View (Niivue)'}
+                    ? 'Signal View (time series), Imaging View, or Multimodal View (combined)'
+                    : 'Imaging View'}
                 </p>
               </div>
             </div>
