@@ -10,6 +10,7 @@
  * Isolated and additive: it does not modify the core backend/frontend code or
  * the ./research workflows.
  */
+const fs = require("fs");
 const path = require("path");
 const { app, BrowserWindow, Menu, ipcMain, shell, dialog } = require("electron");
 
@@ -79,9 +80,18 @@ function isAllowedAppUrl(url) {
 }
 
 function createWindow({ show = true } = {}) {
+  // Restore the last window size/position (native-app behavior).
+  let saved = {};
+  try {
+    saved = desktopState.readSettings().windowBounds || {};
+  } catch (_e) {
+    saved = {};
+  }
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 800,
+    width: saved.width || 1100,
+    height: saved.height || 800,
+    x: typeof saved.x === "number" ? saved.x : undefined,
+    y: typeof saved.y === "number" ? saved.y : undefined,
     minWidth: 880,
     minHeight: 600,
     title: "NeuroInsight Research",
@@ -95,6 +105,18 @@ function createWindow({ show = true } = {}) {
       webSecurity: true,
     },
   });
+  if (saved.maximized) mainWindow.maximize();
+
+  const saveBounds = () => {
+    try {
+      if (!mainWindow) return;
+      const b = mainWindow.getNormalBounds();
+      desktopState.updateSettings({ windowBounds: { ...b, maximized: mainWindow.isMaximized() } });
+    } catch (_e) {
+      // non-fatal
+    }
+  };
+  mainWindow.on("close", saveBounds);
 
   // Security: keep in-window navigation on trusted local origins; send anything
   // else (external links) to the OS browser instead of loading it in-app.
@@ -206,6 +228,64 @@ function injectStatusBar() {
 }
 
 // --------------------------------------------------------------------------
+// Native "Open Data" — load a local volume into the workspace viewer via a
+// native file dialog / menu (and remember recents).
+// --------------------------------------------------------------------------
+function getRecentVolumes() {
+  try {
+    const r = desktopState.readSettings().recentVolumes;
+    return Array.isArray(r) ? r : [];
+  } catch (_e) {
+    return [];
+  }
+}
+
+function recordRecentVolume(filePath) {
+  try {
+    const name = path.basename(filePath);
+    const recents = getRecentVolumes().filter((r) => r.path !== filePath);
+    desktopState.updateSettings({ recentVolumes: [{ path: filePath, name }, ...recents].slice(0, 8) });
+    buildAppMenu();
+  } catch (_e) {
+    // non-fatal
+  }
+}
+
+function openVolumeFromPath(filePath) {
+  if (!mainWindow) return { ok: false, error: "No window." };
+  if (isOnControlCenter()) {
+    dialog.showMessageBox(mainWindow, { type: "info", message: "Open the workspace first, then load data." });
+    return { ok: false, error: "not on workspace" };
+  }
+  let data;
+  try {
+    data = fs.readFileSync(filePath);
+  } catch (e) {
+    dialog.showMessageBox(mainWindow, { type: "error", message: `Could not read file: ${e.message}` });
+    return { ok: false, error: String(e) };
+  }
+  // Send raw bytes; the renderer rebuilds a File and opens it in the Viewer.
+  mainWindow.webContents.send("nir:openVolume", { name: path.basename(filePath), data });
+  recordRecentVolume(filePath);
+  return { ok: true };
+}
+
+async function openDataDialog() {
+  if (!mainWindow) return;
+  if (isOnControlCenter()) {
+    dialog.showMessageBox(mainWindow, { type: "info", message: "Open the workspace first, then load data." });
+    return;
+  }
+  const res = await dialog.showOpenDialog(mainWindow, {
+    title: "Open imaging volume",
+    properties: ["openFile"],
+    filters: [{ name: "Imaging", extensions: ["nii", "gz", "mgz", "mgh"] }],
+  });
+  if (res.canceled || !res.filePaths[0]) return;
+  openVolumeFromPath(res.filePaths[0]);
+}
+
+// --------------------------------------------------------------------------
 // Native application menu — always-available navigation + backend controls.
 // This is the supported way back to the control center after opening the NIR UI.
 // --------------------------------------------------------------------------
@@ -217,8 +297,8 @@ function buildAppMenu() {
     label: "NeuroInsight",
     submenu: [
       {
-        label: "Control Center",
-        accelerator: "CmdOrCtrl+Shift+C",
+        label: "Settings (Control Center)",
+        accelerator: "CmdOrCtrl+,",
         enabled: !onControl,
         click: () => navigateToControl(),
       },
@@ -238,6 +318,32 @@ function buildAppMenu() {
       { type: "separator" },
       ...(isMac ? [{ role: "hide" }, { role: "hideOthers" }, { type: "separator" }] : []),
       { role: "quit" },
+    ],
+  };
+
+  // File menu: native Open Data + Open Recent (reopen by path).
+  const recents = getRecentVolumes();
+  const fileMenu = {
+    label: "File",
+    submenu: [
+      { label: "Open Data…", accelerator: "CmdOrCtrl+O", click: () => openDataDialog() },
+      {
+        label: "Open Recent",
+        submenu: recents.length
+          ? recents
+              .map((r) => ({ label: r.name, click: () => openVolumeFromPath(r.path) }))
+              .concat([
+                { type: "separator" },
+                {
+                  label: "Clear Recent",
+                  click: () => {
+                    desktopState.updateSettings({ recentVolumes: [] });
+                    buildAppMenu();
+                  },
+                },
+              ])
+          : [{ label: "No recent files", enabled: false }],
+      },
     ],
   };
 
@@ -282,7 +388,7 @@ function buildAppMenu() {
     ],
   };
 
-  Menu.setApplicationMenu(Menu.buildFromTemplate([appMenu, { role: "editMenu" }, viewMenu, helpMenu]));
+  Menu.setApplicationMenu(Menu.buildFromTemplate([appMenu, fileMenu, { role: "editMenu" }, viewMenu, helpMenu]));
 }
 
 // --------------------------------------------------------------------------
@@ -334,6 +440,9 @@ function registerIpc() {
 
   // Return to the control center
   ipcMain.handle("ui:control", wrap(() => navigateToControl()));
+
+  // Native open-data dialog (also available via File > Open Data… / Cmd+O)
+  ipcMain.handle("data:openDialog", wrap(() => openDataDialog()));
 
   // Open a URL in the OS browser (http/https only — never file:// or custom schemes)
   ipcMain.handle(

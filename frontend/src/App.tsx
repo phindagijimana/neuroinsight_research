@@ -192,7 +192,7 @@
  * REACT: 18.2+ (concurrent features)
  */
 
-import { useState, lazy, Suspense, type DragEvent } from 'react';
+import { useState, useEffect, lazy, Suspense, type DragEvent } from 'react';
 import Navigation from './components/Navigation';
 import {
   clearViewerQueryParam,
@@ -263,6 +263,27 @@ function App() {
   const handleDragLeave = (e: DragEvent) => {
     if (!e.relatedTarget) setIsDragging(false); // left the window
   };
+
+  // Desktop shell: native "Open Data" (File > Open Data… / Cmd+O) pushes volume
+  // bytes here; rebuild a File and open it in the Viewer.
+  useEffect(() => {
+    const desktop = (window as unknown as { nir?: { onOpenVolume?: (cb: (p: { name: string; data: ArrayBuffer | Uint8Array }) => void) => () => void } }).nir;
+    if (!desktop?.onOpenVolume) return;
+    const off = desktop.onOpenVolume(({ name, data }) => {
+      try {
+        const buf: ArrayBuffer =
+          data instanceof Uint8Array
+            ? (data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer)
+            : data;
+        openLocalVolume(new File([buf], name));
+      } catch {
+        /* ignore malformed payloads */
+      }
+    });
+    return off;
+    // openLocalVolume only uses setState (stable); subscribe once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div

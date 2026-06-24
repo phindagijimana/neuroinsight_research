@@ -152,4 +152,20 @@ test.describe("smooth launch (default flow)", () => {
     await expect(page.getByText(/Viewing local file/i)).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(/sample\.nii\.gz/)).toBeVisible();
   });
+
+  test("native Open Data bridge: main pushes a volume -> Viewer", async () => {
+    const sample = process.env.NIR_E2E_SAMPLE;
+    test.skip(!sample, "set NIR_E2E_SAMPLE to a .nii.gz path");
+    // Simulate the native File > Open Data… by pushing bytes from the MAIN process
+    // (the OS file dialog itself can't be automated). Exercises the full bridge:
+    // main -> preload onOpenVolume -> App -> Viewer. Bytes are read here (Node)
+    // since require() isn't available inside app.evaluate.
+    const bytes = Array.from(fs.readFileSync(sample));
+    await app.evaluate(({ BrowserWindow }, payload) => {
+      const data = new Uint8Array(payload.arr);
+      const win = BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().startsWith("file:"));
+      win.webContents.send("nir:openVolume", { name: payload.name, data });
+    }, { arr: bytes, name: "native-open.nii.gz" });
+    await expect(page.getByText(/native-open\.nii\.gz/)).toBeVisible({ timeout: 20_000 });
+  });
 });
