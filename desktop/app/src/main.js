@@ -34,6 +34,23 @@ function initModules() {
   const paths = desktopState.getPaths();
   stateDir = paths.stateDir;
 
+  // Runtime mode: packaged builds default to the self-contained container (user
+  // needs only Docker); dev defaults to the local process (venv). An explicit
+  // NIR_RUNTIME or a saved setting always wins.
+  if (!process.env.NIR_RUNTIME) {
+    let saved = "";
+    try {
+      saved = desktopState.readSettings().runtimeMode || "";
+    } catch (_e) {
+      saved = "";
+    }
+    process.env.NIR_RUNTIME = saved || (app.isPackaged ? "container" : "process");
+  }
+  // In container mode, a packaged build pulls the versioned GHCR image by default.
+  if (process.env.NIR_RUNTIME === "container" && !process.env.NIR_IMAGE && app.isPackaged) {
+    process.env.NIR_IMAGE = `ghcr.io/phindagijimana/nir-allinone:v${app.getVersion()}`;
+  }
+
   backendManager.init({ stateDir });
   licenseManager.initLicenseManager(stateDir);
   credentialStore.initCredentialStore(stateDir);
@@ -597,10 +614,24 @@ async function runStartupSequence() {
   }
   if (!report.ready) {
     desktopState.appendLog("startup_blocked", { blockers: report.blockers });
+    // First-run guidance: in container mode the blocker is almost always Docker.
+    const dockerMissing = (report.checks && report.checks.docker && !report.checks.docker.ok) || false;
+    if (process.env.NIR_RUNTIME === "container" && dockerMissing && mainWindow) {
+      const choice = dialog.showMessageBoxSync(mainWindow, {
+        type: "warning",
+        message: "Docker is required",
+        detail: "NeuroInsight runs its engine in Docker. Install/start Docker Desktop, then reopen the app.",
+        buttons: ["Get Docker", "Open Control Center"],
+        defaultId: 0,
+        cancelId: 1,
+      });
+      if (choice === 0) shell.openExternal("https://www.docker.com/products/docker-desktop/");
+    }
     return revealControlCenter((report.blockers && report.blockers[0]) || "Environment not ready.");
   }
 
-  setSplashStatus("Starting engine…");
+  // The container engine may pull a multi-GB image on first run.
+  setSplashStatus(process.env.NIR_RUNTIME === "container" ? "Starting engine (first run may download)…" : "Starting engine…");
   const start = await backendManager.start();
   desktopState.appendLog("backend_autostart", { ok: start.ok });
   if (!start.ok) {
