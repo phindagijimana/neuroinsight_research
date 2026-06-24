@@ -24,19 +24,20 @@
 
     <div id="startupBanner" class="banner banner-muted">Running startup checks…</div>
 
+    <!-- Essentials: what a user needs to get into the workspace or fix a blocker. -->
     <main class="grid">
-      <!-- Backend -->
+      <!-- Engine -->
       <section class="card">
-        <h2>Backend</h2>
+        <h2>Engine</h2>
         <div class="statusline">
           <span id="backendDot" class="dot dot-off"></span>
           <span id="backendStatus">Unknown</span>
         </div>
         <p id="backendMeta" class="meta"></p>
         <div class="actions">
-          <button id="btnStart" class="primary">Start backend</button>
-          <button id="btnStop">Stop backend</button>
           <button id="btnOpenUI" class="primary" disabled>Open Workspace</button>
+          <button id="btnStart" class="primary">Start engine</button>
+          <button id="btnStop">Stop engine</button>
           <button id="btnRefresh">Refresh</button>
         </div>
       </section>
@@ -50,65 +51,71 @@
         </div>
         <ul id="preflightList" class="checks"></ul>
       </section>
-
-      <!-- License (deferred for this version — hidden via LICENSE_ENABLED) -->
-      <section class="card" id="licenseCard">
-        <h2>License</h2>
-        <p id="licenseMode" class="meta">Mode: …</p>
-        <p id="licenseDetail" class="meta">No license imported.</p>
-        <div id="licenseWarn" class="inlinewarn" hidden></div>
-        <div class="actions">
-          <button id="btnImportLicense">Import license file…</button>
-          <button id="btnImportLicenseText">Paste token…</button>
-        </div>
-      </section>
-
-      <!-- Credential vault -->
-      <section class="card">
-        <h2>Credential Vault</h2>
-        <p id="credsBackend" class="meta">Backend: …</p>
-        <div class="field-row">
-          <input id="credKey" type="text" placeholder="namespaced.key (e.g. pennsieve.api_key)" />
-          <input id="credValue" type="password" placeholder="secret value" />
-        </div>
-        <div class="actions">
-          <button id="btnCredSet">Save</button>
-          <button id="btnCredGet">Retrieve</button>
-          <button id="btnCredDelete">Delete</button>
-        </div>
-        <p id="credsDetail" class="meta"></p>
-      </section>
-
-      <!-- Security / App lock -->
-      <section class="card">
-        <h2>App Lock</h2>
-        <p id="lockDetail" class="meta">Loading…</p>
-        <div class="actions row">
-          <input id="pinInput" type="password" placeholder="PIN (min 6)" />
-          <button id="btnLockEnable">Enable</button>
-          <button id="btnLockUnlock">Unlock</button>
-          <button id="btnLockNow">Lock now</button>
-          <button id="btnLockDisable">Disable</button>
-        </div>
-      </section>
-
-      <!-- Diagnostics -->
-      <section class="card">
-        <h2>Diagnostics</h2>
-        <p class="meta">Export a support bundle (status, checks, logs).</p>
-        <div class="actions">
-          <button id="btnDiagnostics">Export bundle</button>
-          <button id="btnRevealBundle" disabled>Show in folder</button>
-        </div>
-        <p id="diagnosticsDetail" class="meta"></p>
-      </section>
-
-      <!-- Runtime info -->
-      <section class="card">
-        <h2>Runtime</h2>
-        <dl id="runtimeRows" class="rows"></dl>
-      </section>
     </main>
+
+    <!-- Advanced: power-user / support tools, collapsed by default. -->
+    <details class="advanced">
+      <summary>Advanced</summary>
+      <div class="grid">
+        <!-- License (deferred for this version — hidden via LICENSE_ENABLED) -->
+        <section class="card" id="licenseCard">
+          <h2>License</h2>
+          <p id="licenseMode" class="meta">Mode: …</p>
+          <p id="licenseDetail" class="meta">No license imported.</p>
+          <div id="licenseWarn" class="inlinewarn" hidden></div>
+          <div class="actions">
+            <button id="btnImportLicense">Import license file…</button>
+            <button id="btnImportLicenseText">Paste token…</button>
+          </div>
+        </section>
+
+        <!-- Credential vault -->
+        <section class="card">
+          <h2>Credential Vault</h2>
+          <p id="credsBackend" class="meta">Backend: …</p>
+          <div class="field-row">
+            <input id="credKey" type="text" placeholder="namespaced.key (e.g. pennsieve.api_key)" />
+            <input id="credValue" type="password" placeholder="secret value" />
+          </div>
+          <div class="actions">
+            <button id="btnCredSet">Save</button>
+            <button id="btnCredGet">Retrieve</button>
+            <button id="btnCredDelete">Delete</button>
+          </div>
+          <p id="credsDetail" class="meta"></p>
+        </section>
+
+        <!-- Security / App lock -->
+        <section class="card">
+          <h2>App Lock</h2>
+          <p id="lockDetail" class="meta">Loading…</p>
+          <div class="actions row">
+            <input id="pinInput" type="password" placeholder="PIN (min 6)" />
+            <button id="btnLockEnable">Enable</button>
+            <button id="btnLockUnlock">Unlock</button>
+            <button id="btnLockNow">Lock now</button>
+            <button id="btnLockDisable">Disable</button>
+          </div>
+        </section>
+
+        <!-- Diagnostics -->
+        <section class="card">
+          <h2>Diagnostics</h2>
+          <p class="meta">Export a support bundle (status, checks, logs).</p>
+          <div class="actions">
+            <button id="btnDiagnostics">Export bundle</button>
+            <button id="btnRevealBundle" disabled>Show in folder</button>
+          </div>
+          <p id="diagnosticsDetail" class="meta"></p>
+        </section>
+
+        <!-- Runtime info -->
+        <section class="card">
+          <h2>Runtime</h2>
+          <dl id="runtimeRows" class="rows"></dl>
+        </section>
+      </div>
+    </details>
 
     <div id="toast" class="toast"></div>
     <script src="renderer.js"></script>

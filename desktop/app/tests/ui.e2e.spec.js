@@ -55,6 +55,14 @@ test.describe("control center", () => {
   test.beforeAll(async () => {
     app = await launch({ NIR_START_IN_CONTROL: "1" });
     page = await pageWithSelector(app, "#btnPreflight");
+    // Advanced tools (credentials, app lock, diagnostics) live in a collapsed
+    // <details> — expand it so those cards are interactable.
+    await page
+      .locator("details.advanced")
+      .evaluate((d) => {
+        d.open = true;
+      })
+      .catch(() => {});
   });
   test.afterAll(async () => {
     if (app) await app.close();
