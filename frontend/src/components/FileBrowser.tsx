@@ -110,6 +110,8 @@ interface TreeNode {
   size?: string;
   children?: TreeNode[];
   isImage?: boolean;
+  isEeg?: boolean;
+  viewInViewer?: boolean;
   fileType?: string;
 }
 
@@ -219,7 +221,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
       try {
         const data = await apiService.getJobFiles(jobId);
         if (!cancelled) {
-          setTree(buildTree(data.files));
+          setTree(buildTree(data.files, viewerFileMode));
           setTotalFiles(data.total);
         }
       } catch (err: any) {

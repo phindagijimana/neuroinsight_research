@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Zap, GitBranch, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Zap, GitBranch } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import type { Pipeline } from '../types';
@@ -400,12 +400,6 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   // Live data from API (or fallback to mock)
   const [livePlugins, setLivePlugins] = useState<Plugin[]>([]);
   const [liveWorkflows, setLiveWorkflows] = useState<Workflow[]>([]);
-  const [licenseStatus, setLicenseStatus] = useState<{
-    freesurfer: { found: boolean; path: string | null; registration_url: string };
-    meld_graph: { found: boolean; path: string | null; registration_url: string };
-    hint: string;
-  } | null>(null);
-
   // Decide which data source to use. When EEG is disabled, drop EEG/multimodal
   // categories so the offline (mock) catalog matches the imaging-only backend.
   const categoryAllowed = (c: PipelineCategory) => eegEnabled || !EEG_CATEGORIES.includes(c);

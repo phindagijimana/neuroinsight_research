@@ -557,7 +557,7 @@ const EegViewerPanel: React.FC<EegViewerPanelProps> = ({
                       ? { backgroundColor: '#2d2d2d', border: '1px solid #555', color: '#eee' }
                       : undefined
                   }
-                  formatter={(value: number, name: string) => {
+                  formatter={(value: any, name: any) => {
                     const rawV = typeof value === 'number' ? value : Number(value);
                     const ci = chartPayload.chNames.indexOf(String(name));
                     const baseline = ci >= 0 ? ci * chartPayload.spacing : 0;
