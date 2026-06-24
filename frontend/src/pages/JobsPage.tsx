@@ -18,8 +18,11 @@ import Trash2 from '../components/icons/Trash2';
 import Eye from '../components/icons/Eye';
 import JobProgressBar from '../components/JobProgressBar';
 import SlurmQueueMonitor from '../components/SlurmQueueMonitor';
+import StatusBadge from '../components/StatusBadge';
+import { LoadingState } from '../components/LoadingState';
 import type { ViewerTab } from '../utils/viewerQuery';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
+import { useToast, useConfirm } from '../contexts/NotificationContext';
 
 const SAMPLE_VIEWER_TABS: ViewerTab[] = ['eeg', 'imaging', 'eeg-brain'];
 
@@ -30,6 +33,8 @@ interface JobsPageProps {
 
 const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) => {
   const { eegEnabled } = useFeatureFlags();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [jobsLoading, setJobsLoading] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
@@ -154,18 +159,23 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
 
     if (deletingJobs.has(jobId)) return;
 
-    if (!confirm('Delete this job? This action cannot be undone.')) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Delete job',
+      message: 'Delete this job? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
 
     setDeletingJobs((prev) => new Set(prev).add(jobId));
 
     try {
       await apiService.deleteJob(jobId);
+      toast.success('Job deleted.');
       fetchJobs();
     } catch (error) {
       console.error('Failed to delete job:', error);
-      alert('Failed to delete job.');
+      toast.error('Could not delete the job. Please try again.');
     } finally {
       setDeletingJobs((prev) => {
         const newSet = new Set(prev);
@@ -217,23 +227,6 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
         return <XCircle className="w-5 h-5 text-red-600" />;
       default:
         return <Clock className="w-5 h-5 text-navy-300" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'text-green-600 bg-green-100';
-      case 'running':
-        return 'text-[#003d7a] bg-navy-100';
-      case 'failed':
-        return 'text-red-600 bg-red-100';
-      case 'pending':
-        return 'text-navy-600 bg-navy-50';
-      case 'cancelled':
-        return 'text-navy-400 bg-navy-50';
-      default:
-        return 'text-navy-400 bg-navy-50';
     }
   };
 
@@ -322,10 +315,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
           </div>
 
           {jobsLoading ? (
-            <div className="px-4 sm:px-6 py-12 text-center">
-              <div className="animate-spin h-8 w-8 border-4 border-[#003d7a] border-t-transparent rounded-full mx-auto"></div>
-              <p className="text-navy-500 mt-4">Loading jobs...</p>
-            </div>
+            <LoadingState message="Loading jobs…" />
           ) : jobs.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -356,13 +346,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                             <span className="text-xs px-2 py-0.5 rounded bg-navy-50 text-[#003d7a] border border-navy-200">
                               {job.execution_mode === 'workflow' ? 'Workflow' : 'Plugin'}
                             </span>
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                                job.status
-                              )}`}
-                            >
-                              {job.status}
-                            </span>
+                            <StatusBadge status={job.status} />
                           </div>
                           <div className="mt-1 flex items-center gap-4 text-xs text-gray-500">
                             <span>ID: {job.id.slice(0, 8)}</span>

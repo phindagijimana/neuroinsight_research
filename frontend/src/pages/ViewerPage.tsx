@@ -13,7 +13,6 @@ import EegBrainFusionPanel from '../components/EegBrainFusionPanel';
 import JobSelector from '../components/JobSelector';
 import FileBrowser, { type ViewerFileMode } from '../components/FileBrowser';
 import Eye from '../components/icons/Eye';
-import Activity from '../components/icons/Activity';
 import Download from '../components/icons/Download';
 import RefreshCw from '../components/icons/RefreshCw';
 import Brain from '../components/icons/Brain';
@@ -27,6 +26,7 @@ import {
   parseViewerTabFromSearch,
   setViewerQueryParam,
 } from '../utils/viewerQuery';
+import { LoadingState } from '../components/LoadingState';
 
 export type { ViewerTab } from '../utils/viewerQuery';
 
@@ -339,9 +339,8 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
         )}
 
         {loading && (
-          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-            <Activity className="w-6 h-6 text-[#003d7a] animate-spin mx-auto mb-3" />
-            <span className="text-gray-600">Loading...</span>
+          <div className="bg-white rounded-lg border border-gray-200">
+            <LoadingState message="Loading…" />
           </div>
         )}
 
