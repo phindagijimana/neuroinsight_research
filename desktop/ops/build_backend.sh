@@ -39,7 +39,11 @@ echo "    python: $PY"
   --add-data "$ROOT_DIR/workflows:workflows" \
   --add-data "$ROOT_DIR/alembic:alembic" \
   --add-data "$ROOT_DIR/alembic.ini:." \
+  --add-data "$ROOT_DIR/frontend/dist:frontend/dist" \
   "$ROOT_DIR/desktop/backend_launcher.py"
+
+# Note: frontend/dist must be built first (npm run build in frontend/) so the
+# self-contained backend can serve the SPA.
 
 echo "==> Done: $DIST/nir-backend/nir-backend"
 echo "    Smoke test:  $DIST/nir-backend/nir-backend --host 127.0.0.1 --port 3055"

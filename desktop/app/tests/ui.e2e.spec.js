@@ -1,12 +1,12 @@
 /**
  * NIR Desktop — Electron UI end-to-end tests (Playwright).
  *
- * Drives the REAL renderer (clicks actual buttons, asserts the DOM), replacing
- * the manual click-through of the control center.
+ * Drives the REAL renderer (clicks actual buttons, asserts the DOM).
  *
- * - The "control center" suite needs no backend and runs anywhere (incl. CI).
- * - The "backend lifecycle" suite starts the real backend and opens the NIR UI;
- *   it requires the repo venv, so it is gated on NIR_E2E_BACKEND=1.
+ * - "control center" suite forces the control center (NIR_START_IN_CONTROL=1) and
+ *   needs no backend — runs anywhere (incl. CI).
+ * - "smooth launch" suite exercises the default flow (splash -> auto-start ->
+ *   land in the NIR workspace) and is gated on NIR_E2E_BACKEND (needs the venv).
  */
 const path = require("path");
 const os = require("os");
@@ -16,34 +16,50 @@ const { test, expect, _electron: electron } = require("@playwright/test");
 const APP_DIR = path.resolve(__dirname, "..");
 const REPO_ROOT = path.resolve(APP_DIR, "..", "..");
 
-let app;
-let page;
-let userDataDir;
+function baseEnv(extra) {
+  const env = { ...process.env, NIR_REPO_DIR: REPO_ROOT };
+  delete env.ELECTRON_RUN_AS_NODE; // sandbox sets this; it breaks the GUI launch
+  return Object.assign(env, extra || {});
+}
 
-test.beforeAll(async () => {
-  // Clean env: the sandbox may set ELECTRON_RUN_AS_NODE=1, which turns Electron
-  // into plain Node and breaks the GUI launch.
-  const env = { ...process.env };
-  delete env.ELECTRON_RUN_AS_NODE;
-  env.NIR_REPO_DIR = REPO_ROOT;
-
-  // Isolate app state per run.
-  userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "nir-ui-"));
-
-  app = await electron.launch({
+async function launch(extraEnv) {
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "nir-ui-"));
+  const app = await electron.launch({
     args: [APP_DIR, `--user-data-dir=${userDataDir}`],
     cwd: APP_DIR,
-    env,
+    env: baseEnv(extraEnv),
   });
-  page = await app.firstWindow();
-  await page.waitForLoadState("domcontentloaded");
-});
+  return app;
+}
 
-test.afterAll(async () => {
-  if (app) await app.close();
-});
+/** Wait for the window that contains a given selector (skips the splash window). */
+async function pageWithSelector(app, selector, timeoutMs = 30000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    for (const w of app.windows()) {
+      try {
+        if (await w.$(selector)) return w;
+      } catch (_e) {
+        // window may be navigating
+      }
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error(`No window with selector ${selector} appeared`);
+}
 
 test.describe("control center", () => {
+  let app;
+  let page;
+
+  test.beforeAll(async () => {
+    app = await launch({ NIR_START_IN_CONTROL: "1" });
+    page = await pageWithSelector(app, "#btnPreflight");
+  });
+  test.afterAll(async () => {
+    if (app) await app.close();
+  });
+
   test("loads the control center shell", async () => {
     await expect(page.locator("h1")).toContainText("NeuroInsight Research");
     await expect(page.locator("#startupBanner")).toBeVisible();
@@ -52,7 +68,6 @@ test.describe("control center", () => {
   test("preflight runs and populates checks + banner", async () => {
     await page.locator("#btnPreflight").click();
     await expect(page.locator("#preflightList li")).not.toHaveCount(0);
-    // banner leaves the muted "running checks" state
     await expect(page.locator("#startupBanner")).not.toHaveClass(/banner-muted/);
   });
 
@@ -61,10 +76,8 @@ test.describe("control center", () => {
     await page.locator("#credValue").fill("ui-test-secret-123");
     await page.locator("#btnCredSet").click();
     await expect(page.locator("#credsDetail")).toContainText("Saved");
-
     await page.locator("#btnCredGet").click();
     await expect(page.locator("#credsDetail")).toContainText("is set");
-
     await page.locator("#btnCredDelete").click();
     await expect(page.locator("#credsDetail")).toContainText("Deleted");
   });
@@ -80,18 +93,14 @@ test.describe("control center", () => {
     await page.locator("#pinInput").fill("pilot-pin-123");
     await page.locator("#btnLockEnable").click();
     await expect(page.locator("#lockDetail")).toContainText("Enabled");
-
     await page.locator("#btnLockNow").click();
     await expect(page.locator("#lockDetail")).toContainText("LOCKED");
-
     await page.locator("#pinInput").fill("wrong");
     await page.locator("#btnLockUnlock").click();
     await expect(page.locator("#lockDetail")).toContainText("LOCKED");
-
     await page.locator("#pinInput").fill("pilot-pin-123");
     await page.locator("#btnLockUnlock").click();
     await expect(page.locator("#lockDetail")).toContainText("unlocked");
-
     await page.locator("#pinInput").fill("pilot-pin-123");
     await page.locator("#btnLockDisable").click();
   });
@@ -101,20 +110,33 @@ test.describe("control center", () => {
     await expect(page.locator("#diagnosticsDetail")).toContainText("Saved:");
     await expect(page.locator("#btnRevealBundle")).toBeEnabled();
   });
-});
 
-test.describe("backend lifecycle", () => {
-  test.skip(process.env.NIR_E2E_BACKEND !== "1", "set NIR_E2E_BACKEND=1 (needs repo venv) to run");
-
-  test("start backend, become healthy, open the NIR UI", async () => {
+  test("manual: start backend, become healthy, open the NIR UI", async () => {
+    test.skip(process.env.NIR_E2E_BACKEND !== "1", "set NIR_E2E_BACKEND=1 (needs repo venv)");
     await page.locator("#btnStart").click();
-    // Backend boot + health poll can take a while.
     await expect(page.locator("#backendStatus")).toContainText("Running (healthy)", { timeout: 90_000 });
     await expect(page.locator("#btnOpenUI")).toBeEnabled();
-
     await page.locator("#btnOpenUI").click();
-    // The same window navigates to the live NIR SPA on the backend port.
     await page.waitForURL(/127\.0\.0\.1:\d+|localhost:\d+/, { timeout: 30_000 });
-    expect(page.url()).toMatch(/:\d+\/?$/);
+    // the persistent status bar is injected into the workspace
+    await expect(page.locator("#nir-desktop-statusbar")).toBeVisible({ timeout: 15_000 });
+  });
+});
+
+test.describe("smooth launch (default flow)", () => {
+  test.skip(process.env.NIR_E2E_BACKEND !== "1", "set NIR_E2E_BACKEND=1 (needs repo venv)");
+  let app;
+
+  test.afterAll(async () => {
+    if (app) await app.close();
+  });
+
+  test("splash -> auto-start backend -> lands directly in the NIR workspace", async () => {
+    app = await launch(); // no NIR_START_IN_CONTROL: exercise the real launch
+    // The workspace page is the one carrying the injected status bar.
+    const page = await pageWithSelector(app, "#nir-desktop-statusbar", 120_000);
+    await expect(page.locator("#nir-desktop-statusbar")).toBeVisible();
+    await expect(page.locator("#nir-engine")).toContainText(/healthy|starting/);
+    expect(page.url()).toMatch(/127\.0\.0\.1:\d+|localhost:\d+/);
   });
 });

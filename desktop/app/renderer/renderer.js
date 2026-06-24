@@ -333,7 +333,17 @@ function init() {
   refreshLock();
   refreshCredsBackend();
   // Auto-run preflight on load so startup state (banner + Start gating) is set.
-  runPreflight(true);
+  // If we landed here because auto-launch couldn't reach the workspace, surface
+  // why — after preflight renders, so the notice wins the banner.
+  const notice = new URLSearchParams(window.location.search).get("notice");
+  runPreflight(true).then(() => {
+    if (notice) {
+      const banner = $("startupBanner");
+      banner.textContent = `Couldn't open the workspace automatically: ${notice} — fix below, then “Open NIR UI”.`;
+      banner.className = "banner banner-bad";
+      toast(notice);
+    }
+  });
 }
 
 document.addEventListener("DOMContentLoaded", init);

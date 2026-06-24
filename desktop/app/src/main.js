@@ -24,6 +24,7 @@ const platformAdapter = require("./platformAdapter");
 const updater = require("./updater");
 
 let mainWindow = null;
+let splashWindow = null;
 let stateDir = null;
 
 function initModules() {
@@ -77,7 +78,7 @@ function isAllowedAppUrl(url) {
   }
 }
 
-function createWindow() {
+function createWindow({ show = true } = {}) {
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 800,
@@ -85,6 +86,7 @@ function createWindow() {
     minHeight: 600,
     title: "NeuroInsight Research",
     backgroundColor: "#0b1f3a",
+    show,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -154,28 +156,53 @@ async function navigateToNIR() {
     await mainWindow.loadURL(status.backend.url);
     desktopState.updateSettings({ lastMode: "nir", lastKnownPort: status.backend.port });
     buildAppMenu();
-    // Inject an always-visible affordance back to the control center. The
-    // preload runs on this page too, so window.nir.ui.control() is available.
-    await mainWindow.webContents
-      .executeJavaScript(
-        `(function () {
-          if (document.getElementById('nir-desktop-back')) return;
-          var b = document.createElement('button');
-          b.id = 'nir-desktop-back';
-          b.textContent = '\\u2039 Control Center';
-          b.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483647;' +
-            'background:#003d7a;color:#fff;border:none;border-radius:999px;padding:10px 16px;' +
-            'font:600 12px -apple-system,BlinkMacSystemFont,sans-serif;cursor:pointer;' +
-            'box-shadow:0 3px 10px rgba(0,0,0,.3)';
-          b.onmouseenter = function () { b.style.background = '#002b55'; };
-          b.onmouseleave = function () { b.style.background = '#003d7a'; };
-          b.onclick = function () { if (window.nir && window.nir.ui) window.nir.ui.control(); };
-          document.body.appendChild(b);
-        })();`
-      )
-      .catch(() => {});
+    injectStatusBar();
   }
   return { ok: true, url: status.backend.url };
+}
+
+/** Inject a persistent bottom status bar into the NIR workspace page: an engine
+ *  health dot (polled) and a gear button back to the control center (Settings).
+ *  The preload runs on this page too, so window.nir.* is available. */
+function injectStatusBar() {
+  if (!mainWindow) return;
+  mainWindow.webContents
+    .executeJavaScript(
+      `(function () {
+        if (document.getElementById('nir-desktop-statusbar')) return;
+        var bar = document.createElement('div');
+        bar.id = 'nir-desktop-statusbar';
+        bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;height:30px;z-index:2147483647;' +
+          'display:flex;align-items:center;justify-content:space-between;padding:0 12px;' +
+          'background:#0b1f3a;color:#cdd9ea;font:600 11px -apple-system,BlinkMacSystemFont,sans-serif;' +
+          'box-shadow:0 -1px 4px rgba(0,0,0,.25)';
+        bar.innerHTML =
+          '<span style="display:flex;align-items:center;gap:7px">' +
+            '<span id="nir-dot" style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block"></span>' +
+            '<span id="nir-engine">Engine: healthy</span></span>' +
+          '<button id="nir-settings" style="background:transparent;color:#cdd9ea;border:1px solid rgba(255,255,255,.25);' +
+            'border-radius:6px;padding:3px 10px;font:inherit;cursor:pointer">\\u2699 Control Center</button>';
+        document.body.appendChild(bar);
+        document.body.style.paddingBottom = '34px';
+        document.getElementById('nir-settings').onclick = function () {
+          if (window.nir && window.nir.ui) window.nir.ui.control();
+        };
+        function refresh() {
+          if (!window.nir || !window.nir.backend) return;
+          window.nir.backend.status().then(function (s) {
+            var dot = document.getElementById('nir-dot');
+            var eng = document.getElementById('nir-engine');
+            if (!dot || !eng) return;
+            if (s.backend && s.backend.healthy) { dot.style.background = '#16a34a'; eng.textContent = 'Engine: healthy'; }
+            else if (s.backend && s.backend.running) { dot.style.background = '#d97706'; eng.textContent = 'Engine: starting'; }
+            else { dot.style.background = '#9ca3af'; eng.textContent = 'Engine: stopped'; }
+          }).catch(function () {});
+        }
+        refresh();
+        setInterval(refresh, 5000);
+      })();`
+    )
+    .catch(() => {});
 }
 
 // --------------------------------------------------------------------------
@@ -385,13 +412,108 @@ function registerIpc() {
 }
 
 // --------------------------------------------------------------------------
+// Smooth launch: splash -> silent preflight + backend auto-start -> workspace.
+// The control center is the fallback/Settings view, shown only if something
+// needs attention (or if the user opts to start there).
+// --------------------------------------------------------------------------
+function createSplash() {
+  splashWindow = new BrowserWindow({
+    width: 460,
+    height: 300,
+    frame: false,
+    resizable: false,
+    center: true,
+    backgroundColor: "#0b1f3a",
+    alwaysOnTop: true,
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
+  });
+  splashWindow.loadFile(path.join(__dirname, "..", "renderer", "splash.html"));
+  splashWindow.on("closed", () => {
+    splashWindow = null;
+  });
+}
+
+function setSplashStatus(text) {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.webContents
+      .executeJavaScript(`window.setStatus && window.setStatus(${JSON.stringify(text)});`)
+      .catch(() => {});
+  }
+}
+
+function closeSplash() {
+  if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
+  splashWindow = null;
+}
+
+function showMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+  closeSplash();
+}
+
+/** Fall back to the control center (Settings) and surface an optional reason. */
+async function revealControlCenter(reason) {
+  if (mainWindow) {
+    await mainWindow.loadFile(controlCenterPath(), {
+      search: reason ? "notice=" + encodeURIComponent(String(reason)) : "",
+    });
+    buildAppMenu();
+  }
+  showMainWindow();
+}
+
+async function runStartupSequence() {
+  let settings = {};
+  try {
+    settings = desktopState.readSettings();
+  } catch (_e) {
+    // defaults
+  }
+  // Power users (and tests) can choose to land in the control center.
+  if (settings.startInControlCenter === true || process.env.NIR_START_IN_CONTROL === "1") {
+    return revealControlCenter();
+  }
+
+  setSplashStatus("Running checks…");
+  let report;
+  try {
+    report = await preflight.runPreflight();
+    desktopState.updateSettings({ lastPreflightAt: report.generatedAt, lastPreflightReady: report.ready });
+  } catch (e) {
+    desktopState.appendLog("startup_preflight_error", { error: String(e) });
+    return revealControlCenter("Could not run startup checks — see Preflight.");
+  }
+  if (!report.ready) {
+    desktopState.appendLog("startup_blocked", { blockers: report.blockers });
+    return revealControlCenter((report.blockers && report.blockers[0]) || "Environment not ready.");
+  }
+
+  setSplashStatus("Starting engine…");
+  const start = await backendManager.start();
+  desktopState.appendLog("backend_autostart", { ok: start.ok });
+  if (!start.ok) {
+    const err = (start.backend && start.backend.error) || start.error || "Backend failed to start.";
+    return revealControlCenter(err);
+  }
+
+  setSplashStatus("Opening workspace…");
+  const nav = await navigateToNIR();
+  if (!nav.ok) {
+    return revealControlCenter(nav.error || "Could not open the workspace.");
+  }
+  showMainWindow();
+}
+
+// --------------------------------------------------------------------------
 // App lifecycle
 // --------------------------------------------------------------------------
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   initModules();
   registerIpc();
   tryAutoImportLicense();
-  createWindow();
   buildAppMenu();
 
   // Silent auto-update check (no-op in dev / when no feed is published).
@@ -399,38 +521,12 @@ app.whenReady().then(() => {
     if (r && (r.version || r.skipped)) desktopState.appendLog("update_check", r);
   });
 
-  // Startup preflight: run once, record the result, and only auto-start the
-  // backend when the environment is actually ready (no blockers).
-  preflight
-    .runPreflight()
-    .then((report) => {
-      desktopState.appendLog("startup_preflight", {
-        ready: report.ready,
-        summary: report.summary,
-        blockers: report.blockers,
-      });
-      try {
-        desktopState.updateSettings({
-          lastPreflightAt: report.generatedAt,
-          lastPreflightReady: report.ready,
-        });
-      } catch (_e) {
-        // non-fatal
-      }
-
-      const settings = desktopState.readSettings();
-      if (settings.autoOpenOnStart && report.ready) {
-        backendManager.start().then((r) => {
-          desktopState.appendLog("backend_autostart", { ok: r.ok });
-        });
-      } else if (settings.autoOpenOnStart && !report.ready) {
-        desktopState.appendLog("backend_autostart_skipped", { reason: "preflight blockers", blockers: report.blockers });
-      }
-    })
-    .catch((e) => desktopState.appendLog("startup_preflight_error", { error: String(e) }));
+  createSplash();
+  createWindow({ show: false });
+  await runStartupSequence();
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) createWindow({ show: true });
   });
 });
 
