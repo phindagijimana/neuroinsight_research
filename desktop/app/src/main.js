@@ -11,7 +11,7 @@
  * the ./research workflows.
  */
 const path = require("path");
-const { app, BrowserWindow, ipcMain, shell, dialog } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, shell, dialog } = require("electron");
 
 const desktopState = require("./desktopState");
 const backendManager = require("./backendManager");
@@ -88,6 +88,131 @@ function createWindow() {
 }
 
 // --------------------------------------------------------------------------
+// Navigation (shared by IPC handlers and the application menu)
+// --------------------------------------------------------------------------
+function controlCenterPath() {
+  return path.join(__dirname, "..", "renderer", "index.html");
+}
+
+function isOnControlCenter() {
+  if (!mainWindow) return false;
+  const url = mainWindow.webContents.getURL();
+  return !url || url.startsWith("file:");
+}
+
+async function navigateToControl() {
+  if (mainWindow) {
+    await mainWindow.loadFile(controlCenterPath());
+    desktopState.updateSettings({ lastMode: "control" });
+    buildAppMenu();
+  }
+  return { ok: true };
+}
+
+async function navigateToNIR() {
+  // Licensing policy: a licensed build (key configured) with an expired/invalid
+  // license drops to limited mode and cannot open the UI. Unlicensed/community
+  // and active/grace licenses are allowed.
+  const enf = licenseManager.getEnforcement();
+  if (!enf.allowFullFeatures) {
+    return { ok: false, error: enf.reason || "A valid license is required to open the app." };
+  }
+  const status = await backendManager.getStatus();
+  if (!status.backend.healthy) {
+    return { ok: false, error: "Backend is not healthy yet. Start it first." };
+  }
+  if (mainWindow) {
+    await mainWindow.loadURL(status.backend.url);
+    desktopState.updateSettings({ lastMode: "nir", lastKnownPort: status.backend.port });
+    buildAppMenu();
+    // Inject an always-visible affordance back to the control center. The
+    // preload runs on this page too, so window.nir.ui.control() is available.
+    await mainWindow.webContents
+      .executeJavaScript(
+        `(function () {
+          if (document.getElementById('nir-desktop-back')) return;
+          var b = document.createElement('button');
+          b.id = 'nir-desktop-back';
+          b.textContent = '\\u2039 Control Center';
+          b.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483647;' +
+            'background:#003d7a;color:#fff;border:none;border-radius:999px;padding:10px 16px;' +
+            'font:600 12px -apple-system,BlinkMacSystemFont,sans-serif;cursor:pointer;' +
+            'box-shadow:0 3px 10px rgba(0,0,0,.3)';
+          b.onmouseenter = function () { b.style.background = '#002b55'; };
+          b.onmouseleave = function () { b.style.background = '#003d7a'; };
+          b.onclick = function () { if (window.nir && window.nir.ui) window.nir.ui.control(); };
+          document.body.appendChild(b);
+        })();`
+      )
+      .catch(() => {});
+  }
+  return { ok: true, url: status.backend.url };
+}
+
+// --------------------------------------------------------------------------
+// Native application menu — always-available navigation + backend controls.
+// This is the supported way back to the control center after opening the NIR UI.
+// --------------------------------------------------------------------------
+function buildAppMenu() {
+  const onControl = isOnControlCenter();
+  const isMac = process.platform === "darwin";
+
+  const appMenu = {
+    label: "NeuroInsight",
+    submenu: [
+      {
+        label: "Control Center",
+        accelerator: "CmdOrCtrl+Shift+C",
+        enabled: !onControl,
+        click: () => navigateToControl(),
+      },
+      {
+        label: "Open NIR UI",
+        accelerator: "CmdOrCtrl+Shift+O",
+        click: async () => {
+          const res = await navigateToNIR();
+          if (!res.ok && mainWindow) {
+            dialog.showMessageBox(mainWindow, { type: "info", message: res.error });
+          }
+        },
+      },
+      { type: "separator" },
+      { label: "Start Backend", click: () => backendManager.start() },
+      { label: "Stop Backend", click: () => backendManager.stopBackend() },
+      { type: "separator" },
+      ...(isMac ? [{ role: "hide" }, { role: "hideOthers" }, { type: "separator" }] : []),
+      { role: "quit" },
+    ],
+  };
+
+  const viewMenu = {
+    label: "View",
+    submenu: [
+      { role: "reload" },
+      { role: "toggleDevTools" },
+      { type: "separator" },
+      { role: "resetZoom" },
+      { role: "zoomIn" },
+      { role: "zoomOut" },
+      { type: "separator" },
+      { role: "togglefullscreen" },
+    ],
+  };
+
+  const helpMenu = {
+    role: "help",
+    submenu: [
+      {
+        label: "NeuroInsight Research on GitHub",
+        click: () => shell.openExternal("https://github.com/phindagijimana/neuroinsight_research"),
+      },
+    ],
+  };
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate([appMenu, { role: "editMenu" }, viewMenu, helpMenu]));
+}
+
+// --------------------------------------------------------------------------
 // IPC handlers — the renderer's window.nir.* surface (see preload.js)
 // --------------------------------------------------------------------------
 function registerIpc() {
@@ -131,39 +256,10 @@ function registerIpc() {
   ipcMain.handle("backend:runtime", wrap(() => backendManager.getRuntimeInfo()));
 
   // Open the live NIR UI inside the desktop window
-  ipcMain.handle(
-    "backend:openUI",
-    wrap(async () => {
-      // Enforce licensing policy: in a licensed build (key configured) an
-      // expired/invalid license drops to limited mode and cannot open the UI.
-      // Unlicensed/community mode (no key) and active/grace licenses are allowed.
-      const enf = licenseManager.getEnforcement();
-      if (!enf.allowFullFeatures) {
-        return { ok: false, error: enf.reason || "A valid license is required to open the app." };
-      }
-      const status = await backendManager.getStatus();
-      if (!status.backend.healthy) {
-        return { ok: false, error: "Backend is not healthy yet. Start it first." };
-      }
-      if (mainWindow) {
-        await mainWindow.loadURL(status.backend.url);
-        desktopState.updateSettings({ lastMode: "nir", lastKnownPort: status.backend.port });
-      }
-      return { ok: true, url: status.backend.url };
-    })
-  );
+  ipcMain.handle("backend:openUI", wrap(() => navigateToNIR()));
 
   // Return to the control center
-  ipcMain.handle(
-    "ui:control",
-    wrap(async () => {
-      if (mainWindow) {
-        await mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
-        desktopState.updateSettings({ lastMode: "control" });
-      }
-      return { ok: true };
-    })
-  );
+  ipcMain.handle("ui:control", wrap(() => navigateToControl()));
 
   // Open a URL in the OS browser
   ipcMain.handle(
@@ -240,6 +336,7 @@ app.whenReady().then(() => {
   registerIpc();
   tryAutoImportLicense();
   createWindow();
+  buildAppMenu();
 
   // Startup preflight: run once, record the result, and only auto-start the
   // backend when the environment is actually ready (no blockers).
