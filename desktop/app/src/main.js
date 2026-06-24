@@ -12,7 +12,20 @@
  */
 const fs = require("fs");
 const path = require("path");
-const { app, BrowserWindow, Menu, ipcMain, shell, dialog } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, shell, dialog, crashReporter } = require("electron");
+
+// Collect native crash minidumps locally (never uploaded — no server). Stored
+// under userData/Crashpad. Must start before app is ready.
+try {
+  crashReporter.start({
+    productName: "NeuroInsight",
+    companyName: "NeuroInsight",
+    submitURL: "",
+    uploadToServer: false,
+  });
+} catch (_e) {
+  // non-fatal — crash reporting is best-effort
+}
 
 const desktopState = require("./desktopState");
 const backendManager = require("./backendManager");
@@ -648,10 +661,51 @@ async function runStartupSequence() {
 }
 
 // --------------------------------------------------------------------------
+// Crash & error capture — log everything to the desktop state dir (the same
+// place the diagnostics bundle reads), and show the user one clear dialog
+// instead of a silent failure. Errors stay local; nothing is uploaded.
+// (To forward to a service later, init Sentry here behind process.env.NIR_SENTRY_DSN.)
+// --------------------------------------------------------------------------
+let crashDialogShown = false;
+function reportFatal(kind, err) {
+  const message = err && err.stack ? err.stack : String(err);
+  try {
+    desktopState.appendLog("fatal_error", { kind, message });
+  } catch (_e) {
+    // logging is best-effort
+  }
+  if (crashDialogShown) return;
+  crashDialogShown = true;
+  try {
+    dialog.showMessageBox({
+      type: "error",
+      title: "NeuroInsight hit an unexpected error",
+      message: "Something went wrong. You can keep working, but if it persists, export a diagnostics bundle from the Control Center and share it.",
+      detail: String(message).slice(0, 1500),
+      buttons: ["OK"],
+    });
+  } catch (_e) {
+    // dialog may be unavailable very early — already logged above
+  }
+}
+
+function installCrashHandlers() {
+  process.on("uncaughtException", (err) => reportFatal("uncaughtException", err));
+  process.on("unhandledRejection", (reason) => reportFatal("unhandledRejection", reason));
+  app.on("render-process-gone", (_e, _wc, details) =>
+    reportFatal("render-process-gone", `${details.reason} (exitCode ${details.exitCode})`)
+  );
+  app.on("child-process-gone", (_e, details) =>
+    reportFatal("child-process-gone", `${details.type}: ${details.reason}`)
+  );
+}
+
+// --------------------------------------------------------------------------
 // App lifecycle
 // --------------------------------------------------------------------------
 app.whenReady().then(async () => {
   initModules();
+  installCrashHandlers();
   registerIpc();
   tryAutoImportLicense();
   buildAppMenu();
