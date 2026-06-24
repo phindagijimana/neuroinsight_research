@@ -22,6 +22,19 @@ function toast(msg) {
 }
 
 // ---- Backend -------------------------------------------------------------
+function setEngineBadge(stateName) {
+  const badge = $("engineBadge");
+  if (!badge) return;
+  const map = {
+    healthy: ["badge badge-ok", "Engine: healthy"],
+    starting: ["badge badge-warn", "Engine: starting…"],
+    stopped: ["badge badge-off", "Engine: stopped"],
+  };
+  const [cls, text] = map[stateName] || map.stopped;
+  badge.className = cls;
+  badge.textContent = text;
+}
+
 async function refreshStatus() {
   const status = await nir.backend.status();
   const dot = $("backendDot");
@@ -33,24 +46,53 @@ async function refreshStatus() {
     dot.className = "dot dot-on";
     label.textContent = "Running (healthy)";
     openBtn.disabled = false;
+    setEngineBadge("healthy");
   } else if (status.backend && status.backend.running) {
     dot.className = "dot dot-warn";
     label.textContent = "Starting / not healthy yet";
     openBtn.disabled = true;
+    setEngineBadge("starting");
   } else {
     dot.className = "dot dot-off";
     label.textContent = "Stopped";
     openBtn.disabled = true;
+    setEngineBadge("stopped");
   }
 
   if (status.backend) {
-    meta.textContent = `URL ${status.backend.url} · backend PID ${
+    meta.textContent = `${status.backend.url} · backend PID ${
       status.backend.pid || "—"
-    } · celery ${status.celery && status.celery.running ? "running" : "stopped"}`;
+    } · worker ${status.celery && status.celery.running ? "running" : "stopped"}`;
   }
 
-  const runtime = await nir.backend.runtime();
-  $("runtimeInfo").textContent = JSON.stringify(runtime, null, 2);
+  renderRuntimeRows(await nir.backend.runtime());
+}
+
+// Render runtime info as clean labelled rows (instead of a raw JSON dump).
+function renderRuntimeRows(rt) {
+  const el = $("runtimeRows");
+  if (!el || !rt) return;
+  const rows =
+    rt.mode === "container"
+      ? [
+          ["Mode", "Container"],
+          ["Image", rt.image],
+          ["Container", rt.container],
+          ["Port", rt.port],
+          ["Data dir", rt.dataDir],
+        ]
+      : [
+          ["Mode", "Local process"],
+          ["Python", rt.pythonCmd || "—"],
+          ["Port", rt.port],
+          ["Repo", rt.repoDir],
+        ];
+  el.innerHTML = rows
+    .map(
+      ([k, v]) =>
+        `<dt>${k}</dt><dd title="${String(v ?? "—")}">${String(v ?? "—")}</dd>`
+    )
+    .join("");
 }
 
 function applyStartGate() {
