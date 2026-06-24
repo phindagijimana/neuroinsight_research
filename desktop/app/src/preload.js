@@ -29,6 +29,14 @@ contextBridge.exposeInMainWorld("nir", {
   ui: {
     control: () => invoke("ui:control"),
   },
+  // Native "Open Data" pushes a volume's bytes to the workspace; the renderer
+  // rebuilds a File and opens it in the Viewer. Returns an unsubscribe fn.
+  onOpenVolume: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("nir:openVolume", handler);
+    return () => ipcRenderer.removeListener("nir:openVolume", handler);
+  },
+  openDataDialog: () => invoke("data:openDialog"),
   shell: {
     openExternal: (url) => invoke("shell:openExternal", url),
   },
