@@ -16,7 +16,7 @@ export const Spinner: React.FC<{ size?: keyof typeof SIZE; className?: string }>
   <span
     role="status"
     aria-label="Loading"
-    className={`inline-block animate-spin rounded-full border-navy-600 border-t-transparent ${SIZE[size]} ${className}`}
+    className={`inline-block animate-spin rounded-full border-current border-t-transparent ${SIZE[size]} ${className}`}
   />
 );
 
@@ -25,7 +25,7 @@ export const LoadingState: React.FC<{ message?: string; className?: string }> = 
   className = '',
 }) => (
   <div className={`flex flex-col items-center justify-center py-12 text-center ${className}`}>
-    <Spinner size="lg" />
+    <Spinner size="lg" className="text-navy-600" />
     <p className="text-gray-500 mt-4 text-sm">{message}</p>
   </div>
 );

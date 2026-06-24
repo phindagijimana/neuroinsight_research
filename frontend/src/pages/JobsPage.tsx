@@ -151,7 +151,9 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
     };
   }, [jobs, pollProgress]);
 
-  const handleJobsSubmitted = (_jobIds: string[]) => {
+  const handleJobsSubmitted = (jobIds: string[]) => {
+    const n = jobIds.length;
+    if (n > 0) toast.success(n === 1 ? 'Job submitted.' : `${n} jobs submitted.`);
     fetchJobs();
   };
 

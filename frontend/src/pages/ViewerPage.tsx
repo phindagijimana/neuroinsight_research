@@ -27,6 +27,7 @@ import {
   setViewerQueryParam,
 } from '../utils/viewerQuery';
 import { LoadingState } from '../components/LoadingState';
+import StatusBadge from '../components/StatusBadge';
 
 export type { ViewerTab } from '../utils/viewerQuery';
 
@@ -321,19 +322,7 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
                 <span className="text-sm font-medium text-gray-900">{job.pipeline_name}</span>
                 <span className="text-sm text-gray-500 ml-3">Job: {job.id.slice(0, 8)}</span>
               </div>
-              <span
-                className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  job.status === 'completed'
-                    ? 'bg-green-100 text-green-800'
-                    : job.status === 'running'
-                      ? 'bg-navy-100 text-navy-800'
-                      : job.status === 'failed'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-gray-100 text-gray-800'
-                }`}
-              >
-                {job.status}
-              </span>
+              <StatusBadge status={job.status} />
             </div>
           </div>
         )}

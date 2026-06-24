@@ -9,10 +9,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   AlertCircle, FolderOpen, File, FileText,
-  ChevronRight, ArrowUp, Loader2, CheckCircle2,
+  ChevronRight, ArrowUp, CheckCircle2,
   History,
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import { Spinner } from './LoadingState';
 
 type BrowseMode = 'local' | 'remote' | 'hpc';
 
@@ -254,7 +255,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
           <div className="max-h-52 overflow-y-auto">
             {prevLoading && (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-4 w-4 text-navy-600 animate-spin mr-2" />
+                <Spinner size="sm" className="text-navy-600 mr-2" />
                 <span className="text-xs text-gray-500">Loading completed jobs...</span>
               </div>
             )}
@@ -362,7 +363,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
           <div className="max-h-52 overflow-y-auto">
             {loading && (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-4 w-4 text-navy-600 animate-spin mr-2" />
+                <Spinner size="sm" className="text-navy-600 mr-2" />
                 <span className="text-xs text-gray-500">Loading...</span>
               </div>
             )}

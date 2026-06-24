@@ -85,17 +85,17 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, onOpenLocal }) => {
           {[
             {
               icon: Brain,
-              title: 'Pipeline Plugins and Workflows',
+              title: 'Pipelines & workflows',
               description: 'YAML-based pipeline definitions. Contains pipelines like FreeSurfer, FastSurfer, QSIprep, fMRIprep, ... and common workflows.'
             },
             {
               icon: Zap,
-              title: 'Works Anywhere',
+              title: 'Local, HPC, or cloud',
               description: 'Runs locally with Docker, HPC with SLURM and Remote servers on AWS, Google Cloud, Azure.'
             },
             {
               icon: Shield,
-              title: 'Research-Ready',
+              title: 'Data stays in place',
               description: 'Data governance compliant. No cloud uploads. Runs where your data already lives.'
             }
           ].map((feature, idx) => (

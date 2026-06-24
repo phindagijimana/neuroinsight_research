@@ -8,7 +8,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../services/api';
-import Activity from './icons/Activity';
+import { Spinner } from './LoadingState';
 
 interface QCSlice {
   index: number;
@@ -122,7 +122,7 @@ const QCImageGallery: React.FC<QCImageGalleryProps> = ({ jobId }) => {
   if (loading) {
     return (
       <div className="p-8 text-center">
-        <Activity className="w-6 h-6 text-navy-600 animate-spin mx-auto mb-2" />
+        <Spinner size="md" className="text-navy-600 mx-auto mb-2" />
         <span className="text-sm text-gray-600">Loading QC images...</span>
       </div>
     );

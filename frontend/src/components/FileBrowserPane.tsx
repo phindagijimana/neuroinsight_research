@@ -17,10 +17,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   FolderOpen, File, ChevronRight, ArrowUp, RefreshCw,
-  CheckSquare, Square, Loader2, AlertCircle, FileText, FolderPlus,
+  CheckSquare, Square, AlertCircle, FileText, FolderPlus,
   Monitor, Cloud, Server, Database, Globe, HardDrive,
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import { Spinner } from './LoadingState';
 
 type PlatformType = 'local' | 'remote' | 'hpc' | 'pennsieve' | 'xnat';
 
@@ -379,7 +380,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-12 flex-1">
-          <Loader2 className="h-5 w-5 text-navy-600 animate-spin mr-2" />
+          <Spinner size="md" className="text-navy-600 mr-2" />
           <span className="text-sm text-gray-500">Loading...</span>
         </div>
       )}

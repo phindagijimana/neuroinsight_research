@@ -7,10 +7,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Download, Upload, Loader2, CheckCircle2, XCircle, AlertCircle,
+  Download, Upload, CheckCircle2, XCircle, AlertCircle,
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { TransferStatus } from '../types';
+import { Spinner } from './LoadingState';
 
 interface TransferProgressProps {
   transferId: string;
@@ -127,7 +128,7 @@ export const TransferProgress: React.FC<TransferProgressProps> = ({
       <div className="flex items-center gap-2 text-xs">
         {isActive && (
           <>
-            <Loader2 className="h-3.5 w-3.5 text-navy-600 animate-spin" />
+            <Spinner size="sm" className="text-navy-600" />
             <span className="text-gray-600">
               {status?.status === 'pending' ? 'Preparing transfer...' :
                status?.status === 'transferring' ? 'Transferring data...' :

@@ -15,10 +15,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   FolderOpen, File, AlertCircle, CheckCircle2,
-  ChevronRight, ArrowUp, Loader2, FileText, Users,
+  ChevronRight, ArrowUp, FileText, Users,
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { DirectoryInfo } from '../types';
+import { Spinner } from './LoadingState';
 
 interface DirectorySelectorProps {
   mode: 'local' | 'remote' | 'hpc';
@@ -251,7 +252,7 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
           <div className="max-h-52 overflow-y-auto">
             {browserLoading && (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-4 w-4 text-navy-600 animate-spin mr-2" />
+                <Spinner size="sm" className="text-navy-600 mr-2" />
                 <span className="text-xs text-gray-500">Loading...</span>
               </div>
             )}

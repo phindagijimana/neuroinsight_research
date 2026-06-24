@@ -11,10 +11,11 @@
 import React, { useState } from 'react';
 import {
   Monitor, Cloud, Server, Database, Globe,
-  Loader2, AlertCircle, CheckCircle2, KeyRound,
+  AlertCircle, CheckCircle2, KeyRound,
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { DataSourceType, PlatformConnection } from '../types';
+import { Spinner } from './LoadingState';
 
 interface DataSourceSelectorProps {
   selected: DataSourceType;
@@ -222,7 +223,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({
             className="w-full px-3 py-2 text-sm bg-navy-600 text-white rounded-md hover:bg-navy-800 disabled:bg-gray-300 font-medium transition flex items-center justify-center gap-2"
           >
             {connecting ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Connecting...</>
+              <><Spinner size="sm" /> Connecting...</>
             ) : (
               'Connect'
             )}
