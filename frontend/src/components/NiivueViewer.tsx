@@ -10,6 +10,8 @@ interface NiivueViewerProps {
   imageUrl?: string;
   segmentationUrl?: string;
   pipelineName?: string;
+  /** Explicit volume name — needed when imageUrl is a blob: URL (drag-and-drop). */
+  imageName?: string;
   onLoad?: () => void;
   /** Canvas height in pixels (default 600; use smaller in EEG+Brain layout). */
   canvasHeightPx?: number;
@@ -25,6 +27,7 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
   imageUrl,
   segmentationUrl,
   pipelineName,
+  imageName,
   onLoad,
   canvasHeightPx = 600,
 }) => {
@@ -91,7 +94,7 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
         const volumeList: Array<{ url: string; name: string; colormap?: string; opacity?: number }> = [
           {
             url: imageUrl,
-            name: extractName(imageUrl),
+            name: imageName || extractName(imageUrl),
             colormap: colormap,
             opacity: 1.0,
           },
@@ -117,7 +120,7 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
     };
 
     loadImages();
-  }, [imageUrl, segmentationUrl, colormap, onLoad]);
+  }, [imageUrl, segmentationUrl, colormap, imageName, onLoad]);
 
   // Update slice type
   useEffect(() => {
