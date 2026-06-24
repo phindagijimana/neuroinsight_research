@@ -18,6 +18,7 @@ import Activity from '../components/icons/Activity';
 import Download from '../components/icons/Download';
 import type { ViewerTab } from '../utils/viewerQuery';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
+import { LoadingState } from '../components/LoadingState';
 
 const VIEWER_TABS: ViewerTab[] = ['eeg', 'imaging', 'eeg-brain'];
 
@@ -173,9 +174,8 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
 
         {/* Loading state */}
         {loading && (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-            <Activity className="w-8 h-8 text-[#003d7a] animate-spin mx-auto mb-3" />
-            <p className="text-gray-600">Loading jobs...</p>
+          <div className="bg-white rounded-lg border border-gray-200">
+            <LoadingState message="Loading jobs…" />
           </div>
         )}
 

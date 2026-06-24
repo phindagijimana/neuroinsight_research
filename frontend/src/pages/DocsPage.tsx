@@ -10,7 +10,6 @@ import {
   FileText,
   Zap,
   GitBranch,
-  Loader2,
   Search,
   Box,
   Cpu,
@@ -22,6 +21,7 @@ import {
   FolderTree,
   CheckCircle,
 } from 'lucide-react';
+import { LoadingState } from '../components/LoadingState';
 
 interface InputFormat {
   format_name?: string;
@@ -557,10 +557,7 @@ const DocsPage: React.FC<DocsPageProps> = () => {
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-[#003d7a] mr-3" />
-          <span className="text-gray-600 text-lg">Loading documentation...</span>
-        </div>
+        <LoadingState message="Loading documentation…" />
       </div>
     );
   }
