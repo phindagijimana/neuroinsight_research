@@ -6,7 +6,7 @@ cd /home/neuroinsight/app
 source /opt/allinone/nir-env.sh
 export PATH="$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1):$PATH"
 
-until redis-cli -h 127.0.0.1 -a nirredis ping >/dev/null 2>&1; do sleep 1; done
+until redis-cli -h 127.0.0.1 -a "$REDIS_PASSWORD" ping >/dev/null 2>&1; do sleep 1; done
 until pg_isready -h 127.0.0.1 -U neuroinsight >/dev/null 2>&1; do sleep 1; done
 sleep 4  # let the API run migrations first
 
