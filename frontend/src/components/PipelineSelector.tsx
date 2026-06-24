@@ -5,10 +5,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, Zap, GitBranch, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Zap, GitBranch, CheckCircle, AlertTriangle } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import type { Pipeline } from '../types';
+import { Spinner } from './LoadingState';
 
 // Categories hidden from the catalog when the EEG feature is disabled.
 const EEG_CATEGORIES: PipelineCategory[] = ['eeg', 'multimodal'];
@@ -524,7 +525,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-5 flex items-center justify-center shadow-sm">
         <div className="flex items-center">
-          <Loader2 className="h-6 w-6 animate-spin text-navy-600 mr-2" />
+          <Spinner size="md" className="text-navy-600 mr-2" />
           <span className="text-sm text-gray-500">Loading pipelines…</span>
         </div>
       </div>

@@ -24,6 +24,7 @@ import { PlatformBrowser } from './PlatformBrowser';
 import { TransferProgress } from './TransferProgress';
 import { apiService } from '../services/api';
 import type { Pipeline, DataSourceType, PlatformConnection, PlatformFile } from '../types';
+import { useToast } from '../contexts/NotificationContext';
 
 type UploadMode = 'directory' | 'single';
 type Step = 'source' | 'browse' | 'backend' | 'transfer' | 'pipeline';
@@ -40,6 +41,7 @@ interface SelectedExecution {
 }
 
 export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack }) => {
+  const toast = useToast();
   // Data source (where data lives)
   const [dataSource, setDataSource] = useState<DataSourceType>('local');
   const [platformConnection, setPlatformConnection] = useState<PlatformConnection | null>(null);
@@ -126,7 +128,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
       setTransferId(result.transfer_id);
       setTransferredPath((result as any).target_path || targetPath);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to start transfer');
+      toast.error(err.response?.data?.detail || 'Failed to start transfer.');
     }
   };
 
@@ -174,7 +176,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
       }
       onJobsSubmitted(jobIds);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to submit batch job');
+      toast.error(err.response?.data?.detail || 'Failed to submit batch job.');
     } finally {
       setSubmitting(false);
     }
@@ -207,7 +209,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
 
       if (jobIds.length > 0) onJobsSubmitted(jobIds);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to submit BIDS batch');
+      toast.error(err.response?.data?.detail || 'Failed to submit BIDS batch.');
     } finally {
       setSubmitting(false);
     }
@@ -238,7 +240,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
         onJobsSubmitted([result.job_id]);
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to submit job');
+      toast.error(err.response?.data?.detail || 'Failed to submit job.');
     } finally {
       setSubmitting(false);
     }
@@ -272,7 +274,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
         onJobsSubmitted([result.job_id]);
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to submit job');
+      toast.error(err.response?.data?.detail || 'Failed to submit job.');
     } finally {
       setSubmitting(false);
     }
@@ -388,7 +390,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
               )}
             </div>
             <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 space-y-4">
-              <h3 className="text-sm font-semibold text-gray-800">Ready to Process</h3>
+              <h3 className="text-sm font-semibold text-gray-800">Ready to submit</h3>
               <div className="text-xs text-gray-600 space-y-1">
                 <p><strong>Source:</strong> {dataSource === 'pennsieve' ? 'Pennsieve' : 'XNAT'}</p>
                 <p><strong>Files:</strong> {platformFiles.length}</p>

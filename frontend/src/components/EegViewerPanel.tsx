@@ -18,7 +18,7 @@ import {
 import { Minus, Plus } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { EegPreviewPayload } from '../types';
-import Activity from './icons/Activity';
+import { Spinner } from './LoadingState';
 
 const WINDOW_MIN_S = 0.5;
 const WINDOW_MAX_S = 120;
@@ -343,7 +343,7 @@ const EegViewerPanel: React.FC<EegViewerPanelProps> = ({
   if (loading) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-8 flex items-center justify-center gap-3">
-        <Activity className="w-6 h-6 text-navy-600 animate-spin" />
+        <Spinner size="md" className="text-navy-600" />
         <span className="text-gray-600">Loading EEG preview…</span>
       </div>
     );

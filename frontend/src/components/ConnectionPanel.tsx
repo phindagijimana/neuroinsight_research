@@ -11,10 +11,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ChevronDown, Loader2, AlertCircle, CheckCircle2, Wifi, KeyRound, Server, Cloud,
+  ChevronDown, AlertCircle, CheckCircle2, Wifi, KeyRound, Server, Cloud,
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { PlatformType } from './FileBrowserPane';
+import { Spinner } from './LoadingState';
 
 interface ConnectionPanelProps {
   platform: PlatformType;
@@ -206,7 +207,7 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   if (checking) {
     return (
       <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500">
-        <Loader2 className="h-3 w-3 animate-spin" />
+        <Spinner size="sm" />
         Checking {platformLabel} connection...
       </div>
     );
@@ -355,7 +356,7 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
             disabled={connecting}
             className="w-full px-3 py-1.5 text-xs bg-navy-600 text-white rounded hover:bg-navy-800 disabled:bg-gray-300 font-medium transition flex items-center justify-center gap-1.5"
           >
-            {connecting ? (<><Loader2 className="h-3 w-3 animate-spin" />Connecting...</>) : (
+            {connecting ? (<><Spinner size="sm" />Connecting...</>) : (
               <><Wifi className="h-3 w-3" />Connect to {platformLabel}</>
             )}
           </button>

@@ -14,6 +14,7 @@ import Eye from './icons/Eye';
 import Brain from './icons/Brain';
 import Activity from './icons/Activity';
 import { apiService } from '../services/api';
+import { Spinner } from './LoadingState';
 
 interface ApiFile {
   name: string;
@@ -259,7 +260,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <div className="flex items-center justify-center gap-3">
-          <Activity className="w-5 h-5 text-navy-600 animate-spin" />
+          <Spinner size="md" className="text-navy-600" />
           <span className="text-gray-600">Loading files...</span>
         </div>
       </div>

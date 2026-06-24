@@ -14,11 +14,12 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Monitor, Server, AlertCircle, Loader2, Wifi,
+  Monitor, Server, AlertCircle, Wifi,
   Settings2, Cloud, Database, Globe, CheckCircle2, KeyRound,
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { DataSourceType, PlatformConnection } from '../types';
+import { Spinner } from './LoadingState';
 
 export type BackendType = 'local' | 'remote' | 'remote_hpc';
 
@@ -407,7 +408,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
                   disabled={!host || !username || isConnecting}
                   className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium transition flex items-center gap-1.5"
                 >
-                  {isConnecting ? (<><Loader2 className="h-3.5 w-3.5 animate-spin" />Connecting...</>) : 'Connect'}
+                  {isConnecting ? (<><Spinner size="sm" />Connecting...</>) : 'Connect'}
                 </button>
                 {connectionStatus === 'error' && (
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-red-50 text-red-700">
@@ -496,7 +497,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
                     onClick={() => switchToRemote()} disabled={isSwitching}
                     className="w-full px-3 py-2 text-sm bg-navy-600 text-white rounded-md hover:bg-navy-700 disabled:bg-gray-300 font-medium transition flex items-center justify-center gap-2"
                   >
-                    {isSwitching ? (<><Loader2 className="h-4 w-4 animate-spin" />Activating...</>) : (
+                    {isSwitching ? (<><Spinner size="sm" />Activating...</>) : (
                       <>{selectedBackend === 'remote_hpc' ? <Server className="h-4 w-4" /> : <Cloud className="h-4 w-4" />}
                         {selectedBackend === 'remote_hpc' ? 'Activate SLURM' : 'Activate Remote'}</>
                     )}
@@ -591,7 +592,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
             onClick={handlePlatformConnect} disabled={platformConnecting}
             className="w-full px-3 py-2 text-sm bg-navy-600 text-white rounded-md hover:bg-navy-800 disabled:bg-gray-300 font-medium transition flex items-center justify-center gap-2"
           >
-            {platformConnecting ? (<><Loader2 className="h-4 w-4 animate-spin" /> Connecting...</>) : 'Connect'}
+            {platformConnecting ? (<><Spinner size="sm" /> Connecting...</>) : 'Connect'}
           </button>
         </div>
       )}

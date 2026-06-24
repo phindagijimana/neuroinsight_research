@@ -14,12 +14,12 @@ import QCImageGallery from '../components/QCImageGallery';
 import BarChart from '../components/icons/BarChart';
 import RefreshCw from '../components/icons/RefreshCw';
 import Eye from '../components/icons/Eye';
-import Activity from '../components/icons/Activity';
 import Download from '../components/icons/Download';
 import type { ViewerTab } from '../utils/viewerQuery';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
-import { LoadingState } from '../components/LoadingState';
+import { LoadingState, Spinner } from '../components/LoadingState';
 import Button from '../components/Button';
+import StatusBadge from '../components/StatusBadge';
 
 const VIEWER_TABS: ViewerTab[] = ['eeg', 'imaging', 'eeg-brain'];
 
@@ -226,18 +226,11 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`px-4 py-2 rounded-full text-sm font-medium ${
-                    selectedJob.status === 'completed' ? 'bg-green-100 text-green-800' :
-                    selectedJob.status === 'running' ? 'bg-navy-100 text-navy-800' :
-                    selectedJob.status === 'failed' ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {selectedJob.status.charAt(0).toUpperCase() + selectedJob.status.slice(1)}
-                  </span>
+                  <StatusBadge status={selectedJob.status} />
                   {selectedJob.status === 'completed' && (
                     <>
                       <Button variant="secondary" onClick={handleExportBundle} disabled={exporting}>
-                        {exporting ? <Activity className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                        {exporting ? <Spinner size="sm" /> : <Download className="w-4 h-4" />}
                         Export Bundle
                       </Button>
                       <Button onClick={handleViewInViewer}>
@@ -336,7 +329,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                     <div className="p-6">
                       {provenanceLoading ? (
                         <div className="flex items-center gap-3">
-                          <Activity className="w-5 h-5 text-navy-600 animate-spin" />
+                          <Spinner size="md" className="text-navy-600" />
                           <span className="text-gray-600">Loading provenance...</span>
                         </div>
                       ) : provenance ? (

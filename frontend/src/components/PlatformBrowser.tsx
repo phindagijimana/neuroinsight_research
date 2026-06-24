@@ -15,10 +15,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   FolderOpen, File, ChevronRight, ArrowLeft, CheckSquare, Square,
-  Loader2, AlertCircle, Database, FileText, HardDrive,
+  AlertCircle, Database, FileText, HardDrive,
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { DataSourceType, PlatformFile, PlatformDataset } from '../types';
+import { Spinner } from './LoadingState';
 
 interface PlatformBrowserProps {
   platform: DataSourceType;
@@ -199,7 +200,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 text-navy-600 animate-spin mr-2" />
+          <Spinner size="md" className="text-navy-600 mr-2" />
           <span className="text-sm text-gray-500">Loading...</span>
         </div>
       )}

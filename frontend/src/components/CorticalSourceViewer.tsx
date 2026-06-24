@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { apiService } from '../services/api';
-import Activity from './icons/Activity';
+import { Spinner } from './LoadingState';
 
 function paintValues(
   values: number[],
@@ -218,7 +218,7 @@ const CorticalSourceViewer: React.FC<CorticalSourceViewerProps> = ({
       >
         {!meshReady && (
           <div className="absolute inset-0 flex items-center justify-center gap-2 text-gray-600 text-sm bg-gray-50/90 z-10">
-            <Activity className="w-5 h-5 text-navy-600 animate-spin" />
+            <Spinner size="md" className="text-navy-600" />
             Loading cortical mesh…
           </div>
         )}
