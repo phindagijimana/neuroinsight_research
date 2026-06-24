@@ -25,6 +25,11 @@ env/
 node_modules/
 frontend/dist/
 
+# Playwright (desktop UI tests)
+desktop/app/test-results/
+desktop/app/playwright-report/
+desktop/app/blob-report/
+
 # Logs
 logs/
 *.log

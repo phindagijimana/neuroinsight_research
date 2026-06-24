@@ -1,0 +1,40 @@
+name: Desktop UI Tests (Playwright)
+
+# Runs the Electron control-center UI suite headless (xvfb). The backend
+# lifecycle suite is gated on NIR_E2E_BACKEND and stays skipped here (it needs
+# the repo Python venv); it runs locally / in a fuller integration job.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "desktop/app/**"
+      - ".github/workflows/desktop_ui_tests.yml"
+
+jobs:
+  ui-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install desktop dependencies
+        working-directory: desktop/app
+        run: npm install --no-audit --no-fund
+
+      - name: Install Electron runtime libraries + xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libnss3 libatk1.0-0 libatk-bridge2.0-0 \
+            libcups2 libdrm2 libgbm1 libgtk-3-0 libxss1 libasound2t64 \
+            || sudo apt-get install -y xvfb libnss3 libatk1.0-0 libatk-bridge2.0-0 \
+            libcups2 libdrm2 libgbm1 libgtk-3-0 libxss1 libasound2
+
+      - name: Run UI E2E (control center, headless)
+        working-directory: desktop/app
+        run: xvfb-run -a npm run test:e2e
