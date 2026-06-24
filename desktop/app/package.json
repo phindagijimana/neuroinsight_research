@@ -18,6 +18,9 @@
     "dist:win:ci": "electron-builder --win nsis --publish never",
     "test:e2e": "playwright test"
   },
+  "dependencies": {
+    "electron-updater": "^6.3.0"
+  },
   "devDependencies": {
     "@playwright/test": "^1.45.0",
     "electron": "^31.0.0",
@@ -29,6 +32,13 @@
     "directories": {
       "output": "../dist"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "phindagijimana",
+        "repo": "neuroinsight_research"
+      }
+    ],
     "files": [
       "src/**/*",
       "renderer/**/*",
