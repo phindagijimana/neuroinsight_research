@@ -35,12 +35,15 @@ interface ViewerPageProps {
   setSelectedJobId: (jobId: string | null) => void;
   /** Incremented when app navigates to Viewer (re-sync tab from URL). */
   viewerNavEpoch?: number;
+  /** A locally-opened volume (drag-and-drop / file picker) — viewed without upload. */
+  localVolume?: { url: string; name: string } | null;
 }
 
 const ViewerPage: React.FC<ViewerPageProps> = ({
   selectedJobId,
   setSelectedJobId,
   viewerNavEpoch = 0,
+  localVolume = null,
 }) => {
   const { eegEnabled } = useFeatureFlags();
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -62,6 +65,13 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
     setViewerTab(tab);
     setViewerQueryParam(tab);
   }, []);
+
+  // A locally-opened volume (drag-and-drop / file picker) overrides the
+  // job-driven image and is viewed in place — no upload.
+  const effectiveImageUrl = localVolume?.url || imageUrl;
+  useEffect(() => {
+    if (localVolume) commitViewerTab('imaging');
+  }, [localVolume, commitViewerTab]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -339,12 +349,18 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
           <EegViewerPanel jobId={selectedJobId} eegRelativePath={eegFileRelPath} />
         )}
 
-        {!loading && viewerTab === 'imaging' && imageUrl && (
+        {!loading && viewerTab === 'imaging' && effectiveImageUrl && (
           <div className="space-y-6">
+            {localVolume && (
+              <div className="bg-[#003d7a]/10 border border-[#003d7a]/20 rounded-lg px-4 py-2.5 text-sm text-gray-700">
+                Viewing local file <span className="font-medium text-[#003d7a]">{localVolume.name}</span> — opened in place, not uploaded.
+              </div>
+            )}
             <NiivueViewer
-              imageUrl={imageUrl}
-              segmentationUrl={segmentationUrl || undefined}
+              imageUrl={effectiveImageUrl}
+              segmentationUrl={localVolume ? undefined : segmentationUrl || undefined}
               pipelineName={job?.pipeline_name}
+              imageName={localVolume?.name}
               onLoad={() => setViewerReady(true)}
             />
             <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -421,7 +437,7 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
           </div>
         )}
 
-        {!loading && viewerTab === 'imaging' && !imageUrl && !error && (
+        {!loading && viewerTab === 'imaging' && !effectiveImageUrl && !error && (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
             <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">

@@ -12,9 +12,11 @@ import Brain from '../components/icons/Brain';
 
 interface HomePageProps {
   setActivePage: (page: string) => void;
+  /** Open a local NIfTI/MGZ in the Viewer (no upload). Provided by the desktop/app shell. */
+  onOpenLocal?: (file: File) => void;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ setActivePage }) => {
+const HomePage: React.FC<HomePageProps> = ({ setActivePage, onOpenLocal }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-navy-50 via-white to-navy-50">
       <main className="max-w-7xl mx-auto px-6 py-8">
@@ -45,15 +47,36 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage }) => {
               ))}
             </div>
 
-            <div className="pt-6">
+            <div className="pt-6 flex flex-wrap items-center gap-3">
               <button
                 onClick={() => setActivePage('jobs')}
                 className="group flex items-center gap-2 bg-[#003d7a] text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-[#002b55] transition shadow-lg hover:shadow-xl"
               >
-                Get Started
+                New Job
                 <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition" />
               </button>
+              {onOpenLocal && (
+                <label className="flex items-center gap-2 bg-white text-[#003d7a] px-6 py-4 rounded-xl font-semibold text-lg border border-navy-100 hover:bg-navy-50 transition cursor-pointer shadow-sm">
+                  <Brain className="w-5 h-5" />
+                  Open Imaging File
+                  <input
+                    type="file"
+                    accept=".nii,.nii.gz,.mgz,.mgh"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) onOpenLocal(f);
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                </label>
+              )}
             </div>
+            {onOpenLocal && (
+              <p className="text-sm text-gray-500">
+                Tip: drag &amp; drop a NIfTI or MGZ file anywhere to view it instantly — no upload.
+              </p>
+            )}
           </div>
 
           {/* Brain Illustration */}

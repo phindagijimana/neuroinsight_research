@@ -192,7 +192,7 @@
  * REACT: 18.2+ (concurrent features)
  */
 
-import { useState, lazy, Suspense } from 'react';
+import { useState, lazy, Suspense, type DragEvent } from 'react';
 import Navigation from './components/Navigation';
 import {
   clearViewerQueryParam,
@@ -222,6 +222,9 @@ function App() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   /** Bumps when navigating to Viewer so the page re-reads `?viewer=` (e.g. header while already on Viewer). */
   const [viewerNavEpoch, setViewerNavEpoch] = useState(0);
+  /** A locally-opened imaging volume (drag-and-drop / file picker), viewed without upload. */
+  const [localVolume, setLocalVolume] = useState<{ url: string; name: string } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   /** Updates URL `?viewer=` when entering/leaving the Viewer page (deep links). */
   const navigateTo = (page: string, opts?: NavigateOptions) => {
@@ -235,8 +238,47 @@ function App() {
     setActivePage(p);
   };
 
+  /** Open a local NIfTI/MGZ volume in the Viewer (no upload — data stays in place). */
+  const isVolumeFile = (name: string) => /\.(nii(\.gz)?|mgz|mgh)$/i.test(name);
+  const openLocalVolume = (file: File) => {
+    if (!file) return;
+    if (localVolume?.url) URL.revokeObjectURL(localVolume.url);
+    const url = URL.createObjectURL(file);
+    setLocalVolume({ url, name: file.name });
+    navigateTo('viewer', { viewerTab: 'imaging' });
+  };
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = Array.from(e.dataTransfer?.files || []).find((f) => isVolumeFile(f.name));
+    if (file) openLocalVolume(file);
+  };
+  const handleDragOver = (e: DragEvent) => {
+    if (e.dataTransfer?.types?.includes('Files')) {
+      e.preventDefault();
+      setIsDragging(true);
+    }
+  };
+  const handleDragLeave = (e: DragEvent) => {
+    if (!e.relatedTarget) setIsDragging(false); // left the window
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div
+      className="min-h-screen bg-gray-50"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDragging && (
+        <div className="fixed inset-0 z-50 bg-[#003d7a]/70 flex items-center justify-center pointer-events-none">
+          <div className="bg-white rounded-2xl px-10 py-8 text-center shadow-2xl border-2 border-dashed border-[#003d7a]">
+            <p className="text-2xl font-bold text-[#003d7a] mb-1">Drop to view</p>
+            <p className="text-gray-600">Release a NIfTI (.nii/.nii.gz) or MGZ file to open it in the Viewer</p>
+          </div>
+        </div>
+      )}
       <Navigation activePage={activePage} setActivePage={navigateTo} />
 
       <Suspense fallback={
@@ -244,7 +286,7 @@ function App() {
           <div className="text-gray-500 text-lg">Loading...</div>
         </div>
       }>
-        {activePage === 'home' && <HomePage setActivePage={navigateTo} />}
+        {activePage === 'home' && <HomePage setActivePage={navigateTo} onOpenLocal={openLocalVolume} />}
         
         {activePage === 'jobs' && (
           <JobsPage 
@@ -262,10 +304,11 @@ function App() {
         )}
 
         {activePage === 'viewer' && (
-          <ViewerPage 
+          <ViewerPage
             selectedJobId={selectedJobId}
             setSelectedJobId={setSelectedJobId}
             viewerNavEpoch={viewerNavEpoch}
+            localVolume={localVolume}
           />
         )}
 

@@ -126,17 +126,30 @@ test.describe("control center", () => {
 test.describe("smooth launch (default flow)", () => {
   test.skip(process.env.NIR_E2E_BACKEND !== "1", "set NIR_E2E_BACKEND=1 (needs repo venv)");
   let app;
+  let page;
 
+  test.beforeAll(async () => {
+    app = await launch(); // no NIR_START_IN_CONTROL: exercise the real launch
+    page = await pageWithSelector(app, "#nir-desktop-statusbar", 120_000);
+  });
   test.afterAll(async () => {
     if (app) await app.close();
   });
 
   test("splash -> auto-start backend -> lands directly in the NIR workspace", async () => {
-    app = await launch(); // no NIR_START_IN_CONTROL: exercise the real launch
-    // The workspace page is the one carrying the injected status bar.
-    const page = await pageWithSelector(app, "#nir-desktop-statusbar", 120_000);
     await expect(page.locator("#nir-desktop-statusbar")).toBeVisible();
     await expect(page.locator("#nir-engine")).toContainText(/healthy|starting/);
     expect(page.url()).toMatch(/127\.0\.0\.1:\d+|localhost:\d+/);
+  });
+
+  test("data-first home: open a local NIfTI -> Viewer (no upload)", async () => {
+    const sample = process.env.NIR_E2E_SAMPLE;
+    test.skip(!sample, "set NIR_E2E_SAMPLE to a .nii.gz path");
+    // The data-first actions are on the Home landing.
+    await expect(page.getByText("Open Imaging File")).toBeVisible();
+    await page.setInputFiles('input[type="file"][accept*=".nii"]', sample);
+    // Lands in the Viewer with the local-file banner (proves the volume was wired through).
+    await expect(page.getByText(/Viewing local file/i)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/sample\.nii\.gz/)).toBeVisible();
   });
 });
