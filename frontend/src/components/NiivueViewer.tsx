@@ -45,6 +45,11 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
   const [winRange, setWinRange] = useState<{ min: number; max: number } | null>(null);
   const [winMin, setWinMin] = useState<number | null>(null);
   const [winMax, setWinMax] = useState<number | null>(null);
+  // Tier 2/3: mouse mode, slice scrubbing, loaded layers, help overlay.
+  const [mouseMode, setMouseMode] = useState<number>(1); // 1=window/level 2=measure 3=pan
+  const [sliceFrac, setSliceFrac] = useState<[number, number, number]>([0.5, 0.5, 0.5]);
+  const [layers, setLayers] = useState<Array<{ index: number; name: string }>>([]);
+  const [showHelp, setShowHelp] = useState(false);
 
   // Initialize Niivue
   useEffect(() => {
@@ -75,9 +80,14 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
 
     nv.attachToCanvas(canvasRef.current);
     nv.setSliceType(sliceType);
-    // Live cursor readout (voxel coords + intensity), like ITK-SNAP / Slicer.
-    (nv as unknown as { onLocationChange: (d: unknown) => void }).onLocationChange = (d) =>
-      setLocation(d as { vox?: number[]; mm?: number[]; values?: Array<{ value: number }> });
+    // Live cursor readout (voxel coords + intensity) + keep slice sliders in sync.
+    (nv as unknown as { onLocationChange: (d: unknown) => void }).onLocationChange = (d) => {
+      const data = d as { vox?: number[]; mm?: number[]; values?: Array<{ value: number }>; frac?: number[] };
+      setLocation(data);
+      if (data.frac && data.frac.length >= 3) {
+        setSliceFrac([data.frac[0], data.frac[1], data.frac[2]]);
+      }
+    };
     nvRef.current = nv;
 
     return () => {
@@ -121,12 +131,14 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
         await (nvRef.current as Niivue).loadVolumes(volumeList as never);
 
         // Seed window/level from the base volume's display range.
-        const vol = (nvRef.current as unknown as { volumes: Array<{ cal_min: number; cal_max: number; global_min: number; global_max: number }> }).volumes[0];
+        const vols = (nvRef.current as unknown as { volumes: Array<{ cal_min: number; cal_max: number; global_min: number; global_max: number; name?: string }> }).volumes;
+        const vol = vols[0];
         if (vol) {
           setWinRange({ min: vol.global_min, max: vol.global_max });
           setWinMin(vol.cal_min);
           setWinMax(vol.cal_max);
         }
+        setLayers(vols.map((v, i) => ({ index: i, name: v.name || (i === 0 ? 'Base volume' : `Overlay ${i}`) })));
 
         if (onLoad) onLoad();
       } catch (error) {
@@ -172,6 +184,55 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
       nvRef.current.updateGLVolume();
     }
   }, [showCrosshair]);
+
+  // Mouse drag mode: window/level (1), measure (2), pan (3).
+  useEffect(() => {
+    const nv = nvRef.current as unknown as { opts: { dragMode: number }; drawScene: () => void } | null;
+    if (!nv) return;
+    nv.opts.dragMode = mouseMode;
+    nv.drawScene();
+  }, [mouseMode]);
+
+  // Move the crosshair along one axis (slice scrubbing).
+  const setSliceAxis = (axis: number, frac: number) => {
+    const next: [number, number, number] = [...sliceFrac];
+    next[axis] = frac;
+    setSliceFrac(next);
+    const nv = nvRef.current as unknown as { scene?: { crosshairPos: number[] }; drawScene: () => void } | null;
+    if (nv && nv.scene) {
+      nv.scene.crosshairPos = next;
+      nv.drawScene();
+    }
+  };
+
+  const setLayerOpacity = (index: number, value: number) => {
+    if (nvRef.current && nvRef.current.volumes.length > index) {
+      nvRef.current.setOpacity(index, value);
+    }
+  };
+
+  // Viewer keyboard shortcuts (ignored while typing in a field).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && ['INPUT', 'SELECT', 'TEXTAREA'].includes(t.tagName)) return;
+      switch (e.key) {
+        case '1': setSliceType(3); break; // multi-planar
+        case '2': setSliceType(0); break; // axial
+        case '3': setSliceType(1); break; // coronal
+        case '4': setSliceType(2); break; // sagittal
+        case '5': setSliceType(4); break; // 3D render
+        case 'r': case 'R': handleResetView(); break;
+        case 'x': case 'X': setShowCrosshair((v) => !v); break;
+        case '?': setShowHelp((v) => !v); break;
+        case 'Escape': setShowHelp(false); break;
+        default: break;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleResetView = () => {
     if (nvRef.current && nvRef.current.volumes.length > 0) {
@@ -227,20 +288,20 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
             </select>
           </div>
 
-          {/* Segmentation Opacity */}
+          {/* Mouse Mode */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Overlay Opacity: {opacity.toFixed(2)}
+              Mouse (drag)
             </label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={opacity}
-              onChange={(e) => setOpacity(Number(e.target.value))}
-              className="w-full"
-            />
+            <select
+              value={mouseMode}
+              onChange={(e) => setMouseMode(Number(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#003d7a] focus:border-transparent"
+            >
+              <option value={1}>Window / Level</option>
+              <option value={2}>Measure</option>
+              <option value={3}>Pan</option>
+            </select>
           </div>
 
           {/* Crosshair Toggle */}
@@ -294,6 +355,58 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
           </div>
         )}
 
+        {/* Slice position (scrubbing) — hidden in pure 3D render */}
+        {sliceType !== 4 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            {(['Sagittal', 'Coronal', 'Axial'] as const).map((label, axis) => (
+              <div key={label}>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {label} position: {Math.round(sliceFrac[axis] * 100)}%
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.005}
+                  value={sliceFrac[axis]}
+                  onChange={(e) => setSliceAxis(axis, Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Layers */}
+        {layers.length > 0 && (
+          <div className="mt-4">
+            <p className="text-sm font-semibold text-gray-700 mb-2">Layers</p>
+            <div className="space-y-2">
+              {layers.map((l) => (
+                <div key={l.index} className="flex items-center gap-3">
+                  <span className="text-sm text-gray-700 w-40 truncate" title={l.name}>
+                    {l.index === 0 ? '◾' : '▥'} {l.name}
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    defaultValue={l.index === 0 ? 1 : opacity}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      setLayerOpacity(l.index, v);
+                      if (l.index > 0) setOpacity(v);
+                    }}
+                    className="flex-1"
+                  />
+                  <span className="text-xs text-gray-500 w-10 text-right">opacity</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="flex gap-2 mt-4 flex-wrap">
           <button
@@ -307,6 +420,13 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
             className="px-4 py-2 bg-[#003d7a] text-white rounded-lg hover:bg-[#002b55] transition"
           >
             Save Screenshot
+          </button>
+          <button
+            onClick={() => setShowHelp((v) => !v)}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+            title="Keyboard shortcuts & mouse controls"
+          >
+            ? Shortcuts
           </button>
           {isHippo && segmentationUrl && (
             <>
@@ -347,6 +467,33 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
           ref={canvasRef}
           style={{ width: '100%', height: `${canvasHeightPx}px` }}
         />
+
+        {/* Keyboard / mouse help overlay (toggle with ? or the Shortcuts button) */}
+        {showHelp && (
+          <div
+            className="absolute inset-0 z-20 bg-black/70 flex items-center justify-center p-6"
+            onClick={() => setShowHelp(false)}
+          >
+            <div
+              className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-lg font-semibold text-gray-900">Viewer controls</h4>
+                <button onClick={() => setShowHelp(false)} className="text-gray-400 hover:text-gray-700">✕</button>
+              </div>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-gray-700">
+                <span className="font-medium">Keyboard</span><span></span>
+                <span><kbd>1</kbd> Multi-planar</span><span><kbd>2</kbd>/<kbd>3</kbd>/<kbd>4</kbd> Axial/Coronal/Sagittal</span>
+                <span><kbd>5</kbd> 3D render</span><span><kbd>R</kbd> Reset · <kbd>X</kbd> Crosshair</span>
+                <span><kbd>?</kbd> This help</span><span><kbd>Esc</kbd> Close</span>
+                <span className="font-medium mt-2">Mouse</span><span className="mt-2"></span>
+                <span>Left-click: move crosshair</span><span>Left-drag: {mouseMode === 1 ? 'window/level' : mouseMode === 2 ? 'measure' : 'pan'}</span>
+                <span>Scroll: zoom / slice</span><span>Right-drag: window/level</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Cursor readout — voxel coords + intensity (ITK-SNAP / Slicer style) */}
