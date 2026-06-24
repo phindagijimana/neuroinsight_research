@@ -27,6 +27,20 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator, computed_field
 
 
+def _read_version() -> str:
+    """Single source of truth: the repo-root VERSION file.
+
+    Keeps the backend's reported version in lockstep with the desktop app and
+    the all-in-one image tag. Overridable via the APP_VERSION env var.
+    """
+    try:
+        # backend/core/config.py -> repo root is two parents up.
+        version_file = Path(__file__).resolve().parents[2] / "VERSION"
+        return version_file.read_text(encoding="utf-8").strip() or "0.0.0"
+    except Exception:
+        return "0.0.0"
+
+
 class Settings(BaseSettings):
     """
     Application Configuration
@@ -37,7 +51,7 @@ class Settings(BaseSettings):
 
     # -- Application --
     app_name: str = Field(default="NeuroInsight", description="Application display name")
-    app_version: str = Field(default="1.0.0", description="Semantic version")
+    app_version: str = Field(default_factory=_read_version, description="Semantic version (from repo-root VERSION; override with APP_VERSION)")
     environment: str = Field(default="development", description="Runtime environment: development, staging, production")
 
     # -- Feature flags --

@@ -68,6 +68,7 @@ COPY plugins/ ./plugins/
 COPY workflows/ ./workflows/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
+COPY VERSION ./
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 COPY docker/allinone/ /opt/allinone/
 RUN chmod +x /opt/allinone/*.sh

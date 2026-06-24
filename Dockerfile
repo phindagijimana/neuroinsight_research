@@ -42,6 +42,9 @@ COPY workflows/ ./workflows/
 COPY alembic.ini ./alembic.ini
 COPY alembic/ ./alembic/
 
+# Version source of truth (read by backend.core.config)
+COPY VERSION ./VERSION
+
 # Copy built frontend from stage 1
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
