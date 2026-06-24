@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import NiivueViewer from './NiivueViewer';
 import EegViewerPanel from './EegViewerPanel';
 import CorticalSourceViewer from './CorticalSourceViewer';
+import MultimodalLinkageCard from './MultimodalLinkageCard';
 import { apiService } from '../services/api';
 import type { MultimodalManifest } from '../types';
 
