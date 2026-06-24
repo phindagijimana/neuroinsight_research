@@ -15,9 +15,11 @@
     "dist:win": "electron-builder --win nsis",
     "dist:linux:ci": "electron-builder --linux AppImage deb --publish never",
     "dist:mac:ci": "electron-builder --mac dmg --publish never",
-    "dist:win:ci": "electron-builder --win nsis --publish never"
+    "dist:win:ci": "electron-builder --win nsis --publish never",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.45.0",
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3"
   },
