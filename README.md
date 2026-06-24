@@ -140,6 +140,24 @@ For detailed SSH key setup instructions, see the [User Guide](https://github.com
 - **Workflows** -- Chain multiple plugins into one job with automatic data passing between steps
 - **Built-in NIfTI viewer** -- View results with segmentation overlays powered by Niivue
 
+## Security & data
+
+NeuroInsight is designed as a **local, single-user desktop application**. Your
+data stays on your machine (or your HPC) — nothing is uploaded to a third-party
+service. The engine and all its internal services (database, cache, object
+store) bind to `127.0.0.1` only, and the all-in-one container generates unique
+credentials per install.
+
+> **Do not expose the backend to the internet.** The local API has no built-in
+> authentication because it is meant to listen only on localhost. If you change
+> the bind host (e.g. `0.0.0.0`) to reach it from another machine, put it behind
+> your own authenticating reverse proxy / VPN — otherwise anyone on the network
+> could submit jobs or read results.
+
+Credentials you enter for connectors (Pennsieve, XNAT, SSH/HPC) are stored in
+your OS keychain via the desktop Credential Vault, not in the repo. For installer
+trust (code signing / notarization), see [docs/SIGNING_AND_TRUST.md](docs/SIGNING_AND_TRUST.md).
+
 ## Documentation
 
 - [User Guide](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/USER_GUIDE.md) -- Complete setup, connections, SSH key guide, and usage instructions
