@@ -19,6 +19,7 @@ import Download from '../components/icons/Download';
 import type { ViewerTab } from '../utils/viewerQuery';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { LoadingState } from '../components/LoadingState';
+import Button from '../components/Button';
 
 const VIEWER_TABS: ViewerTab[] = ['eeg', 'imaging', 'eeg-brain'];
 
@@ -150,13 +151,10 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
               Detailed view of completed job results, files, and statistics
             </p>
           </div>
-          <button
-            onClick={fetchJobs}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-          >
+          <Button variant="secondary" onClick={fetchJobs}>
             <RefreshCw className="w-4 h-4" />
             Refresh
-          </button>
+          </Button>
         </div>
 
         {/* Error state */}
@@ -201,12 +199,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
             <p className="text-gray-600 mb-6">
               Submit and complete a processing job to view detailed results here
             </p>
-            <button
-              onClick={() => setActivePage('jobs')}
-              className="px-6 py-2 bg-[#003d7a] text-white rounded-lg hover:bg-[#002b55] transition"
-            >
-              Go to Jobs
-            </button>
+            <Button onClick={() => setActivePage('jobs')}>Go to Jobs</Button>
           </div>
         )}
 
@@ -243,21 +236,14 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                   </span>
                   {selectedJob.status === 'completed' && (
                     <>
-                      <button
-                        onClick={handleExportBundle}
-                        disabled={exporting}
-                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
-                      >
+                      <Button variant="secondary" onClick={handleExportBundle} disabled={exporting}>
                         {exporting ? <Activity className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                         Export Bundle
-                      </button>
-                      <button
-                        onClick={handleViewInViewer}
-                        className="flex items-center gap-2 px-4 py-2 bg-[#003d7a] text-white rounded-lg hover:bg-[#002b55] transition"
-                      >
+                      </Button>
+                      <Button onClick={handleViewInViewer}>
                         <Eye className="w-4 h-4" />
                         Open in Viewer
-                      </button>
+                      </Button>
                     </>
                   )}
                 </div>

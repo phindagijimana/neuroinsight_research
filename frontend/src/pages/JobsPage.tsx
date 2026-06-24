@@ -19,7 +19,8 @@ import Eye from '../components/icons/Eye';
 import JobProgressBar from '../components/JobProgressBar';
 import SlurmQueueMonitor from '../components/SlurmQueueMonitor';
 import StatusBadge from '../components/StatusBadge';
-import { LoadingState } from '../components/LoadingState';
+import Button from '../components/Button';
+import { LoadingState, Spinner } from '../components/LoadingState';
 import type { ViewerTab } from '../utils/viewerQuery';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { useToast, useConfirm } from '../contexts/NotificationContext';
@@ -305,13 +306,9 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                 )}
               </p>
             </div>
-            <button
-              onClick={() => fetchJobs(true)}
-              disabled={isRefreshing}
-              className="shrink-0 px-4 py-2 rounded-lg bg-[#003d7a] text-white text-sm font-medium hover:bg-[#002b55] disabled:opacity-50 transition-colors"
-            >
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
-            </button>
+            <Button onClick={() => fetchJobs(true)} disabled={isRefreshing} className="shrink-0">
+              {isRefreshing ? 'Refreshing…' : 'Refresh'}
+            </Button>
           </div>
 
           {jobsLoading ? (
@@ -398,6 +395,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                           }}
                           className="p-2 text-navy-600 hover:bg-navy-50 rounded-md transition"
                           title="View results"
+                          aria-label="View results"
                         >
                           <Eye className="w-5 h-5" />
                         </button>
@@ -417,9 +415,10 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                         disabled={deletingJobs.has(job.id) || job.is_sample_job}
                         className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition disabled:opacity-40 disabled:pointer-events-none"
                         title={job.is_sample_job ? 'Sample jobs cannot be deleted' : 'Delete job'}
+                        aria-label={job.is_sample_job ? 'Sample jobs cannot be deleted' : 'Delete job'}
                       >
                         {deletingJobs.has(job.id) ? (
-                          <div className="animate-spin h-5 w-5 border-2 border-gray-400 border-t-transparent rounded-full"></div>
+                          <Spinner size="sm" className="border-gray-400" />
                         ) : (
                           <Trash2 className="w-5 h-5" />
                         )}
