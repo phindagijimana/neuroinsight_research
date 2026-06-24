@@ -176,12 +176,21 @@ async function runPreflight() {
   const blockers = [];
   const warnings = [];
 
-  if (!checks.python.ok) blockers.push("Python runtime not detected — the backend cannot start.");
+  // In container mode the whole runtime is the all-in-one Docker container, so
+  // Docker is the hard requirement and Python is irrelevant. In process mode the
+  // backend runs from the venv (Python required) and Docker is only needed for
+  // local job execution.
+  const containerMode = process.env.NIR_RUNTIME === "container";
 
-  if (!checks.docker.ok) {
-    warnings.push("Docker not detected — local job execution is unavailable (remote/HPC still work).");
+  if (containerMode) {
+    if (!checks.docker.ok) blockers.push("Docker is not running — install/start Docker Desktop to run NeuroInsight.");
+  } else {
+    if (!checks.python.ok) blockers.push("Python runtime not detected — the backend cannot start.");
+    if (!checks.docker.ok) {
+      warnings.push("Docker not detected — local job execution is unavailable (remote/HPC still work).");
+    }
+    if (!checks.celery.ok) warnings.push("Celery Python package import failed — job processing may not work.");
   }
-  if (!checks.celery.ok) warnings.push("Celery Python package import failed — job processing may not work.");
   if (!checks.keychain.ok) warnings.push("OS keychain backend not detected — credentials use the encrypted fallback.");
   if (checks.disk.ok && checks.disk.freeGB < 20) warnings.push("Low free disk space (<20GB).");
   if (checks.ports.p3000_open && checks.ports.p3001_open) {
