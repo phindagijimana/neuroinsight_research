@@ -21,6 +21,7 @@ const licenseManager = require("./licenseManager");
 const credentialStore = require("./credentialStore");
 const appLock = require("./appLock");
 const platformAdapter = require("./platformAdapter");
+const updater = require("./updater");
 
 let mainWindow = null;
 let stateDir = null;
@@ -64,6 +65,18 @@ function tryAutoImportLicense() {
   }
 }
 
+/** Allow navigation only to the local control center (file://) and the local
+ *  backend (127.0.0.1 / localhost). Everything else opens in the OS browser. */
+function isAllowedAppUrl(url) {
+  try {
+    if (url.startsWith("file:")) return true;
+    const u = new URL(url);
+    return (u.protocol === "http:" || u.protocol === "https:") && (u.hostname === "127.0.0.1" || u.hostname === "localhost");
+  } catch (_e) {
+    return false;
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1100,
@@ -76,8 +89,24 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
+      webSecurity: true,
     },
+  });
+
+  // Security: keep in-window navigation on trusted local origins; send anything
+  // else (external links) to the OS browser instead of loading it in-app.
+  const wc = mainWindow.webContents;
+  wc.on("will-navigate", (event, url) => {
+    if (!isAllowedAppUrl(url)) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+  wc.setWindowOpenHandler(({ url }) => {
+    if (isAllowedAppUrl(url)) return { action: "allow" };
+    shell.openExternal(url);
+    return { action: "deny" };
   });
 
   mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
@@ -203,6 +232,23 @@ function buildAppMenu() {
     role: "help",
     submenu: [
       {
+        label: "Check for Updates…",
+        click: async () => {
+          const res = await updater.checkForUpdates({ silent: false });
+          if (mainWindow) {
+            const msg = res.skipped
+              ? `Updates: ${res.skipped}.`
+              : res.ok
+              ? res.version
+                ? `Update available: ${res.version} (downloading).`
+                : "You are on the latest version."
+              : `Update check failed: ${res.error}`;
+            dialog.showMessageBox(mainWindow, { type: "info", message: msg });
+          }
+        },
+      },
+      { type: "separator" },
+      {
         label: "NeuroInsight Research on GitHub",
         click: () => shell.openExternal("https://github.com/phindagijimana/neuroinsight_research"),
       },
@@ -247,6 +293,7 @@ function registerIpc() {
     })
   );
   ipcMain.handle("platform:summary", wrap(() => platformAdapter.getPlatformSummary()));
+  ipcMain.handle("updates:check", wrap(() => updater.checkForUpdates({ silent: false })));
 
   // Backend lifecycle
   ipcMain.handle("backend:start", wrap(() => backendManager.start()));
@@ -261,11 +308,20 @@ function registerIpc() {
   // Return to the control center
   ipcMain.handle("ui:control", wrap(() => navigateToControl()));
 
-  // Open a URL in the OS browser
+  // Open a URL in the OS browser (http/https only — never file:// or custom schemes)
   ipcMain.handle(
     "shell:openExternal",
     wrap(async (url) => {
-      await shell.openExternal(url);
+      let parsed;
+      try {
+        parsed = new URL(String(url));
+      } catch (_e) {
+        return { ok: false, error: "Invalid URL." };
+      }
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return { ok: false, error: "Only http/https URLs may be opened." };
+      }
+      await shell.openExternal(parsed.toString());
       return { ok: true };
     })
   );
@@ -337,6 +393,11 @@ app.whenReady().then(() => {
   tryAutoImportLicense();
   createWindow();
   buildAppMenu();
+
+  // Silent auto-update check (no-op in dev / when no feed is published).
+  updater.checkForUpdates({ silent: true }).then((r) => {
+    if (r && (r.version || r.skipped)) desktopState.appendLog("update_check", r);
+  });
 
   // Startup preflight: run once, record the result, and only auto-start the
   // backend when the environment is actually ready (no blockers).

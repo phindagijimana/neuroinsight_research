@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld("nir", {
   platform: {
     summary: () => invoke("platform:summary"),
   },
+  updates: {
+    check: () => invoke("updates:check"),
+  },
   backend: {
     start: () => invoke("backend:start"),
     stop: () => invoke("backend:stop"),
