@@ -443,7 +443,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
           {selectedPipeline && (
             <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 space-y-4 flex flex-col h-full">
               <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Input Mode</h3>
+                <h3 className="text-xs font-semibold tracking-wide text-gray-500 mb-3">Input Mode</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <button onClick={() => setMode('single')}
                     className={`p-3 rounded-lg border text-left transition-all ${mode === 'single' ? 'border-[#003d7a]/40 bg-white shadow-sm ring-1 ring-[#003d7a]/15' : 'border-gray-200/80 bg-white hover:border-gray-300'}`}>

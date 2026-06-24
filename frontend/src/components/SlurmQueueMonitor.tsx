@@ -80,7 +80,7 @@ const SlurmQueueMonitor: React.FC<SlurmQueueMonitorProps> = ({
   return (
     <div className="rounded-2xl border border-gray-200/90 bg-white/90 p-4 shadow-sm">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 flex items-center gap-1.5">
+        <h3 className="text-xs font-semibold tracking-wide text-gray-500 flex items-center gap-1.5">
           <Server className="h-4 w-4 text-[#003d7a]" />
           SLURM queue
         </h3>

@@ -146,7 +146,7 @@ function renderBanner(report) {
 
 async function runPreflight(silent) {
   $("btnPreflight").disabled = true;
-  if (!silent) toast("Running preflight…");
+  if (!silent) toast("Running checks…");
   const report = await nir.preflight.run();
   $("btnPreflight").disabled = false;
 
@@ -187,7 +187,7 @@ async function runPreflight(silent) {
     } else if (report.warnings && report.warnings.length) {
       toast(`${report.warnings.length} warning(s) — see list.`);
     } else {
-      toast("Preflight passed.");
+      toast("Checks passed.");
     }
   }
 }

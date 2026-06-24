@@ -16,7 +16,7 @@
         <span class="logo">NI</span>
         <div>
           <h1>Control Center</h1>
-          <p class="subtitle">Engine, preflight &amp; settings</p>
+          <p class="subtitle">Engine, checks &amp; settings</p>
         </div>
       </div>
       <div id="engineBadge" class="badge badge-off">Engine: stopped</div>
@@ -36,14 +36,14 @@
         <div class="actions">
           <button id="btnStart" class="primary">Start backend</button>
           <button id="btnStop">Stop backend</button>
-          <button id="btnOpenUI" class="primary" disabled>Open NeuroInsight</button>
+          <button id="btnOpenUI" class="primary" disabled>Open Workspace</button>
           <button id="btnRefresh">Refresh</button>
         </div>
       </section>
 
-      <!-- Preflight -->
+      <!-- System checks -->
       <section class="card">
-        <h2>Preflight</h2>
+        <h2>System checks</h2>
         <p id="platformLine" class="meta">Platform: …</p>
         <div class="actions">
           <button id="btnPreflight">Run checks</button>
@@ -65,7 +65,7 @@
 
       <!-- Credential vault -->
       <section class="card">
-        <h2>Credential vault</h2>
+        <h2>Credential Vault</h2>
         <p id="credsBackend" class="meta">Backend: …</p>
         <div class="field-row">
           <input id="credKey" type="text" placeholder="namespaced.key (e.g. pennsieve.api_key)" />
@@ -81,7 +81,7 @@
 
       <!-- Security / App lock -->
       <section class="card">
-        <h2>App lock</h2>
+        <h2>App Lock</h2>
         <p id="lockDetail" class="meta">Loading…</p>
         <div class="actions row">
           <input id="pinInput" type="password" placeholder="PIN (min 6)" />
@@ -95,7 +95,7 @@
       <!-- Diagnostics -->
       <section class="card">
         <h2>Diagnostics</h2>
-        <p class="meta">Export a support bundle (status, preflight, logs).</p>
+        <p class="meta">Export a support bundle (status, checks, logs).</p>
         <div class="actions">
           <button id="btnDiagnostics">Export bundle</button>
           <button id="btnRevealBundle" disabled>Show in folder</button>

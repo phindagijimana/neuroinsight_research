@@ -49,7 +49,7 @@ const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) =>
                 activePage === 'dashboard' ? 'text-[#003d7a] font-semibold' : 'text-gray-600 hover:text-[#003d7a]'
               }`}
             >
-              Dashboard
+              Results
             </button>
             <button
               onClick={() => setActivePage('viewer')}

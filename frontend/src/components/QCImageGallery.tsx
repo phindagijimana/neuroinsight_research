@@ -201,19 +201,19 @@ const QCImageGallery: React.FC<QCImageGalleryProps> = ({ jobId }) => {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-white rounded-md border border-[#d0dff0] p-3">
-              <p className="text-[10px] font-medium text-[#4a6fa5] uppercase tracking-wider">Left Hippocampus</p>
+              <p className="text-[10px] font-medium text-[#4a6fa5] tracking-wider">Left Hippocampus</p>
               <p className="text-lg font-bold text-[#003d7a]">{metrics.volumes_mm3.left.toFixed(0)} mm³</p>
             </div>
             <div className="bg-white rounded-md border border-[#d0dff0] p-3">
-              <p className="text-[10px] font-medium text-[#4a6fa5] uppercase tracking-wider">Right Hippocampus</p>
+              <p className="text-[10px] font-medium text-[#4a6fa5] tracking-wider">Right Hippocampus</p>
               <p className="text-lg font-bold text-[#003d7a]">{metrics.volumes_mm3.right.toFixed(0)} mm³</p>
             </div>
             <div className="bg-white rounded-md border border-[#d0dff0] p-3">
-              <p className="text-[10px] font-medium text-[#4a6fa5] uppercase tracking-wider">Asymmetry Index</p>
+              <p className="text-[10px] font-medium text-[#4a6fa5] tracking-wider">Asymmetry Index</p>
               <p className="text-lg font-bold text-[#003d7a]">{metrics.asymmetry_index.toFixed(4)}</p>
             </div>
             <div className={`rounded-md border p-3 ${classificationColor(metrics.classification)}`}>
-              <p className="text-[10px] font-medium uppercase tracking-wider opacity-75">Classification</p>
+              <p className="text-[10px] font-medium tracking-wider opacity-75">Classification</p>
               <p className="text-lg font-bold">{metrics.classification}</p>
             </div>
           </div>

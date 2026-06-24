@@ -30,7 +30,7 @@ const MultimodalLinkageCard: React.FC<MultimodalLinkageCardProps> = ({
   return (
     <div className="rounded-lg border border-[#003d7a]/25 bg-gradient-to-b from-[#003d7a]/[0.06] to-gray-50/80 p-3 space-y-3">
       <div>
-        <h3 className="text-xs font-semibold text-[#003d7a] uppercase tracking-wide">
+        <h3 className="text-xs font-semibold text-[#003d7a] tracking-wide">
           EEG ↔ MRI (source localization)
         </h3>
         <p className="text-xs text-gray-600 mt-1">

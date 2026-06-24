@@ -143,7 +143,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
           <div>
             <div className="flex items-center gap-3 mb-2">
               <BarChart className="w-8 h-8 text-[#003d7a]" />
-              <h1 className="text-3xl font-bold text-gray-900">Job Dashboard</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Results</h1>
             </div>
             <p className="text-gray-600">
               Detailed view of completed job results, files, and statistics
@@ -274,7 +274,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
             {/* QC Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Status</p>
+                <p className="text-xs font-medium text-gray-500 tracking-wider mb-1">Status</p>
                 <p className={`text-lg font-bold ${
                   selectedJob.status === 'completed' ? 'text-green-700' :
                   selectedJob.status === 'failed' ? 'text-red-700' : 'text-gray-900'
@@ -283,11 +283,11 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                 </p>
               </div>
               <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Duration</p>
+                <p className="text-xs font-medium text-gray-500 tracking-wider mb-1">Duration</p>
                 <p className="text-lg font-bold text-gray-900">{getJobDuration(selectedJob)}</p>
               </div>
               <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Submitted</p>
+                <p className="text-xs font-medium text-gray-500 tracking-wider mb-1">Submitted</p>
                 <p className="text-lg font-bold text-gray-900">
                   {new Date(selectedJob.submitted_at).toLocaleDateString()}
                 </p>
@@ -296,7 +296,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                 </p>
               </div>
               <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Pipeline</p>
+                <p className="text-xs font-medium text-gray-500 tracking-wider mb-1">Pipeline</p>
                 <p className="text-lg font-bold text-[#003d7a] truncate">
                   {selectedJob.display_name || selectedJob.pipeline_name}
                 </p>

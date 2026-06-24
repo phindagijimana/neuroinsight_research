@@ -296,7 +296,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
         <span className="text-[#003d7a]">{meta.icon}</span>
-        <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">{side}</span>
+        <span className="text-xs font-semibold text-gray-700 tracking-wider">{side}</span>
         <span className="text-xs text-gray-400">|</span>
         <span className="text-xs font-medium text-gray-600">{meta.label}</span>
       </div>
@@ -359,7 +359,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
       )}
 
       {/* Column header */}
-      <div className="flex items-center px-3 py-1 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-wider bg-gray-50">
+      <div className="flex items-center px-3 py-1 border-b border-gray-100 text-[10px] font-semibold text-gray-400 tracking-wider bg-gray-50">
         <span className="w-6" />
         <span className="w-5" />
         <span className="flex-1">Name</span>
