@@ -20,10 +20,10 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, onOpenLocal }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-navy-50 via-white to-navy-50">
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid md:grid-cols-2 gap-6 items-center">
+        <div className="max-w-3xl">
           <div className="space-y-6">
             <h2 className="text-5xl font-bold text-gray-900 leading-tight">
-              <span className="text-[#003d7a]">Neuroimaging Platform</span>
+              <span className="text-[#003d7a]">Run neuroimaging pipelines, anywhere</span>
             </h2>
 
             <p className="text-lg text-gray-600 leading-relaxed">
@@ -77,22 +77,6 @@ const HomePage: React.FC<HomePageProps> = ({ setActivePage, onOpenLocal }) => {
                 Tip: drag &amp; drop a NIfTI or MGZ file anywhere to view it instantly — no upload.
               </p>
             )}
-          </div>
-
-          {/* Brain Illustration */}
-          <div className="relative">
-            <div className="absolute top-10 right-10 w-72 h-72 rounded-full filter blur-3xl opacity-60 animate-pulse" style={{ backgroundColor: '#003d7a' }}></div>
-            <div className="absolute bottom-10 left-10 w-72 h-72 rounded-full filter blur-3xl opacity-60 animate-pulse" style={{ backgroundColor: '#003d7a', animationDelay: '1s' }}></div>
-
-            <div className="relative bg-white rounded-2xl shadow-2xl p-8 border border-navy-100">
-              <div className="flex items-center justify-center">
-                <Brain className="w-64 h-64 text-[#003d7a]" />
-              </div>
-
-              <div className="mt-4 text-center">
-                <p className="text-sm text-gray-500">Pipeline-Agnostic Processing</p>
-              </div>
-            </div>
           </div>
         </div>
 
