@@ -42,6 +42,22 @@ function resolvePython(repoDir) {
   return platformAdapter.resolvePythonCommand();
 }
 
+/** Locate a self-contained backend binary (PyInstaller bundle), if shipped.
+ *  When present it removes the need for a Python venv on the target machine. */
+function resolveBackendBin(repoDir) {
+  const exe = isWindows() ? "nir-backend.exe" : "nir-backend";
+  const candidates = [];
+  if (process.env.NIR_BACKEND_BIN) candidates.push(process.env.NIR_BACKEND_BIN);
+  // Packaged app: shipped under resources/backend/nir-backend/.
+  if (process.resourcesPath) candidates.push(path.join(process.resourcesPath, "backend", "nir-backend", exe));
+  // Local build output.
+  candidates.push(path.join(repoDir, "desktop", "dist", "backend", "nir-backend", exe));
+  for (const c of candidates) {
+    if (c && fs.existsSync(c)) return c;
+  }
+  return null;
+}
+
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
 }
@@ -56,6 +72,7 @@ function init({ stateDir, repoDir } = {}) {
     runtimeDir,
     repoDir: resolvedRepo,
     pythonCmd: resolvePython(resolvedRepo),
+    backendBin: resolveBackendBin(resolvedRepo),
     port: Number(process.env.NIR_DESKTOP_BACKEND_PORT) || DEFAULT_PORT,
     logFiles: {
       backend: path.join(runtimeDir, "backend.log"),
@@ -183,7 +200,8 @@ function spawnLogged(name, command, args, logFile) {
   const errOut = fs.openSync(logFile, "a");
   const child = spawn(command, args, {
     cwd: c.repoDir,
-    env: { ...process.env, PYTHONUNBUFFERED: "1" },
+    // NIR_REPO_DIR lets a bundled (frozen) backend find the real .env + plugins.
+    env: { ...process.env, PYTHONUNBUFFERED: "1", NIR_REPO_DIR: c.repoDir },
     stdio: ["ignore", out, errOut],
     detached: false,
     windowsHide: true,
@@ -203,11 +221,14 @@ function spawnLogged(name, command, args, logFile) {
 
 async function startBackend() {
   const c = requireInit();
-  if (!c.pythonCmd) {
-    return { ok: false, error: "Python runtime not found (install python3 or set NIR_DESKTOP_PYTHON)." };
-  }
-  if (!backendEntryExists()) {
-    return { ok: false, error: `backend/main.py not found under ${c.repoDir} (set NIR_REPO_DIR).` };
+  // A bundled self-contained backend removes the Python/venv requirement.
+  if (!c.backendBin) {
+    if (!c.pythonCmd) {
+      return { ok: false, error: "No bundled backend and no Python runtime found (install python3 or set NIR_DESKTOP_PYTHON)." };
+    }
+    if (!backendEntryExists()) {
+      return { ok: false, error: `backend/main.py not found under ${c.repoDir} (set NIR_REPO_DIR).` };
+    }
   }
 
   // Already healthy? Reuse.
@@ -221,19 +242,16 @@ async function startBackend() {
     return { ok: true, reused: true, port: c.port, url: `http://localhost:${c.port}` };
   }
 
-  const parts = String(c.pythonCmd).split(/\s+/);
-  const cmd = parts[0];
-  const baseArgs = parts.slice(1);
-  const args = [
-    ...baseArgs,
-    "-m",
-    "uvicorn",
-    "backend.main:app",
-    "--host",
-    "127.0.0.1",
-    "--port",
-    String(c.port),
-  ];
+  let cmd;
+  let args;
+  if (c.backendBin) {
+    cmd = c.backendBin;
+    args = ["--host", "127.0.0.1", "--port", String(c.port)];
+  } else {
+    const parts = String(c.pythonCmd).split(/\s+/);
+    cmd = parts[0];
+    args = [...parts.slice(1), "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", String(c.port)];
+  }
 
   fs.appendFileSync(
     c.logFiles.backend,
