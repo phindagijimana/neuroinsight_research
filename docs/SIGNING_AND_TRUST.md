@@ -1,15 +1,19 @@
 # Signing, Notarization & Trust
 
-This is the runbook for shipping installers that **any user can run without scary
-warnings**. Unsigned builds trigger macOS Gatekeeper ("NeuroInsight can't be
-opened because Apple cannot check it for malicious software") and Windows
-SmartScreen ("Windows protected your PC"). Most users will not click through
-those — so for public distribution, signing is mandatory.
+> **Current status: signing is SKIPPED.** Releases ship **unsigned**; integrity
+> comes from `SHA256SUMS.txt` + the baked-in `app-integrity.json`. Users do a
+> one-time "open anyway" on first launch (see [INSTALL.md](INSTALL.md)). This
+> document is the runbook for **enabling** signing later — when secrets are
+> present, builds sign + notarize automatically and the warnings disappear.
 
-The release workflow (`.github/workflows/desktop_release_multi.yml`) **refuses to
-publish** a `desktop-v*` release unless the platform's signing secrets are
-present. Internal/pilot builds via manual `workflow_dispatch` (without
-`publish_to_release`) may stay unsigned.
+Unsigned builds trigger macOS Gatekeeper ("NeuroInsight can't be opened because
+Apple cannot check it for malicious software") and Windows SmartScreen ("Windows
+protected your PC"). That's acceptable for a pilot but not ideal for broad public
+distribution — so the section below is how to add signing when you're ready.
+
+The release workflow (`.github/workflows/desktop_release_multi.yml`) **warns** (it
+does not block) when signing secrets are absent, so unsigned releases publish.
+Add the secrets below to switch to signed + notarized automatically.
 
 | Platform | Required for a public release? | Mechanism |
 |----------|-------------------------------|-----------|

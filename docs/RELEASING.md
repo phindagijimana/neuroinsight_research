@@ -14,12 +14,11 @@ keeps the desktop/frontend `package.json` in sync.
 
 ## One-time prerequisites
 
-- [ ] **Code-signing secrets** configured in GitHub Actions (see
-      [SIGNING_AND_TRUST.md](SIGNING_AND_TRUST.md)). Without them the desktop
-      release **fails by design** rather than shipping unsigned installers:
-      macOS `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
-      `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`; Windows `WIN_CSC_LINK`,
-      `WIN_CSC_KEY_PASSWORD`.
+- [ ] **Code-signing — currently SKIPPED (optional).** Releases ship **unsigned**;
+      the workflow warns (doesn't block). Users do a one-time "open anyway" on
+      first launch (see [INSTALL.md](INSTALL.md)). To remove the warnings later,
+      add signing secrets (see [SIGNING_AND_TRUST.md](SIGNING_AND_TRUST.md)) and
+      builds sign + notarize automatically.
 - [ ] **GHCR package is public.** After the first image push, set
       `nir-allinone` to Public: GitHub → your profile → **Packages** →
       `nir-allinone` → **Package settings** → **Change visibility → Public**.
@@ -54,14 +53,15 @@ keeps the desktop/frontend `package.json` in sync.
    ```bash
    git tag desktop-v0.1.9 && git push origin desktop-v0.1.9
    ```
-   The *Desktop Release (Multi-Platform)* workflow builds signed/notarized
-   macOS/Windows/Linux installers, generates `SHA256SUMS.txt`, and attaches
-   everything to the GitHub Release. It **fails fast** if signing secrets are
-   missing for a published tag.
+   The *Desktop Release (Multi-Platform)* workflow builds macOS/Windows/Linux
+   installers, generates `SHA256SUMS.txt`, and attaches everything to the GitHub
+   Release. With no signing secrets it **warns and ships unsigned** (current
+   setup); add secrets later to sign + notarize.
 
 5. **Verify the release:**
    - [ ] GitHub Release has `.dmg`, `.exe`, `.AppImage`/`.deb`, and `SHA256SUMS.txt`.
-   - [ ] On macOS: `spctl -a -vvv -t install <app>` reports *Notarized Developer ID*.
+   - [ ] (If signed) macOS: `spctl -a -vvv -t install <app>` reports *Notarized
+         Developer ID*. (If unsigned, expect the one-time right-click → Open.)
    - [ ] Fresh-machine test: on a clean Mac/Win/Linux with only Docker Desktop,
          install → first launch downloads the engine (~1.8 GB) → lands in the
          Workspace.
