@@ -79,6 +79,8 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
   const [host, setHost] = useState(sshConfig?.host || '');
   const [username, setUsername] = useState(sshConfig?.username || '');
   const [port, setPort] = useState(sshConfig?.port || 22);
+  // Saved hosts from ~/.ssh/config (the alias picker).
+  const [sshHosts, setSshHosts] = useState<Array<{ alias: string; hostname: string; user: string; port: number }>>([]);
 
   const [hpcConfig, setHpcConfig] = useState<HPCConfig>({
     workDir: '~', partition: 'general', account: '', qos: '', modules: '',
@@ -105,6 +107,21 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
   const needsSSH = !isPlatformSelected && (dataSourceNeedsSSH || computeNeedsSSH);
 
   useEffect(() => { checkCurrentBackend(); }, []);
+
+  // Load saved Host aliases from ~/.ssh/config once SSH is needed.
+  useEffect(() => {
+    if (needsSSH && sshHosts.length === 0) {
+      apiService.getSshHosts().then(setSshHosts).catch(() => {});
+    }
+  }, [needsSSH]);
+
+  const applySshAlias = (alias: string) => {
+    const h = sshHosts.find((x) => x.alias === alias);
+    if (!h) return;
+    setHost(h.hostname);
+    if (h.user) setUsername(h.user);
+    if (h.port) setPort(h.port);
+  };
 
   useEffect(() => {
     if (onSSHConfigChange && (dataSourceNeedsSSH || computeNeedsSSH)) {
@@ -373,6 +390,24 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
           </div>
 
           <div className="space-y-3">
+            {sshHosts.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Saved host (from ~/.ssh/config)</label>
+                <select
+                  defaultValue=""
+                  disabled={connectionStatus === 'connected'}
+                  onChange={(e) => applySshAlias(e.target.value)}
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white focus:ring-1 focus:ring-green-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
+                >
+                  <option value="">— pick a saved host or enter manually —</option>
+                  {sshHosts.map((h) => (
+                    <option key={h.alias} value={h.alias}>
+                      {h.alias} ({h.user ? `${h.user}@` : ''}{h.hostname})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Hostname *</label>
               <input

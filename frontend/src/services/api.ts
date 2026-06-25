@@ -604,6 +604,16 @@ export const apiService = {
     return response.data;
   },
 
+  /** Saved Host aliases from the user's ~/.ssh/config (for the connect picker). */
+  async getSshHosts(): Promise<Array<{ alias: string; hostname: string; user: string; port: number }>> {
+    try {
+      const response = await api.get('/api/hpc/ssh-hosts');
+      return response.data?.hosts || [];
+    } catch {
+      return [];
+    }
+  },
+
   /**
    * Disconnect SSH connection.
    */
