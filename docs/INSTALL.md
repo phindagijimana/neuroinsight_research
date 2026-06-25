@@ -38,17 +38,18 @@ Get the installer for your platform from the
 
 ### Verify your download (recommended)
 
-Each release includes `SHA256SUMS.txt`. Confirm the file wasn't corrupted or
-tampered with:
+Each release includes a checksum file per platform
+(`desktop-release-sha256-macos.txt`, `-windows.txt`, `-linux.txt`). Confirm your
+download wasn't corrupted or tampered with:
 
 ```bash
-# macOS / Linux
-shasum -a 256 -c SHA256SUMS.txt
+# macOS / Linux — download the matching checksum file next to the installer
+shasum -a 256 -c desktop-release-sha256-macos.txt    # or -linux.txt
 ```
 ```powershell
 # Windows (PowerShell)
 (Get-FileHash .\NeuroInsight-Setup-<version>.exe -Algorithm SHA256).Hash
-# compare against the matching line in SHA256SUMS.txt
+# compare against the matching line in desktop-release-sha256-windows.txt
 ```
 
 ## 3. Install & launch
