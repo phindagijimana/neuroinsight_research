@@ -75,6 +75,10 @@ class SSHManager:
         self.username: Optional[str] = None
         self.port: int = 22
         self.key_path: Optional[str] = None
+        # Password for password / keyboard-interactive (e.g. Duo MFA) auth.
+        # Held in memory only (never written to disk) so the persistent
+        # connection can auto-reconnect within a session without re-prompting.
+        self.password: Optional[str] = None
         self.connect_timeout: int = DEFAULT_CONNECT_TIMEOUT
         self.command_timeout: int = DEFAULT_COMMAND_TIMEOUT
         self.keepalive_interval: int = DEFAULT_KEEPALIVE_INTERVAL
@@ -98,6 +102,7 @@ class SSHManager:
         username: str,
         port: int = 22,
         key_path: Optional[str] = None,
+        password: Optional[str] = None,
         connect_timeout: int = DEFAULT_CONNECT_TIMEOUT,
         command_timeout: int = DEFAULT_COMMAND_TIMEOUT,
         keepalive_interval: int = DEFAULT_KEEPALIVE_INTERVAL,
@@ -124,6 +129,7 @@ class SSHManager:
             self.username = username
             self.port = port
             self.key_path = key_path
+            self.password = password
             self.connect_timeout = connect_timeout
             self.command_timeout = command_timeout
             self.keepalive_interval = keepalive_interval
@@ -189,6 +195,16 @@ class SSHManager:
                         connect_kwargs["key_filename"] = key_path
                         connect_kwargs["allow_agent"] = False
                         connect_kwargs["look_for_keys"] = False
+
+                # Password / keyboard-interactive (e.g. Duo MFA). paramiko uses the
+                # password for password-auth and, when the server only offers
+                # keyboard-interactive (as Duo clusters do), answers the prompt with
+                # it — the Duo push then fires for the user to approve. Approval can
+                # take time, so widen the auth/banner timeouts beyond the TCP connect.
+                if self.password:
+                    connect_kwargs["password"] = self.password
+                    connect_kwargs["auth_timeout"] = max(self.connect_timeout, 60)
+                    connect_kwargs["banner_timeout"] = max(self.connect_timeout, 30)
 
                 logger.info(f"Connecting to {self.username}@{self.host}:{self.port}")
                 client.connect(**connect_kwargs)
@@ -587,10 +603,25 @@ _ssh_manager: Optional[SSHManager] = None
 _ssh_lock = threading.Lock()
 
 
-def get_ssh_manager() -> SSHManager:
-    """Get global SSH manager instance (singleton)."""
+def get_ssh_manager():
+    """Get the global SSH manager (singleton).
+
+    When ``NIR_SSH_BROKER_URL`` is set (desktop container launched with a host
+    SSH broker), return a broker-backed manager so HPC connections use the
+    host's working auth (agent key, ~/.ssh/config, Kerberos). Otherwise fall
+    back to the in-process paramiko manager — nothing that works today changes.
+    """
     global _ssh_manager
     with _ssh_lock:
         if _ssh_manager is None:
-            _ssh_manager = SSHManager()
+            if os.getenv("NIR_SSH_BROKER_URL"):
+                try:
+                    from backend.core.host_ssh_broker_client import BrokerSSHManager
+                    _ssh_manager = BrokerSSHManager()
+                    logger.info("SSH via host broker at %s", os.getenv("NIR_SSH_BROKER_URL"))
+                except Exception as e:  # noqa: BLE001 - fall back to paramiko
+                    logger.warning("Host SSH broker unavailable (%s); using in-process SSH", e)
+                    _ssh_manager = SSHManager()
+            else:
+                _ssh_manager = SSHManager()
         return _ssh_manager

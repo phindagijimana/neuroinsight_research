@@ -62,6 +62,7 @@ class SLURMBackend(ExecutionBackend):
         qos: Optional[str] = None,
         modules: Optional[List[str]] = None,
         container_runtime: str = "singularity",
+        ssh_password: Optional[str] = None,
         ssh_manager: Optional[SSHManager] = None,
     ):
         """Initialize SLURM backend.
@@ -81,6 +82,9 @@ class SLURMBackend(ExecutionBackend):
         self.ssh_host = ssh_host
         self.ssh_user = ssh_user
         self.ssh_port = ssh_port
+        # Password for password/keyboard-interactive (Duo MFA) clusters that
+        # don't accept SSH keys (e.g. BlueHive). In-memory only.
+        self.ssh_password = ssh_password
         self.work_dir = work_dir
         self._work_dir_resolved = False
         self.partition = partition
@@ -157,7 +161,10 @@ class SLURMBackend(ExecutionBackend):
     def _ensure_ssh(self) -> None:
         """Ensure SSH is configured and connected."""
         if not self._ssh.is_connected:
-            self._ssh.configure(host=self.ssh_host, username=self.ssh_user, port=self.ssh_port)
+            self._ssh.configure(
+                host=self.ssh_host, username=self.ssh_user, port=self.ssh_port,
+                password=self.ssh_password,
+            )
             try:
                 self._ssh.connect()
             except SSHConnectionError as e:
