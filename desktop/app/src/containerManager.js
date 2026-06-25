@@ -12,6 +12,7 @@ const path = require("path");
 const http = require("http");
 const net = require("net");
 const { spawnSync, spawn } = require("child_process");
+const { SshBroker } = require("./sshBroker");
 
 const IMAGE_DEFAULT = "nir-allinone:dev";
 const CONTAINER_NAME = "nir-allinone";
@@ -19,6 +20,18 @@ const DEFAULT_PORT = 8800;
 const PORT_SCAN = 20;
 
 let cfg = null;
+let broker = null; // host-side SSH broker (OS ssh + ControlMaster) for HPC
+
+// Start the host SSH broker once and reuse it. The container reaches it via
+// host.docker.internal; the engine inherits the host's working SSH auth (agent
+// key, ~/.ssh/config, Kerberos, ...) instead of doing SSH from inside itself.
+async function ensureBroker() {
+  if (broker && broker.port) return broker;
+  const c = requireInit();
+  broker = new SshBroker({ hostDataDir: c.dataDir, containerDataDir: "/data" });
+  await broker.listen(0, "0.0.0.0"); // token-protected; bound for the app session
+  return broker;
+}
 
 function isWindows() {
   return process.platform === "win32";
@@ -127,6 +140,16 @@ function buildRunArgs(c) {
   // Tell the in-container backend the real host path of /data so sibling job
   // containers (Docker-out-of-Docker) get host-resolvable bind mounts.
   args.push("-e", `NIR_HOST_DATA_DIR=${c.dataDir}`);
+  // Reach the host (and thus the SSH broker) on Linux too; Docker Desktop
+  // provides host.docker.internal natively, this is a harmless no-op there.
+  args.push("--add-host", "host.docker.internal:host-gateway");
+  // Point the engine at the host SSH broker so HPC connections inherit the
+  // host's working auth (agent key, ~/.ssh/config, Kerberos) instead of doing
+  // SSH from inside the container. Token-protected.
+  if (c.brokerPort && c.brokerToken) {
+    args.push("-e", `NIR_SSH_BROKER_URL=http://host.docker.internal:${c.brokerPort}`);
+    args.push("-e", `NIR_SSH_BROKER_TOKEN=${c.brokerToken}`);
+  }
   if (!isWindows() && fs.existsSync("/var/run/docker.sock")) {
     args.push("-v", "/var/run/docker.sock:/var/run/docker.sock");
   }
@@ -194,6 +217,18 @@ async function start(opts = {}) {
     return { ok: true, reused: true, port: c.port, url: `http://localhost:${c.port}`, backend: { reused: true } };
   }
 
+  // Start the host SSH broker and hand its URL+token to the container env so
+  // HPC connections route through the host's working SSH auth. Best-effort:
+  // if it can't start, the engine falls back to in-container SSH.
+  try {
+    const b = await ensureBroker();
+    c.brokerPort = b.port;
+    c.brokerToken = b.token;
+  } catch (e) {
+    c.brokerPort = null;
+    c.brokerToken = null;
+  }
+
   // Remove any stale container of the same name, then run.
   docker(["rm", "-f", c.name]);
   const run = docker(buildRunArgs(c), { timeout: 60000 });
@@ -228,6 +263,11 @@ function stopBackend() {
   dumpLogs();
   const stop = docker(["stop", c.name]);
   docker(["rm", "-f", c.name]);
+  // Tear down the SSH broker + its ControlMaster sockets with the engine.
+  if (broker) {
+    try { broker.close(); } catch (_e) { /* best effort */ }
+    broker = null;
+  }
   return { ok: true, killed: stop.status === 0 };
 }
 

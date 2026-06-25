@@ -68,6 +68,9 @@ class BackendSwitchRequest(BaseModel):
     ssh_host: Optional[str] = None
     ssh_user: Optional[str] = None
     ssh_port: int = int(os.getenv("HPC_SSH_PORT", "22"))
+    # Password for password/keyboard-interactive (Duo MFA) clusters that reject
+    # SSH keys (e.g. BlueHive). Used only to establish the session; never stored.
+    ssh_password: Optional[str] = None
     work_dir: str = "~"
     partition: str = "general"
     account: Optional[str] = None
@@ -283,7 +286,8 @@ def switch_backend(request: BackendSwitchRequest):
         # Establish SSH connection first
         from backend.core.ssh_manager import get_ssh_manager, SSHConnectionError
         ssh = get_ssh_manager()
-        ssh.configure(host=request.ssh_host, username=request.ssh_user, port=request.ssh_port)
+        ssh.configure(host=request.ssh_host, username=request.ssh_user, port=request.ssh_port,
+                      password=request.ssh_password)
         try:
             ssh.connect()
         except SSHConnectionError as e:
@@ -312,6 +316,7 @@ def switch_backend(request: BackendSwitchRequest):
                 ssh_host=request.ssh_host,
                 ssh_user=request.ssh_user,
                 ssh_port=request.ssh_port,
+                ssh_password=request.ssh_password,
                 work_dir=request.work_dir,
                 partition=request.partition,
                 account=request.account,
