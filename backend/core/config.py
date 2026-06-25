@@ -134,6 +134,7 @@ class Settings(BaseSettings):
                 return str(p)
 
         search_paths = [
+            Path(self.data_dir) / "license.txt",  # uploaded via Settings
             Path("./license.txt"),
             Path("./data/license.txt"),
             Path(os.environ.get("FREESURFER_HOME", "/nonexistent")) / "license.txt",
@@ -160,6 +161,7 @@ class Settings(BaseSettings):
                 return str(p)
 
         search_paths = [
+            Path(self.data_dir) / "meld_license.txt",  # uploaded via Settings
             Path("./meld_license.txt"),
             Path("./data/meld_license.txt"),
             Path.home() / ".meld" / "meld_license.txt",

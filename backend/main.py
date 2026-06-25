@@ -34,6 +34,7 @@ from backend.routes import hpc
 from backend.routes import audit
 from backend.routes import platform as platform_routes
 from backend.routes import transfer as transfer_routes
+from backend.routes import licenses as licenses_routes
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -212,6 +213,7 @@ app.include_router(hpc.router)
 app.include_router(audit.router)
 app.include_router(platform_routes.router)
 app.include_router(transfer_routes.router)
+app.include_router(licenses_routes.router)
 
 
 @app.exception_handler(Exception)

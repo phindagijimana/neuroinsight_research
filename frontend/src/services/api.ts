@@ -85,9 +85,21 @@ api.interceptors.response.use(
   }
 );
 
+export interface LicenseInfo {
+  id: string;
+  name: string;
+  filename: string;
+  required_by: string[];
+  registration_url: string;
+  description: string;
+  format_hint?: string;
+  installed: boolean;
+  size: number;
+}
+
 /**
  * API Service
- * 
+ *
  * Collection of type-safe methods for backend communication.
  * All methods return Promises that resolve to typed data.
  */
@@ -619,6 +631,20 @@ export const apiService = {
    */
   async hpcDisconnect(): Promise<void> {
     await api.post('/api/hpc/disconnect');
+  },
+
+  // -- Licenses (FreeSurfer / MELD / future) -------------------------------
+  async getLicenses(): Promise<LicenseInfo[]> {
+    const response = await api.get('/api/licenses');
+    return response.data?.licenses || [];
+  },
+  async uploadLicense(id: string, content: string): Promise<LicenseInfo> {
+    const response = await api.post(`/api/licenses/${id}`, { content });
+    return response.data;
+  },
+  async deleteLicense(id: string): Promise<LicenseInfo> {
+    const response = await api.delete(`/api/licenses/${id}`);
+    return response.data;
   },
 
   /**
