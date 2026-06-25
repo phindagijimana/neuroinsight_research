@@ -4,6 +4,14 @@ An open-source platform for running neuroimaging tools from a web interface. Sel
 
 A **plugin** wraps a single neuroimaging tool (e.g., FreeSurfer, fMRIPrep) so it can run in a container with one click. A **workflow** chains multiple plugins into a single job with automatic data passing between steps (e.g., fMRIPrep then XCP-D). Both are defined as YAML files -- drop a new one in `plugins/` or `workflows/` to extend the platform.
 
+## Desktop app (end users)
+
+Most users want the **desktop app** — download an installer for macOS, Windows,
+or Linux; the only prerequisite is Docker Desktop. See **[docs/INSTALL.md](docs/INSTALL.md)**
+for step-by-step instructions and system requirements.
+
+The sections below are for **developers/contributors** running from source.
+
 ## Requirements
 
 Install these before running `./research install` (the installer handles all Python/Node packages automatically):
