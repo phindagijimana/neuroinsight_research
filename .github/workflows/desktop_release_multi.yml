@@ -82,32 +82,29 @@ jobs:
         working-directory: desktop/app
         run: npm run check
 
-      # Refuse to PUBLISH unsigned installers to end users. Internal/pilot builds
-      # (workflow_dispatch without publish) may stay unsigned; a real release
-      # (desktop-v* tag push, or publish_to_release=true) must be signed.
-      - name: Require signing secrets for published releases
+      # Signing is currently SKIPPED (no certs). Warn — don't fail — so unsigned
+      # pilot releases can ship; integrity is provided by SHA256SUMS.txt and the
+      # baked-in app-integrity manifest. To enforce signing later, add the
+      # secrets (docs/SIGNING_AND_TRUST.md); when present, builds sign + notarize
+      # automatically.
+      - name: Signing status (warn if unsigned)
         if: startsWith(github.ref, 'refs/tags/desktop-v') && (github.event_name == 'push' || github.event.inputs.publish_to_release == 'true')
         shell: bash
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           case "${{ matrix.platform_name }}" in
             macos)
-              if [ -z "$CSC_LINK" ] || [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
-                echo "::error::Publishing a release without macOS signing/notarization secrets (CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID). Refusing to ship an unsigned/un-notarized macOS build — users would hit Gatekeeper. See docs/SIGNING_AND_TRUST.md."
-                exit 1
+              if [ -z "$CSC_LINK" ]; then
+                echo "::warning::Unsigned/un-notarized macOS build — users must right-click → Open on first launch (see docs/INSTALL.md). Add signing secrets to remove the warning."
               fi ;;
             windows)
               if [ -z "$WIN_CSC_LINK" ]; then
-                echo "::error::Publishing a release without the Windows signing secret WIN_CSC_LINK. Refusing to ship an unsigned installer — users would hit SmartScreen. See docs/SIGNING_AND_TRUST.md."
-                exit 1
+                echo "::warning::Unsigned Windows build — users will see SmartScreen (More info → Run anyway). Add WIN_CSC_LINK to sign."
               fi ;;
             linux)
-              echo "Linux AppImage/deb: code signing not required; integrity is provided by the published SHA-256 checksums." ;;
+              echo "Linux AppImage/deb: no signing needed; integrity via the published SHA-256 checksums." ;;
           esac
 
       - name: Build desktop artifacts

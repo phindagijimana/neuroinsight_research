@@ -38,7 +38,10 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
   at launch, warning on tampering/corruption until code signing is in place.
 - All-in-one container now generates unique per-install credentials
   (Redis / MinIO / SECRET_KEY) at first run instead of shipping fixed defaults.
-- Release workflow refuses to publish unsigned/un-notarized installers.
+- Releases currently ship unsigned (signing skipped); integrity via
+  SHA256SUMS.txt + a baked-in app-integrity manifest, with a one-time
+  "open anyway" on first launch. Signing/notarization auto-engages when
+  certs are added (docs/SIGNING_AND_TRUST.md).
 - Documented the local-only trust model and the "do not expose to the internet"
   guidance in the README.
 
