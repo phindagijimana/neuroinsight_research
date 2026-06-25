@@ -234,7 +234,7 @@ function injectStatusBar() {
             '<span id="nir-dot" style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block"></span>' +
             '<span id="nir-engine">Engine: healthy</span></span>' +
           '<button id="nir-settings" style="background:transparent;color:#cdd9ea;border:1px solid rgba(255,255,255,.25);' +
-            'border-radius:6px;padding:3px 10px;font:inherit;cursor:pointer">\\u2699 Control Center</button>';
+            'border-radius:6px;padding:3px 10px;font:inherit;cursor:pointer">\\u2699 Settings</button>';
         document.body.appendChild(bar);
         document.body.style.paddingBottom = '34px';
         document.getElementById('nir-settings').onclick = function () {
@@ -328,7 +328,7 @@ function buildAppMenu() {
     label: "NeuroInsight",
     submenu: [
       {
-        label: "Settings (Control Center)",
+        label: "Settings",
         accelerator: "CmdOrCtrl+,",
         enabled: !onControl,
         click: () => navigateToControl(),
@@ -635,7 +635,7 @@ async function runStartupSequence() {
         type: "warning",
         message: "Docker is required",
         detail: "NeuroInsight runs its engine in Docker. Install/start Docker Desktop, then reopen the app.",
-        buttons: ["Get Docker", "Open Control Center"],
+        buttons: ["Get Docker", "Open Settings"],
         defaultId: 0,
         cancelId: 1,
       });
@@ -681,7 +681,7 @@ function reportFatal(kind, err) {
     dialog.showMessageBox({
       type: "error",
       title: "NeuroInsight hit an unexpected error",
-      message: "Something went wrong. You can keep working, but if it persists, export a diagnostics bundle from the Control Center and share it.",
+      message: "Something went wrong. You can keep working, but if it persists, export a diagnostics bundle from Settings and share it.",
       detail: String(message).slice(0, 1500),
       buttons: ["OK"],
     });
