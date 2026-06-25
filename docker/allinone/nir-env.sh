@@ -2,6 +2,10 @@
 # Shared runtime config for the all-in-one container. Internal services all live
 # on localhost inside this one container (matching the app's default hostnames),
 # so there is no Docker network / DNS / multi-port surface.
+# supervisord drops privileges (user=neuroinsight) but doesn't reset HOME, so it
+# stays /root and ~ resolves wrong. Pin it so ssh + ~/.ssh/config (saved-host
+# aliases) and other HOME-relative lookups work.
+export HOME=/home/neuroinsight
 export ENVIRONMENT=production
 export DATABASE_URL="postgresql://neuroinsight@127.0.0.1:5432/neuroinsight"
 export REDIS_HOST=127.0.0.1
