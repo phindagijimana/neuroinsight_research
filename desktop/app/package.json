@@ -8,7 +8,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "check": "for f in src/*.js renderer/*.js; do node --check \"$f\" || exit 1; done",
+    "check": "node scripts/check.js",
     "dist": "electron-builder",
     "dist:linux": "electron-builder --linux AppImage deb",
     "dist:mac": "electron-builder --mac dmg",
