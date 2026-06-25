@@ -51,7 +51,9 @@
       "category": "Science",
       "icon": "assets/icon.png"
     },
+    "afterPack": "build/after_pack.js",
     "afterSign": "build/notarize.js",
+    "afterAllArtifactBuild": "build/after_all_artifact_build.js",
     "mac": {
       "target": ["dmg"],
       "category": "public.app-category.medical",

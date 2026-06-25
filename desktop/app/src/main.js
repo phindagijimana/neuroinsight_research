@@ -12,6 +12,7 @@
  */
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const { app, BrowserWindow, Menu, ipcMain, shell, dialog, crashReporter } = require("electron");
 
 // Collect native crash minidumps locally (never uploaded — no server). Stored
@@ -689,6 +690,49 @@ function reportFatal(kind, err) {
   }
 }
 
+/** Self-verify the packaged app against the baked-in integrity manifest
+ *  (build/after_pack.js writes app-integrity.json next to app.asar). While the
+ *  app is unsigned this catches tampering/corruption of the app's code. No-op in
+ *  dev (no asar) or if the manifest is absent. */
+function verifyIntegrity() {
+  if (!app.isPackaged) return;
+  try {
+    const manifestPath = path.join(process.resourcesPath, "app-integrity.json");
+    const asarPath = path.join(process.resourcesPath, "app.asar");
+    if (!fs.existsSync(manifestPath) || !fs.existsSync(asarPath)) return;
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const expected = manifest && manifest.files && manifest.files["app.asar"];
+    if (!expected) return;
+    const hash = crypto.createHash("sha256");
+    const stream = fs.createReadStream(asarPath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("end", () => {
+      const actual = hash.digest("hex");
+      if (actual === expected) {
+        desktopState.appendLog("integrity_ok", {});
+      } else {
+        desktopState.appendLog("integrity_mismatch", { expected, actual });
+        try {
+          dialog.showMessageBox({
+            type: "warning",
+            title: "Integrity check failed",
+            message:
+              "This installation appears to have been modified or corrupted. For your safety, reinstall NeuroInsight from an official release.",
+            buttons: ["Continue anyway"],
+          });
+        } catch (_e) {
+          // dialog best-effort
+        }
+      }
+    });
+    stream.on("error", () => {
+      /* best effort */
+    });
+  } catch (_e) {
+    // integrity check is best-effort
+  }
+}
+
 function installCrashHandlers() {
   process.on("uncaughtException", (err) => reportFatal("uncaughtException", err));
   process.on("unhandledRejection", (reason) => reportFatal("unhandledRejection", reason));
@@ -706,6 +750,7 @@ function installCrashHandlers() {
 app.whenReady().then(async () => {
   initModules();
   installCrashHandlers();
+  verifyIntegrity();
   registerIpc();
   tryAutoImportLicense();
   buildAppMenu();
