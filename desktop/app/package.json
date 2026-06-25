@@ -1,7 +1,7 @@
 {
   "name": "nir-desktop-app",
-  "version": "0.1.0",
-  "description": "NeuroInsight Desktop — thin Electron orchestration client",
+  "version": "0.1.9",
+  "description": "NeuroInsight Desktop \u2014 thin Electron orchestration client",
   "private": true,
   "main": "src/main.js",
   "author": "NeuroInsight Team",
@@ -47,7 +47,10 @@
       "package.json"
     ],
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "Science",
       "icon": "assets/icon.png"
     },
@@ -55,7 +58,9 @@
     "afterSign": "build/notarize.js",
     "afterAllArtifactBuild": "build/after_all_artifact_build.js",
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "category": "public.app-category.medical",
       "icon": "assets/icon.icns",
       "hardenedRuntime": true,
@@ -64,9 +69,13 @@
       "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "assets/icon.ico",
-      "signingHashAlgorithms": ["sha256"]
+      "signingHashAlgorithms": [
+        "sha256"
+      ]
     }
   }
 }
