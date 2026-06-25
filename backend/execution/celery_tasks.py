@@ -555,7 +555,9 @@ def run_docker_job(self, job_id: str, spec_dict: dict) -> dict:
 
         # MELD Graph needs a persistent data volume for params/models
         # (~450 MB, downloaded on first run).
-        is_meld = "meld_graph" in image or "meld_graph" in (parameters.get("_plugin_id", ""))
+        from backend.core.config import get_settings
+        settings = get_settings()
+        is_meld = "meld_graph" in image or "meld_graph" in (resolved_params.get("_plugin_id", ""))
         meld_data_dir = Path(settings.data_dir) / "meld_data"
         if is_meld and meld_data_dir.exists():
             volumes[str(meld_data_dir / "meld_params")] = {
