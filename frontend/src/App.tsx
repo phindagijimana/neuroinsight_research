@@ -202,7 +202,7 @@ import {
 } from './utils/viewerQuery';
 
 // Page type definition for type-safe navigation -- exported for child components
-export type Page = 'home' | 'jobs' | 'dashboard' | 'viewer' | 'transfer' | 'docs';
+export type Page = 'home' | 'jobs' | 'dashboard' | 'viewer' | 'transfer' | 'docs' | 'settings';
 
 // Code-split pages with React.lazy for smaller initial bundle
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -211,6 +211,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ViewerPage = lazy(() => import('./pages/ViewerPage'));
 const TransferPage = lazy(() => import('./pages/TransferPage'));
 const DocsPage = lazy(() => import('./pages/DocsPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 type NavigateOptions = { viewerTab?: ViewerTab };
 
@@ -340,6 +341,8 @@ function App() {
         {activePage === 'docs' && (
           <DocsPage setActivePage={navigateTo} />
         )}
+
+        {activePage === 'settings' && <SettingsPage />}
       </Suspense>
     </div>
   );
