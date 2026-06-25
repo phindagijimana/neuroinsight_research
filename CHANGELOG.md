@@ -32,6 +32,10 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 - Streamed first-run container image-pull progress to the splash screen.
 
 ### Security
+- Interim integrity for unsigned builds: every desktop build now emits a
+  `SHA256SUMS.txt` next to the installers (afterAllArtifactBuild hook), and the
+  app bakes in an `app-integrity.json` (sha256 of app.asar) that it self-verifies
+  at launch, warning on tampering/corruption until code signing is in place.
 - All-in-one container now generates unique per-install credentials
   (Redis / MinIO / SECRET_KEY) at first run instead of shipping fixed defaults.
 - Release workflow refuses to publish unsigned/un-notarized installers.

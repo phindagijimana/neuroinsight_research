@@ -19,6 +19,38 @@ present. Internal/pilot builds via manual `workflow_dispatch` (without
 
 ---
 
+## Interim trust before signing — checksums
+
+Until code-signing certificates are in place, **checksums are the integrity
+mechanism**. They're produced automatically on every build (no separate step):
+
+- **`SHA256SUMS.txt`** is written next to the installers by the
+  `afterAllArtifactBuild` hook (`build/after_all_artifact_build.js`) and
+  published with each release. Verify a download before running it:
+
+  ```bash
+  # macOS / Linux
+  shasum -a 256 -c SHA256SUMS.txt        # or: sha256sum -c SHA256SUMS.txt
+  ```
+  ```powershell
+  # Windows
+  (Get-FileHash .\NeuroInsight-Setup.exe -Algorithm SHA256).Hash
+  # compare against the matching line in SHA256SUMS.txt
+  ```
+
+- **In-app self-check.** The `afterPack` hook (`build/after_pack.js`) bakes
+  `app-integrity.json` (the SHA-256 of `app.asar`) into the app. At launch the
+  main process re-hashes `app.asar` and compares; on a mismatch it logs
+  `integrity_mismatch` and warns the user that the install was modified or
+  corrupted. This is a no-op in dev and is superseded by the OS signature once
+  signing is enabled.
+
+Checksums detect corruption and tampering-in-transit, but they do **not** prove
+origin the way a code signature does — so they are a bridge, not a replacement
+for signing.
+
+---
+
 ## GitHub Secrets to configure
 
 Set these in **Settings → Secrets and variables → Actions** (repository secrets):
