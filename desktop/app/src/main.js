@@ -748,6 +748,15 @@ function installCrashHandlers() {
 // App lifecycle
 // --------------------------------------------------------------------------
 app.whenReady().then(async () => {
+  // Show the NeuroInsight "NI" icon in the macOS dock in dev too (packaged
+  // builds get it from the .icns via electron-builder).
+  if (process.platform === "darwin" && app.dock) {
+    try {
+      app.dock.setIcon(require("path").join(__dirname, "..", "assets", "icon.png"));
+    } catch (_e) {
+      /* best effort */
+    }
+  }
   initModules();
   installCrashHandlers();
   verifyIntegrity();
