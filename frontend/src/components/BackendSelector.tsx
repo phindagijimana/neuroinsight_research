@@ -81,6 +81,9 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
   const [port, setPort] = useState(sshConfig?.port || 22);
   // Saved hosts from ~/.ssh/config (the alias picker).
   const [sshHosts, setSshHosts] = useState<Array<{ alias: string; hostname: string; user: string; port: number }>>([]);
+  // Password for clusters that reject keys and need password + Duo (e.g. BlueHive).
+  // Optional: blank uses your SSH key / agent. Never persisted.
+  const [password, setPassword] = useState('');
 
   const [hpcConfig, setHpcConfig] = useState<HPCConfig>({
     workDir: '~', partition: 'general', account: '', qos: '', modules: '',
@@ -164,7 +167,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
       const resp = await fetch(`${apiService.getBaseUrl()}/api/hpc/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ host, username, port }),
+        body: JSON.stringify({ host, username, port, password: password || null }),
       });
       const data = await resp.json();
       if (data.connected) {
@@ -213,6 +216,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
         body: JSON.stringify({
           backend_type: backendType,
           ssh_host: host, ssh_user: username, ssh_port: port,
+          ssh_password: password || null,
           work_dir: hpcConfig.workDir, partition: hpcConfig.partition,
           account: hpcConfig.account || null, qos: hpcConfig.qos || null,
           modules: hpcConfig.modules || null,
@@ -435,6 +439,23 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
                 />
               </div>
             </div>
+
+            {connectionStatus !== 'connected' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Password <span className="text-gray-400 font-normal">— only if your cluster uses password/Duo</span>
+                </label>
+                <input
+                  type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                  placeholder="leave blank to use your SSH key"
+                  autoComplete="off"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 focus:border-transparent"
+                />
+                {password && (
+                  <p className="text-xs text-gray-500 mt-1">A Duo push may appear on your phone — approve it to finish connecting.</p>
+                )}
+              </div>
+            )}
 
             {connectionStatus !== 'connected' && (
               <div className="flex items-center gap-2">
