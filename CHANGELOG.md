@@ -7,6 +7,24 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-06-25
+
+### Fixed
+- **Local jobs crashed** (`NameError` in `celery_tasks.run_docker_job`) — every
+  local Docker plugin/workflow job failed. Found by running dcm2niix end-to-end.
+- **Container `HOME` unset** under supervisord → `~/.ssh/config` didn't resolve;
+  saved-host aliases came back empty. Pinned `HOME=/home/neuroinsight`.
+- **Stale `postmaster.pid`** after a force-quit/crash made Postgres refuse to
+  start, so the app never came up; the lock is now cleared on startup.
+
+### Added
+- **Saved-host SSH alias picker** — connect by `~/.ssh/config` alias
+  (`GET /api/hpc/ssh-hosts`), auto-filling host/user/port.
+- **SystemSSHSession** — OS `ssh` + ControlMaster multiplexing (connect/exec/
+  browse), honoring `~/.ssh/config` (aliases, ProxyJump). Foundation for the
+  designed interactive-MFA HPC flow (`docs/design/interactive-ssh-auth.md`).
+- End-user docs: `docs/INSTALL.md`, `docs/RELEASING.md`; real multi-res app icon.
+
 ## [0.1.9] - 2026-06-25
 
 ### Added
