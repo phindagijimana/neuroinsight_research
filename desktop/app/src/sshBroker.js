@@ -25,6 +25,23 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
+// Build the env for spawned ssh/scp with a usable ssh-agent. When the app is
+// launched from Finder/dock, the Electron process may not have inherited
+// SSH_AUTH_SOCK; on macOS the launchd session still knows it, so recover it.
+function agentEnv() {
+  const env = { ...process.env };
+  if (!env.SSH_AUTH_SOCK && process.platform === "darwin") {
+    try {
+      const r = spawnSync("launchctl", ["getenv", "SSH_AUTH_SOCK"], { encoding: "utf8", timeout: 4000 });
+      const sock = (r.stdout || "").trim();
+      if (sock) env.SSH_AUTH_SOCK = sock;
+    } catch (_e) {
+      /* best effort */
+    }
+  }
+  return env;
+}
+
 function socketDir() {
   // Prefer a short, private path (ssh control sockets have a ~104 char limit).
   const d = path.join(os.tmpdir(), "nir-ssh");
@@ -49,6 +66,7 @@ class SshBroker {
     this.conns = new Map(); // key -> { cp, host, user, port }
     this.server = null;
     this.port = null;
+    this.env = agentEnv(); // env (with resolved SSH_AUTH_SOCK) for ssh/scp
   }
 
   _key(host, user, port) {
@@ -82,7 +100,7 @@ class SshBroker {
     const r = spawnSync(
       "ssh",
       [...this._baseOpts(cp), "-p", String(port), `${user}@${host}`, "-O", "check"],
-      { timeout: 8000 }
+      { timeout: 8000, env: this.env }
     );
     return r.status === 0;
   }
@@ -102,7 +120,7 @@ class SshBroker {
       "-p", String(port),
       `${user}@${host}`,
     ];
-    const r = spawnSync("ssh", args, { timeout: 35000 });
+    const r = spawnSync("ssh", args, { timeout: 35000, env: this.env });
     if (r.status !== 0) {
       const err = (r.stderr || "").toString();
       // Cluster wants interactive auth (e.g. password + Duo). Phase 2 handles
@@ -114,13 +132,65 @@ class SshBroker {
     return { connected: true, multiplexed: true };
   }
 
+  // Interactive auth (password + Duo) for clusters that reject keys (e.g.
+  // CIRC/BlueHive). We feed the password via a short-lived SSH_ASKPASS helper
+  // (no PTY / native dep); the Duo push then fires for the user to approve on
+  // their phone. The password file is 0600 and deleted as soon as ssh returns.
+  // Note: this handles the common "one password prompt + Duo push" flow.
+  connectInteractive({ host, user, port = 22, password, persist = "8h" }) {
+    const key = this._key(host, user, port);
+    const cp = this._controlPath(key);
+    if (this.isAlive(host, user, port)) {
+      this.conns.set(key, { cp, host, user, port });
+      return { connected: true, multiplexed: true, reused: true };
+    }
+    if (!password) return { connected: false, error: "password required" };
+    let dir;
+    try {
+      dir = fs.mkdtempSync(path.join(socketDir(), "ask-"));
+      const passFile = path.join(dir, "p");
+      fs.writeFileSync(passFile, String(password), { mode: 0o600 });
+      const askpass = path.join(dir, "askpass.sh");
+      fs.writeFileSync(askpass, `#!/bin/sh\ncat ${passFile}\n`, { mode: 0o700 });
+      const env = {
+        ...this.env,
+        SSH_ASKPASS: askpass,
+        SSH_ASKPASS_REQUIRE: "force", // use askpass even with no tty (OpenSSH 8.4+)
+        DISPLAY: this.env.DISPLAY || ":0",
+      };
+      const args = [
+        "-fNM",
+        "-o", `ControlPersist=${persist}`,
+        "-o", `ControlPath=${cp}`,
+        "-o", "StrictHostKeyChecking=accept-new",
+        "-o", "ConnectTimeout=20",
+        "-o", "NumberOfPasswordPrompts=1",
+        "-o", "PreferredAuthentications=keyboard-interactive,password",
+        "-p", String(port),
+        `${user}@${host}`,
+      ];
+      // Duo approval can take a while — give the user time to tap their phone.
+      const r = spawnSync("ssh", args, { timeout: 120000, env });
+      if (r.status !== 0) {
+        const err = (r.stderr || "").toString();
+        return { connected: false, error: err.slice(0, 400) || "authentication failed" };
+      }
+      this.conns.set(key, { cp, host, user, port });
+      return { connected: true, multiplexed: true, interactive: true };
+    } finally {
+      if (dir) {
+        try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_e) { /* best effort */ }
+      }
+    }
+  }
+
   exec({ host, user, port = 22, command, timeout = 120 }) {
     const key = this._key(host, user, port);
     const c = this.conns.get(key) || { cp: this._controlPath(key) };
     const r = spawnSync(
       "ssh",
       [...this._baseOpts(c.cp), "-p", String(port), `${user}@${host}`, command],
-      { timeout: timeout * 1000, maxBuffer: 64 * 1024 * 1024 }
+      { timeout: timeout * 1000, maxBuffer: 64 * 1024 * 1024, env: this.env }
     );
     return {
       rc: r.status == null ? 255 : r.status,
@@ -136,7 +206,7 @@ class SshBroker {
     const r = spawnSync(
       "scp",
       [...this._baseOpts(c.cp), "-p", "-P", String(port), src, `${user}@${host}:${remotePath}`],
-      { timeout: 1800000, maxBuffer: 16 * 1024 * 1024 }
+      { timeout: 1800000, maxBuffer: 16 * 1024 * 1024, env: this.env }
     );
     return { ok: r.status === 0, error: (r.stderr || "").toString().slice(0, 400) };
   }
@@ -153,7 +223,7 @@ class SshBroker {
     const r = spawnSync(
       "scp",
       [...this._baseOpts(c.cp), "-p", "-P", String(port), `${user}@${host}:${remotePath}`, dst],
-      { timeout: 1800000, maxBuffer: 16 * 1024 * 1024 }
+      { timeout: 1800000, maxBuffer: 16 * 1024 * 1024, env: this.env }
     );
     return { ok: r.status === 0, error: (r.stderr || "").toString().slice(0, 400) };
   }
@@ -163,6 +233,7 @@ class SshBroker {
     const cp = this._controlPath(key);
     spawnSync("ssh", [...this._baseOpts(cp), "-p", String(port), `${user}@${host}`, "-O", "exit"], {
       timeout: 8000,
+      env: this.env,
     });
     this.conns.delete(key);
     return { connected: false };
@@ -172,6 +243,7 @@ class SshBroker {
   _route(name, body) {
     switch (name) {
       case "connect": return this.connect(body);
+      case "connect-interactive": return this.connectInteractive(body);
       case "exec": return this.exec(body);
       case "put": return this.put(body);
       case "get": return this.get(body);

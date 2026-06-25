@@ -45,6 +45,7 @@ class BrokerSSHManager:
         self.host: Optional[str] = None
         self.username: Optional[str] = None
         self.port: int = 22
+        self._password: Optional[str] = None  # in-memory only, for Duo clusters
         self._connect_time: Optional[float] = None
 
     # ------------------------------------------------------------------
@@ -75,21 +76,31 @@ class BrokerSSHManager:
     def configure(self, host: str, username: str, port: int = 22,
                   key_path: Optional[str] = None, password: Optional[str] = None,
                   **_ignored) -> None:
-        # key_path / password are intentionally ignored: the host broker owns
-        # authentication (agent key, config, Kerberos). Kept for signature parity.
+        # key_path is ignored (the host broker owns key/agent/Kerberos auth).
+        # password, when given, is used for interactive (password + Duo) clusters
+        # that reject keys; held in memory only.
         with self._lock:
             self.host = host
             self.username = username
             self.port = port
+            self._password = password
 
     def connect(self) -> None:
         with self._lock:
-            res = self._call("connect", self._target(), timeout=45)
+            if self._password:
+                # Duo approval can take ~a minute; allow time on the HTTP call.
+                res = self._call(
+                    "connect-interactive",
+                    {**self._target(), "password": self._password},
+                    timeout=130,
+                )
+            else:
+                res = self._call("connect", self._target(), timeout=45)
             if not res.get("connected"):
                 if res.get("needsInteractive"):
                     raise SSHConnectionError(
-                        f"{self.host} requires interactive login (e.g. password + Duo). "
-                        f"Interactive broker auth is not enabled yet for this cluster."
+                        f"{self.host} requires interactive login (password + Duo). "
+                        f"Provide your password to connect."
                     )
                 raise SSHConnectionError(
                     f"Broker could not connect to {self.username}@{self.host}: {res.get('error', 'unknown')}"
