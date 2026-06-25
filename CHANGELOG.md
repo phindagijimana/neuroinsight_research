@@ -7,6 +7,8 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-06-25
+
 ### Added
 - Desktop crash & fatal-error capture: native crash minidumps (local-only) plus
   handlers for uncaughtException / unhandledRejection / render- & child-process
