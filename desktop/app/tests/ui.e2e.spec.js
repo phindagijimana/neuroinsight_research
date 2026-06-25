@@ -69,7 +69,7 @@ test.describe("control center", () => {
   });
 
   test("loads the control center shell", async () => {
-    await expect(page.locator("h1")).toContainText("Control Center");
+    await expect(page.locator("h1")).toContainText("Settings");
     await expect(page.locator("#startupBanner")).toBeVisible();
   });
 
