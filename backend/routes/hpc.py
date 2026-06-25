@@ -51,6 +51,9 @@ class SSHConnectRequest(BaseModel):
     username: str
     port: int = int(os.getenv("HPC_SSH_PORT", "22"))
     key_path: Optional[str] = None
+    # For clusters that reject keys and require password + Duo (e.g. BlueHive).
+    # Used only to establish the session; never stored.
+    password: Optional[str] = None
 
 
 class SSHConnectResponse(BaseModel):
@@ -97,6 +100,7 @@ def ssh_connect(request: SSHConnectRequest):
         username=request.username,
         port=request.port,
         key_path=request.key_path,
+        password=request.password,
     )
 
     try:
