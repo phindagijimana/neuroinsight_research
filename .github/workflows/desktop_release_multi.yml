@@ -121,7 +121,17 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           # On macOS, avoid keychain identity auto-discovery when no cert is provided.
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' }}
-        run: ${{ matrix.build_cmd }}
+        shell: bash
+        run: |
+          # electron-builder treats an EMPTY CSC_LINK/WIN_CSC_LINK as a (bad) cert
+          # path and fails ("⨯ … not a file"). GitHub always defines these env
+          # vars (empty when the secret is unset), so unset the empty ones to get
+          # the clean unsigned path. When the secrets are set, they pass through
+          # and signing/notarization engage automatically.
+          for v in CSC_LINK CSC_KEY_PASSWORD WIN_CSC_LINK WIN_CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            eval "val=\${$v:-}"; [ -z "$val" ] && unset "$v" || true
+          done
+          ${{ matrix.build_cmd }}
 
       - name: Generate checksums and metadata
         run: node desktop/ops/release_metadata.js desktop/dist desktop/dist ${{ matrix.platform_name }}
