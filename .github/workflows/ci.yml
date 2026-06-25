@@ -33,11 +33,29 @@ jobs:
           pip install pytest httpx pytest-cov
 
       - name: Run tests
+        # --cov-fail-under is a ratchet: keep at/below the current baseline
+        # (~22%) and raise it as coverage improves.
         run: |
-          PYTHONPATH=. python -m pytest tests/ -v --tb=short --cov=backend --cov-report=term-missing
+          PYTHONPATH=. python -m pytest tests/ -v --tb=short --cov=backend --cov-report=term-missing --cov-fail-under=20
         env:
           DATABASE_URL: sqlite:///test.db
           ENVIRONMENT: development
+
+  # --------------------------------------------------------------------------
+  #  Security scan (advisory) — surfaces likely issues without blocking yet.
+  # --------------------------------------------------------------------------
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install bandit
+        run: pip install bandit
+      - name: Run bandit (medium+ severity, advisory)
+        continue-on-error: true
+        run: bandit -r backend -ll
 
   # --------------------------------------------------------------------------
   #  Frontend build (TypeScript + Vite)
