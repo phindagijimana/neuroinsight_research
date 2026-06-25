@@ -685,3 +685,77 @@ def stream_nifti_from_hpc(remote_path: str):
         media_type=content_type,
         headers={"Access-Control-Allow-Origin": "*"},
     )
+
+
+# ---------------------------------------------------------------------------
+# Saved hosts (~/.ssh/config) + system-ssh ControlMaster session
+#   (a) alias picker  + (b) Phase-1 multiplexed connect/exec/browse
+# ---------------------------------------------------------------------------
+from backend.core.ssh_config import list_ssh_hosts, resolve_alias
+from backend.core.system_ssh import SystemSSHSession, SystemSSHError
+
+_system_session: Optional[SystemSSHSession] = None
+
+
+class SystemConnectRequest(BaseModel):
+    """Connect via the OS ssh client (ControlMaster). Provide an alias OR host."""
+    alias: Optional[str] = None
+    host: Optional[str] = None
+    username: Optional[str] = None
+    port: int = 22
+    key_path: Optional[str] = None
+    # When an alias is given, let ssh resolve ~/.ssh/config (ProxyJump, IdentityFile).
+    use_config: bool = True
+
+
+@router.get("/ssh-hosts")
+def ssh_hosts():
+    """Saved Host aliases from ~/.ssh/config (for the connect picker)."""
+    return {"hosts": list_ssh_hosts()}
+
+
+@router.post("/system-connect")
+def system_connect(request: SystemConnectRequest):
+    """Open a multiplexed SSH master via the OS ssh client (key/agent, Phase 1)."""
+    global _system_session
+    host, username, port, key_path = request.host, request.username, request.port, request.key_path
+    use_alias = None
+    if request.alias:
+        if request.use_config:
+            use_alias = request.alias
+        else:
+            r = resolve_alias(request.alias) or {}
+            host = host or r.get("hostname")
+            username = username or r.get("user")
+            port = r.get("port", port) or port
+            key_path = key_path or r.get("identityfile")
+    if not (use_alias or host):
+        raise HTTPException(status_code=400, detail="Provide an alias or host")
+    sess = SystemSSHSession()
+    try:
+        remote = sess.open(host=host, username=username, port=port, key_path=key_path, alias=use_alias)
+        _audit("ssh_system_connected", host=host or request.alias, username=username)
+        _system_session = sess
+        return {"connected": True, "message": f"Connected to {remote}", "multiplexed": sess.is_alive()}
+    except SystemSSHError as e:
+        return {"connected": False, "message": f"{e} Hint: {_ssh_error_hint(str(e))}"}
+
+
+@router.get("/system-browse")
+def system_browse(path: str = "."):
+    """List a remote directory over the multiplexed master (Phase 1 smoke path)."""
+    if not _system_session or not _system_session.target:
+        raise HTTPException(status_code=400, detail="Not connected (call /system-connect first)")
+    try:
+        return {"path": path, "items": _system_session.listdir(path)}
+    except SystemSSHError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.post("/system-disconnect")
+def system_disconnect():
+    global _system_session
+    if _system_session:
+        _system_session.close()
+        _system_session = None
+    return {"connected": False}
