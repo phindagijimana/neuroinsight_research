@@ -1,6 +1,6 @@
 # Plugin: TSC T2 Combination (NiftyMIC)
 id: tsc_t2_combine_niftymic
-name: "TSC T2 Combine (NiftyMIC)"
+name: "TSC T2 Super-Resolution (NiftyMIC)"
 version: "1.0.0"
 type: plugin
 domain: epilepsy
@@ -8,11 +8,10 @@ domain: epilepsy
 visibility:
   user_selectable: false
   ui_category: utility
-  ui_label: "TSC T2 Combine (hidden)"
+  ui_label: "TSC T2 Super-Resolution (NiftyMIC)"
 
 description: >
-  Performs T2 super-resolution combination when both axial and coronal T2 are
-  available; otherwise falls back to passing through a single T2 image.
+  Combines axial and coronal T2 into a super-resolution volume (NiftyMIC) when both are available; otherwise passes through the single T2 image.
 
 authors:
   - "NeuroInsight Research Team"

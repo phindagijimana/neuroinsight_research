@@ -1,6 +1,6 @@
 # Plugin 5: FreeSurfer SegmentHA_T2
 id: segmentha_t2
-name: "FreeSurfer SegmentHA_T2"
+name: "Hippocampal Subfield Segmentation (T1 + T2)"
 version: "7.4.1"
 type: plugin
 domain: structural_mri
@@ -8,12 +8,10 @@ domain: structural_mri
 visibility:
   user_selectable: true
   ui_category: primary
-  ui_label: "FreeSurfer SegmentHA_T2"
+  ui_label: "Hippocampal Subfield Segmentation (T1 + T2)"
 
 description: >
-  Enhanced hippocampal subfield segmentation using high-resolution T2 MRI
-  in addition to T1. Produces improved subfield delineation, especially
-  for CA subfields.
+  Segments hippocampal subfields using high-resolution T2 in addition to T1, improving subfield delineation (notably CA subfields). Requires prior recon-all output.
 
 authors:
   - "NeuroInsight Research Team"

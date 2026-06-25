@@ -107,7 +107,7 @@ const MOCK_PLUGINS: Plugin[] = [
   },
   {
     id: 'segmentha_t1',
-    name: 'FreeSurfer SegmentHA_T1',
+    name: 'Hippocampal Subfield Segmentation (T1)',
     version: '7.4.1',
     container: 'freesurfer/freesurfer:7.4.1',
     description: '',
@@ -115,7 +115,7 @@ const MOCK_PLUGINS: Plugin[] = [
   },
   {
     id: 'segmentha_t2',
-    name: 'FreeSurfer SegmentHA_T2',
+    name: 'Hippocampal Subfield Segmentation (T1 + T2)',
     version: '7.4.1',
     container: 'freesurfer/freesurfer:7.4.1',
     description: '',
@@ -172,7 +172,7 @@ const MOCK_PLUGINS: Plugin[] = [
   },
   {
     id: 'freesurfer_longitudinal_stats',
-    name: 'FreeSurfer Longitudinal Stats Utility',
+    name: 'FreeSurfer Longitudinal Statistics',
     version: '1.0.0',
     container: 'freesurfer/freesurfer:7.4.1',
     description: '',
@@ -222,7 +222,7 @@ const MOCK_PLUGINS: Plugin[] = [
   },
   {
     id: 'mri_segmentation',
-    name: 'MRI Segmentation (FreeSurfer VolOnly)',
+    name: 'MRI Volumetric Segmentation',
     version: '7.4.1',
     container: 'phindagijimana321/freesurfer-autorecon-volonly:7.4.1',
     description: '',
@@ -266,7 +266,7 @@ const MOCK_WORKFLOWS: Workflow[] = [
   },
   {
     id: 'hippocampal_subfields_t1',
-    name: 'Hippocampal Subfields Segmentation T1',
+    name: 'Hippocampal Subfield Segmentation (T1)',
     version: '1.0.0',
     description: '',
     plugins: ['freesurfer_recon', 'segmentha_t1'],
@@ -274,7 +274,7 @@ const MOCK_WORKFLOWS: Workflow[] = [
   },
   {
     id: 'hippocampal_subfields_t2',
-    name: 'Hippocampal Subfields Segmentation T1 + T2',
+    name: 'Hippocampal Subfield Segmentation (T1 + T2)',
     version: '1.0.0',
     description: '',
     plugins: ['freesurfer_recon', 'segmentha_t2'],

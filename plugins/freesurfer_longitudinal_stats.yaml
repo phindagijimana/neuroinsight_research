@@ -1,6 +1,6 @@
 # Plugin 12: FreeSurfer Longitudinal Stats (Hidden Utility)
 id: freesurfer_longitudinal_stats
-name: "FreeSurfer Longitudinal Stats Utility"
+name: "FreeSurfer Longitudinal Statistics"
 version: "1.0.0"
 type: plugin
 domain: structural_mri
@@ -8,12 +8,10 @@ domain: structural_mri
 visibility:
   user_selectable: false
   ui_category: internal_utility
-  ui_label: "Longitudinal Stats Utility"
+  ui_label: "FreeSurfer Longitudinal Statistics"
 
 description: >
-  Utility plugin for post-processing existing FreeSurfer longitudinal
-  outputs. Hidden from UI plugin list. Invoked by workflows only.
-  Generates QDEC-style tables and optional slopes summaries.
+  Post-processes existing FreeSurfer longitudinal output into QDEC-style tables and optional longitudinal-slope summaries. Used within longitudinal workflows.
 
 authors:
   - "NeuroInsight Research Team"

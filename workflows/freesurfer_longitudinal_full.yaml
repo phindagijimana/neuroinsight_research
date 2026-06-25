@@ -2,7 +2,7 @@
 # Combines longitudinal recon-all (CROSS -> BASE -> LONG) with
 # post-processing stats extraction into one end-to-end workflow.
 id: wf_freesurfer_longitudinal_full
-name: "FreeSurfer Longitudinal Full"
+name: "FreeSurfer Longitudinal Pipeline"
 version: "1.0.0"
 type: workflow
 domain: structural_mri

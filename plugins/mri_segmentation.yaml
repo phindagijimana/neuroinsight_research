@@ -1,7 +1,7 @@
 # Plugin: MRI segmentation (FreeSurfer volumetric — multimodal epilepsy branch)
 # Same container as freesurfer_autorecon_volonly; distinct plugin id for EEG+imaging workflows.
 id: mri_segmentation
-name: "MRI Segmentation (FreeSurfer VolOnly)"
+name: "MRI Volumetric Segmentation"
 version: "1.0.0"
 type: plugin
 domain: eeg_imaging
@@ -9,11 +9,10 @@ domain: eeg_imaging
 visibility:
   user_selectable: true
   ui_category: primary
-  ui_label: "MRI Segmentation (VolOnly)"
+  ui_label: "MRI Volumetric Segmentation"
 
 description: >
-  FreeSurfer autorecon1 + autorecon2-volonly plus mri_segstats (aseg.stats).
-  Used as the structural branch for multimodal epilepsy biomarker workflows.
+  FreeSurfer volumetric-only reconstruction with subcortical volume statistics. Serves as the structural branch of multimodal epilepsy biomarker workflows.
 
 authors:
   - "NeuroInsight Research Team"

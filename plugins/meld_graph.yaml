@@ -1,6 +1,6 @@
 # Plugin 10: Focal Cortical Lesion Detection
 id: meld_graph
-name: "Focal Cortical Lesion Detection"
+name: "MELD Graph Lesion Detection"
 version: "2.2.4"
 type: plugin
 domain: epilepsy
@@ -8,16 +8,10 @@ domain: epilepsy
 visibility:
   user_selectable: true
   ui_category: primary
-  ui_label: "Focal Cortical Lesion Detection"
+  ui_label: "MELD Graph Lesion Detection"
 
 description: >
-  Focal cortical dysplasia detection for drug-resistant epilepsy using
-  graph neural networks (Wagstyl et al., 2025). Operates on FreeSurfer
-  recon-all outputs to produce lesion probability maps and detection
-  reports. Uses a NeuroInsight-managed MELD Graph Docker image derived
-  from meldproject/meld_graph and pinned for deterministic production runs,
-  which bundles FreeSurfer 7.2, FastSurfer 1.1.2, and the MELD
-  classifier. On HPC, runs via Apptainer/Singularity.
+  Detects focal cortical dysplasia in drug-resistant epilepsy using graph neural networks (Wagstyl et al., 2025). Operates on FreeSurfer recon-all output to produce lesion probability maps and detection reports. Runs via Apptainer/Singularity on HPC.
 
 authors:
   - "Mathilde Ripart, Hannah Spitzer, Sophie Adler, Konrad Wagstyl"

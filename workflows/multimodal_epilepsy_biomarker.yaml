@@ -7,10 +7,7 @@ type: workflow
 domain: eeg_imaging
 
 description: >
-  Combines EEG source localization with FreeSurfer vol-only segmentation,
-  extracts ROI-level multimodal features, and produces biomarker summaries
-  (laterality, concordance, viewer-ready JSON). Container images and digests
-  below match plugins/ at this workflow version for reproducible HPC pulls.
+  Combines EEG source localization with FreeSurfer volumetric segmentation, extracts ROI-level multimodal features, and produces biomarker summaries (laterality, concordance, and viewer-ready output).
 
 # Manifest digests (linux/amd64) for each step’s plugin container; keep in sync
 # with plugins/*.yaml container.image and container.digest.

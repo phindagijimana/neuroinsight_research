@@ -11,8 +11,7 @@ visibility:
   ui_label: "EEG–MRI Coregistration"
 
 description: >
-  Produces head↔MRI transform (trans.fif passthrough or JSON 4×4) and electrode
-  coordinates in MRI space from cleaned EEG.
+  Produces the head-to-MRI coordinate transform and electrode coordinates in MRI space from cleaned EEG.
 
 authors:
   - "NeuroInsight Research Team"

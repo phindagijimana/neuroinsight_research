@@ -11,8 +11,7 @@ visibility:
   ui_label: "TSC Data Preparation (hidden)"
 
 description: >
-  Validates and organizes TSC input MRI files into a normalized subject layout
-  expected by downstream TSC workflow plugins.
+  Validates and organizes tuberous sclerosis input MRI into the normalized subject layout expected by downstream steps.
 
 authors:
   - "NeuroInsight Research Team"

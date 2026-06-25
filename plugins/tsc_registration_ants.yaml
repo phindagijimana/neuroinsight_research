@@ -11,8 +11,7 @@ visibility:
   ui_label: "TSC Registration (hidden)"
 
 description: >
-  Bias-corrects, resamples, and registers TSC MRI to MNI space for
-  segmentation-ready standardized inputs.
+  Bias-corrects, resamples, and registers tuberous sclerosis MRI to MNI space, producing standardized, segmentation-ready inputs.
 
 authors:
   - "NeuroInsight Research Team"

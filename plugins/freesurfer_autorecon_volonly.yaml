@@ -1,6 +1,6 @@
 # Plugin: FreeSurfer Volumetric (autorecon1 + autorecon2-volonly)
 id: freesurfer_autorecon_volonly
-name: "FreeSurfer Volumetric (autorecon1 + autorecon2-volonly)"
+name: "FreeSurfer Volumetric Segmentation"
 version: "1.0.0"
 type: plugin
 domain: structural_mri
@@ -8,12 +8,10 @@ domain: structural_mri
 visibility:
   user_selectable: true
   ui_category: primary
-  ui_label: "FreeSurfer VolOnly"
+  ui_label: "FreeSurfer Volumetric Segmentation"
 
 description: >
-  Runs FreeSurfer recon-all for volumetric processing only (autorecon1 + autorecon2-volonly),
-  then computes aseg.stats using mri_segstats. Faster than full recon-all when only volumetric
-  measures are needed. Intended for standalone use or as the first step in HS detection workflows.
+  Runs FreeSurfer volumetric-only reconstruction and computes subcortical volume statistics. Faster than full recon-all when only volumetric measures are needed; usable standalone or as the first step of hippocampal-sclerosis workflows.
 
 authors:
   - "NeuroInsight Research Team"

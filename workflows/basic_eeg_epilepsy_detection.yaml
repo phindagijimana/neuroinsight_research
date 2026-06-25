@@ -1,7 +1,7 @@
 # Workflow: Basic EEG Epilepsy Detection
 # Starter pipeline: clean continuous EEG, then epileptiform spike detection.
 id: basic_eeg_epilepsy_detection
-name: "Basic EEG Epilepsy Detection"
+name: "EEG Epilepsy Screening"
 version: "1.0.0"
 type: workflow
 domain: eeg

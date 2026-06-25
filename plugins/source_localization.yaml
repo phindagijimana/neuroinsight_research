@@ -1,6 +1,6 @@
 # Plugin: Source localization / inverse (MNE dSPM-style)
 id: source_localization
-name: "EEG Source Localization"
+name: "EEG Source Localization (Inverse)"
 version: "1.0.0"
 type: plugin
 domain: eeg_imaging
@@ -8,11 +8,10 @@ domain: eeg_imaging
 visibility:
   user_selectable: true
   ui_category: primary
-  ui_label: "EEG Source Localization"
+  ui_label: "EEG Source Localization (Inverse)"
 
 description: >
-  Minimum-norm / dSPM-style inverse using cleaned EEG, optional spike events TSV,
-  and a precomputed forward_solution.fif.
+  Computes a minimum-norm / dSPM inverse solution from cleaned EEG, an optional spike-events table, and a precomputed forward solution.
 
 authors:
   - "NeuroInsight Research Team"

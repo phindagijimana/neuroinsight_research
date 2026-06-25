@@ -11,8 +11,7 @@ visibility:
   ui_label: "ROI Feature Extraction"
 
 description: >
-  Maps source NIfTI and segmentation label volumes into per-ROI features
-  (source intensity, structural volumes, concordance block).
+  Maps source and segmentation label volumes into per-ROI features (source intensity, structural volumes, and a concordance summary).
 
 authors:
   - "NeuroInsight Research Team"
