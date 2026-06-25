@@ -37,30 +37,31 @@ const CAPABILITIES = [
 
 const HomePage: React.FC<HomePageProps> = () => {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="max-w-5xl mx-auto px-6 py-12">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <main className="max-w-5xl w-full mx-auto px-6 py-12 text-center">
         {/* Introduction */}
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-navy-600 text-white flex items-center justify-center font-extrabold text-lg tracking-wide">
+        <div className="flex flex-col items-center">
+          <div className="w-14 h-14 rounded-xl bg-navy-600 text-white flex items-center justify-center font-extrabold text-xl tracking-wide mb-4">
             NI
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">NeuroInsight</h1>
-            <p className="text-sm text-gray-500 mt-1 max-w-2xl">
-              Run reproducible neuroimaging pipelines on your data — on this computer,
-              your HPC cluster, or the cloud.
-            </p>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-900">NeuroInsight</h1>
+          <p className="text-base text-gray-500 mt-2 max-w-2xl">
+            Run reproducible neuroimaging pipelines on your data — on this computer,
+            your HPC cluster, or the cloud.
+          </p>
         </div>
 
         {/* What you can do */}
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mt-10 mb-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mt-12 mb-4">
           What you can do
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {CAPABILITIES.map((c) => (
-            <div key={c.title} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="w-10 h-10 rounded-lg bg-navy-50 flex items-center justify-center mb-3">
+            <div
+              key={c.title}
+              className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm flex flex-col items-center text-center"
+            >
+              <div className="w-11 h-11 rounded-lg bg-navy-50 flex items-center justify-center mb-3">
                 <c.icon className="w-5 h-5 text-navy-600" />
               </div>
               <div className="font-semibold text-gray-900">{c.title}</div>
