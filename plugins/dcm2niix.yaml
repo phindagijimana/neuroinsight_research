@@ -11,9 +11,7 @@ visibility:
   ui_label: "DICOM to NIfTI Converter"
 
 description: >
-  Convert DICOM images to NIfTI format with JSON sidecars using dcm2niix.
-  Supports all standard DICOM formats and produces NIfTI files with
-  BIDS-style naming. Uses the HeuDiConv container which includes dcm2niix.
+  Converts DICOM images to NIfTI with JSON sidecars and BIDS-style naming, using dcm2niix. Supports all standard DICOM formats.
 
 authors:
   - "NeuroInsight Research Team"

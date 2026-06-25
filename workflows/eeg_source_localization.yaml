@@ -7,9 +7,7 @@ type: workflow
 domain: eeg_imaging
 
 description: >
-  End-to-end source imaging: clean EEG, detect spike candidates, align sensors
-  to MRI, compute the forward solution, then minimum-norm / dSPM-style inverse.
-  Outputs support Brain View and Multimodal View when bundled.
+  End-to-end source imaging: clean EEG, detect spike candidates, align sensors to MRI, compute the forward solution, then a minimum-norm / dSPM inverse. Outputs support the Multimodal View.
 
 developer_contract: >
   Workflows only orchestrate plugins. Supply MRI (T1), optional BEM/surfaces,

@@ -11,9 +11,7 @@ visibility:
   ui_label: "EEG Forward Model"
 
 description: >
-  Computes MNE forward solution from cleaned EEG info, head↔MRI transform,
-  and optional source space + BEM under models/. If those files are absent,
-  uses a reproducible sphere BEM + volume source grid (logged WARNING).
+  Computes the MNE forward solution from cleaned EEG, the head-to-MRI transform, and an optional source space and head model. Falls back to a reproducible spherical head model and volume source grid when those are not provided.
 
 authors:
   - "NeuroInsight Research Team"

@@ -1,15 +1,12 @@
 # Workflow: Hippocampal Sclerosis Detection (T1w)
 id: wf_hs_detection_v1
-name: "Hippocampal Sclerosis Detection (T1w)"
+name: "Hippocampal Sclerosis Detection (T1)"
 version: "1.0.0"
 type: workflow
 domain: structural_mri
 
 description: >
-  Runs FreeSurfer volumetric processing (autorecon1 + autorecon2-volonly), computes hippocampal
-  volumes and asymmetry index with calibrated thresholds (AI = (L-R)/(L+R)), generates a PDF
-  report (with slices 3-6), produces Top10 QC overlays from hippo-guided slice selection,
-  and prepares Niivue viewer assets for interactive NIfTI overlay inspection.
+  Runs FreeSurfer volumetric processing, computes hippocampal volumes and an asymmetry index with calibrated thresholds, generates a PDF report and QC overlays, and prepares interactive viewer assets.
 
 developer_contract: >
   This workflow strictly calls plugins only. hs_postprocess is a utility plugin that does not

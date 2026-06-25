@@ -11,12 +11,7 @@ visibility:
   ui_label: "EEG → BIDS conversion"
 
 description: >
-  Converts flat continuous EEG (EDF, BDF, BrainVision, FIF under eeg/raw/) into a minimal
-  BIDS EEG dataset under outputs. Optional metadata/channels.tsv (BIDS) sets channel types
-  for reproducible EEG vs ECG/EOG/EMG. Optional metadata/bids_config.yaml sets subject, task,
-  session, run. Does not replace vendor-specific formats; convert those to EDF/FIF first.
-  Pair with eeg_preprocessing on the BIDS export for a BIDS-native path, or keep using the
-  legacy flat layout with preprocessing heuristics only.
+  Converts flat continuous EEG (EDF, BDF, BrainVision, FIF) into a minimal BIDS EEG dataset. Optional BIDS metadata sets channel types (EEG vs ECG/EOG/EMG) and the subject, task, session, and run. Convert vendor-specific formats to EDF/FIF first; pair with EEG Preprocessing for a BIDS-native path.
 
 authors:
   - "NeuroInsight Research Team"

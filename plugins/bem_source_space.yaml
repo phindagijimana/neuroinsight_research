@@ -1,6 +1,6 @@
 # Plugin: BEM + volume source space (MNE + FreeSurfer watershed)
 id: bem_source_space
-name: "EEG BEM & Source Space"
+name: "EEG Head Model & Source Space"
 version: "1.0.0"
 type: plugin
 domain: eeg_imaging
@@ -8,12 +8,10 @@ domain: eeg_imaging
 visibility:
   user_selectable: true
   ui_category: primary
-  ui_label: "BEM & Source Space (MNE)"
+  ui_label: "EEG Head Model & Source Space"
 
 description: >
-  Builds subject-specific BEM (bem_sol.fif) and a BEM-bounded volume source space
-  (src.fif) from staged T1w.nii.gz using FreeSurfer watershed and MNE. Run before
-  forward_model when you want subject anatomy instead of sphere/volume-grid fallbacks.
+  Builds a subject-specific boundary-element head model and a bounded volume source space from the staged T1-weighted MRI (FreeSurfer watershed + MNE). Run before the EEG Forward Model when subject anatomy is preferred over the spherical fallback.
 
 authors:
   - "NeuroInsight Research Team"

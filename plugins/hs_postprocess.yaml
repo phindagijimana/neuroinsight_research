@@ -1,6 +1,6 @@
 # Plugin: HS Detection Postprocess
 id: hs_postprocess
-name: "Hippocampal Sclerosis Detection"
+name: "Hippocampal Sclerosis Analysis"
 version: "1.0.0"
 type: plugin
 domain: structural_mri
@@ -8,14 +8,10 @@ domain: structural_mri
 visibility:
   user_selectable: true
   ui_category: primary
-  ui_label: "HS Detection (postprocess)"
+  ui_label: "Hippocampal Sclerosis Analysis"
 
 description: >
-  Reads FreeSurfer outputs, extracts hippocampal volumes, computes asymmetry index and
-  lateralization using calibrated thresholds (AI = (L-R)/(L+R)), generates QC overlays
-  (Top10 hippo-guided slices) and Report overlays (slices 3-6), writes a PDF report,
-  and produces a Niivue viewer manifest.
-  Can be used standalone with existing FreeSurfer results, or as part of the HS Detection workflow.
+  Extracts hippocampal volumes from FreeSurfer output and computes an asymmetry index and lateralization using calibrated thresholds. Generates QC overlays, a PDF report, and viewer assets. Runs standalone on existing FreeSurfer results or within the Hippocampal Sclerosis Detection workflow.
 
 authors:
   - "NeuroInsight Research Team"

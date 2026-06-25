@@ -1,6 +1,6 @@
 # Plugin 11: FreeSurfer Longitudinal
 id: freesurfer_longitudinal
-name: "FreeSurfer Longitudinal (CROSS->BASE->LONG)"
+name: "FreeSurfer Longitudinal Reconstruction"
 version: "1.0.0"
 type: plugin
 domain: structural_mri
@@ -8,12 +8,10 @@ domain: structural_mri
 visibility:
   user_selectable: true
   ui_category: primary
-  ui_label: "FreeSurfer Longitudinal"
+  ui_label: "FreeSurfer Longitudinal Reconstruction"
 
 description: >
-  Runs the full FreeSurfer longitudinal stream for a subject with >=2
-  timepoints: (1) CROSS recon-all per timepoint, (2) BASE within-subject
-  template, (3) LONG recon-all per timepoint against BASE.
+  Runs the full FreeSurfer longitudinal stream for subjects with two or more timepoints: per-timepoint cross-sectional reconstruction, a within-subject template, and longitudinal reconstruction against that template.
 
 authors:
   - "NeuroInsight Research Team"

@@ -11,7 +11,7 @@ visibility:
   ui_label: "Biomarker Scoring"
 
 description: >
-  Scores fused ROI features into laterality, concordance, and viewer_summary JSON.
+  Scores fused ROI features into laterality and concordance summaries for the viewer.
 
 authors:
   - "NeuroInsight Research Team"

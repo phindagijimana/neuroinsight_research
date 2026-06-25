@@ -45,7 +45,7 @@ class TestFreeSurferVolOnly:
 
     def test_plugin_name(self, registry):
         plugin = registry.get_plugin("freesurfer_autorecon_volonly")
-        assert "VolOnly" in plugin.name or "autorecon" in plugin.name.lower()
+        assert "Volumetric" in plugin.name or "autorecon" in plugin.name.lower()
 
     def test_user_selectable(self, registry):
         plugin = registry.get_plugin("freesurfer_autorecon_volonly")

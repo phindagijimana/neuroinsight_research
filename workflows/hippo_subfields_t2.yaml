@@ -1,6 +1,6 @@
 # Workflow 4: Hippocampal Subfields Segmentation T1 + T2
 id: hippo_subfields_t2
-name: "Hippocampal Subfields Segmentation T1 + T2"
+name: "Hippocampal Subfield Segmentation (T1 + T2)"
 version: "1.0.0"
 type: workflow
 domain: structural_mri

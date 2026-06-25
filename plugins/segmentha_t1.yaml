@@ -1,6 +1,6 @@
 # Plugin 4: FreeSurfer SegmentHA_T1
 id: segmentha_t1
-name: "FreeSurfer SegmentHA_T1"
+name: "Hippocampal Subfield Segmentation (T1)"
 version: "7.4.1"
 type: plugin
 domain: structural_mri
@@ -8,11 +8,10 @@ domain: structural_mri
 visibility:
   user_selectable: true
   ui_category: primary
-  ui_label: "FreeSurfer SegmentHA_T1"
+  ui_label: "Hippocampal Subfield Segmentation (T1)"
 
 description: >
-  Segment hippocampal subfields and amygdala nuclei from T1-weighted MRI
-  using FreeSurfer's segmentHA_T1.sh. Requires prior recon-all output.
+  Segments hippocampal subfields and amygdala nuclei from T1-weighted MRI using FreeSurfer. Requires prior recon-all output.
 
 authors:
   - "NeuroInsight Research Team"

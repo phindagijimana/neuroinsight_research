@@ -77,12 +77,12 @@ const TSC_HIDDEN_PLUGIN_NOTES = [
   },
   {
     id: 'tsc_skull_strip_synthstrip',
-    name: 'TSC Skull Strip (SynthStrip)',
+    name: 'TSC Skull Stripping (SynthStrip)',
     purpose: 'Performs brain extraction and mask generation for downstream processing.',
   },
   {
     id: 'tsc_t2_combine_niftymic',
-    name: 'TSC T2 Combine (NiftyMIC)',
+    name: 'TSC T2 Super-Resolution (NiftyMIC)',
     purpose: 'Combines axial/coronal T2 when available; otherwise falls back to single-T2 passthrough.',
   },
   {
@@ -92,7 +92,7 @@ const TSC_HIDDEN_PLUGIN_NOTES = [
   },
   {
     id: 'tsc_segmentation_tsccnn3d',
-    name: 'TSC Segmentation (TSCCNN3D)',
+    name: 'TSC Tuber Segmentation (TSCCNN3D)',
     purpose: 'Runs CNN-based tuber segmentation and quantifies tuber burden outputs.',
   },
 ];

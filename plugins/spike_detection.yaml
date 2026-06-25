@@ -11,8 +11,7 @@ visibility:
   ui_label: "EEG Spike Detection"
 
 description: >
-  Baseline epileptiform candidate detection (band-limited Hilbert envelope + peaks).
-  Requires preprocessed EEG at inputs/eeg/clean_raw.fif from the preprocessing step.
+  Detects candidate epileptiform spikes using a band-limited Hilbert envelope and peak detection. Requires preprocessed EEG from the EEG Preprocessing step.
 
 authors:
   - "NeuroInsight Research Team"

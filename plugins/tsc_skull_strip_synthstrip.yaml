@@ -1,6 +1,6 @@
 # Plugin: TSC Skull Stripping (SynthStrip)
 id: tsc_skull_strip_synthstrip
-name: "TSC Skull Strip (SynthStrip)"
+name: "TSC Skull Stripping (SynthStrip)"
 version: "1.0.0"
 type: plugin
 domain: epilepsy
@@ -8,11 +8,10 @@ domain: epilepsy
 visibility:
   user_selectable: false
   ui_category: utility
-  ui_label: "TSC Skull Strip (hidden)"
+  ui_label: "TSC Skull Stripping (SynthStrip)"
 
 description: >
-  Runs SynthStrip-based skull stripping and mask generation for TSC workflow
-  inputs and writes normalized outputs for downstream stages.
+  Performs SynthStrip skull stripping and brain-mask generation for tuberous sclerosis inputs, writing normalized outputs for downstream stages.
 
 authors:
   - "NeuroInsight Research Team"

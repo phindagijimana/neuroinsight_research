@@ -1,6 +1,6 @@
 # Plugin: TSC Segmentation (TSCCNN3D)
 id: tsc_segmentation_tsccnn3d
-name: "TSC Segmentation (TSCCNN3D)"
+name: "TSC Tuber Segmentation (TSCCNN3D)"
 version: "1.0.0"
 type: plugin
 domain: epilepsy
@@ -8,11 +8,10 @@ domain: epilepsy
 visibility:
   user_selectable: false
   ui_category: utility
-  ui_label: "TSC Segmentation (hidden)"
+  ui_label: "TSC Tuber Segmentation (TSCCNN3D)"
 
 description: >
-  Performs tuber segmentation and tuber burden quantification using TSCCNN3D
-  and writes segmentation outputs plus summary metrics.
+  Segments cortical tubers and quantifies tuber burden using TSCCNN3D, writing segmentation maps and summary metrics.
 
 authors:
   - "NeuroInsight Research Team"
