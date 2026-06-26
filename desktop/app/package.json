@@ -63,7 +63,8 @@
     "afterAllArtifactBuild": "build/after_all_artifact_build.js",
     "mac": {
       "target": [
-        "dmg"
+        "dmg",
+        "zip"
       ],
       "category": "public.app-category.medical",
       "icon": "assets/icon.icns",
