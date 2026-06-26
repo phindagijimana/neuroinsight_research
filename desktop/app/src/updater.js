@@ -26,8 +26,14 @@ function getUpdater() {
   }
   if (!wired) {
     wired = true;
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
+    // Do NOT auto-download. We only *check* and log availability. Auto-download
+    // breaks on macOS unless the release ships a signed `.zip` (Squirrel.Mac):
+    // electron-updater's MacUpdater throws "ZIP file not provided" for a
+    // dmg-only, unsigned release, and the async rejection surfaces to the user.
+    // Downloads should only happen on an explicit, user-initiated update once
+    // code signing + the zip artifact are in place.
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = false;
     autoUpdater.on("error", (e) => desktopState.appendLog("updater_error", { error: String(e) }));
     autoUpdater.on("update-available", (i) => desktopState.appendLog("update_available", { version: i && i.version }));
     autoUpdater.on("update-downloaded", (i) =>
