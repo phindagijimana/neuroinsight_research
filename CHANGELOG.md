@@ -8,6 +8,17 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 ## [Unreleased]
 
 ### Fixed
+- **Remote Docker backend couldn't run single-plugin jobs.** Two bugs: (1) the
+  command was run as `docker run <image> bash -c …` with no `--entrypoint`, so
+  images with a non-shell ENTRYPOINT (heudiconv, fmriprep, qsiprep…) consumed
+  the script as their own arguments and failed; (2) **directory** inputs were
+  never uploaded (only single files), and inputs weren't staged under the
+  plugin's declared key. Now the substituted script is written to a file and run
+  via a mounted path with `--entrypoint /bin/bash` (matching the workflow path),
+  and inputs are staged under their plugin key with recursive directory upload.
+  Verified end-to-end on a real EC2 host: dcm2niix now exits 0 and writes
+  `.nii.gz` to the remote output dir. (Remaining: remote job status-monitoring /
+  result pull-back still report `pending` — tracked separately.)
 - **Boolean plugin parameters were ignored** across all execution backends
   (local Docker, SLURM/HPC, remote Docker). Command templates test
   `[ "{flag}" = "true" ]`, but Python `True` was substituted as `"True"`

@@ -22,7 +22,7 @@ import logging
 import re
 import uuid
 from datetime import datetime
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional
 
 from backend.core.execution import (
@@ -125,6 +125,69 @@ class RemoteDockerBackend(ExecutionBackend):
     # Job submission
     # ------------------------------------------------------------------
 
+    def _resolve_input_keymap(self, plugin_id, input_files) -> Dict[int, str]:
+        """Map input-file index -> the plugin's declared input key (e.g. dicom_dir).
+
+        Mirrors the local backend's name-based matching with a positional
+        fallback, so command templates that reference /data/inputs/<key> resolve
+        the same way on the remote host.
+        """
+        expected: List[str] = []
+        try:
+            from backend.core.plugin_registry import get_plugin_workflow_registry
+            registry = get_plugin_workflow_registry()
+            plugin = registry.get_plugin(plugin_id) if plugin_id else None
+            if plugin:
+                for inp in plugin.inputs_required:
+                    key = inp.get("key", "") if isinstance(inp, dict) else getattr(inp, "key", "")
+                    typ = inp.get("type", "") if isinstance(inp, dict) else getattr(inp, "type", "")
+                    if key and typ not in ("string", "int", "float", "bool"):
+                        expected.append(key)
+        except Exception as e:
+            logger.debug("Could not resolve input keys for %s: %s", plugin_id, e)
+
+        def _stem(p) -> str:
+            n = Path(p).name.lower()
+            return n[:-7] if n.endswith(".nii.gz") else Path(p).stem.lower()
+
+        matched: Dict[int, str] = {}
+        unmatched = list(range(len(input_files)))
+        for en in expected:
+            for idx in list(unmatched):
+                if _stem(input_files[idx]) == en.lower():
+                    matched[idx] = en
+                    unmatched.remove(idx)
+                    break
+        remaining = [n for n in expected if n not in matched.values()]
+        for idx in list(unmatched):
+            if remaining:
+                matched[idx] = remaining.pop(0)
+                unmatched.remove(idx)
+        return matched
+
+    def _upload_dir(self, ssh, local_dir, remote_dir: str) -> None:
+        """Recursively upload a local directory's contents into remote_dir.
+
+        SSHManager only transfers single files, so stream the tree as a gzipped
+        tar, then extract on the remote (works for both paramiko and the broker).
+        """
+        import os
+        import tarfile
+        import tempfile
+
+        self._run(f"mkdir -p {remote_dir}")
+        tmp = tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False)
+        tmp.close()
+        try:
+            with tarfile.open(tmp.name, "w:gz") as tar:
+                for item in Path(local_dir).iterdir():
+                    tar.add(str(item), arcname=item.name)
+            remote_tar = f"{remote_dir}/.nir_upload.tar.gz"
+            ssh.put_file(tmp.name, remote_tar)
+            self._run(f"tar xzf {remote_tar} -C {remote_dir} && rm -f {remote_tar}", check=True)
+        finally:
+            os.unlink(tmp.name)
+
     def submit_job(self, spec: JobSpec, job_id: Optional[str] = None) -> str:
         """Submit a job to run in Docker on the remote machine.
 
@@ -145,20 +208,32 @@ class RemoteDockerBackend(ExecutionBackend):
 
         # Create working directories on remote
         job_dir = f"{self._work_dir}/jobs/{job_id}"
-        self._run(f"mkdir -p {job_dir}/inputs {job_dir}/outputs {job_dir}/logs")
+        self._run(f"mkdir -p {job_dir}/inputs {job_dir}/outputs {job_dir}/logs {job_dir}/scripts")
 
-        # Upload input files if they are local paths
+        # Stage inputs under the plugin's declared input keys (e.g. dicom_dir) so
+        # command templates resolve, matching the local backend. Files upload
+        # directly; directories upload recursively.
+        keymap = self._resolve_input_keymap(spec.plugin_id, spec.input_files)
         for i, input_file in enumerate(spec.input_files):
-            if input_file.startswith("/") or input_file.startswith("./"):
-                try:
-                    from pathlib import Path
-                    local_path = Path(input_file)
-                    if local_path.exists():
-                        remote_input = f"{job_dir}/inputs/{local_path.name}"
-                        ssh.put_file(str(local_path), remote_input)
-                        logger.info(f"Uploaded {local_path.name} to remote")
-                except Exception as e:
-                    logger.warning(f"Could not upload input file {input_file}: {e}")
+            if not (input_file.startswith("/") or input_file.startswith("./")):
+                continue  # already a remote path reference
+            try:
+                local_path = Path(input_file)
+                if not local_path.exists():
+                    logger.warning("Input not found, skipping upload: %s", input_file)
+                    continue
+                if local_path.is_dir():
+                    target = keymap.get(i, local_path.name)
+                    self._upload_dir(ssh, local_path, f"{job_dir}/inputs/{target}")
+                    logger.info("Uploaded directory %s -> inputs/%s", local_path.name, target)
+                else:
+                    ext = "".join(local_path.suffixes)
+                    base = keymap.get(i)
+                    name = f"{base}{ext}" if base else local_path.name
+                    ssh.put_file(str(local_path), f"{job_dir}/inputs/{name}")
+                    logger.info("Uploaded file %s -> inputs/%s", local_path.name, name)
+            except Exception as e:
+                logger.warning("Could not upload input %s: %s", input_file, e)
 
         # Build docker run command
         image = spec.container_image
@@ -204,8 +279,15 @@ class RemoteDockerBackend(ExecutionBackend):
                     safe_val = "".join(c for c in _shell_value(value) if c not in dangerous)
                     cmd = cmd.replace(f"{{{key}}}", safe_val)
                     cmd = cmd.replace(f"${{{key}}}", safe_val)
+            # Write the (possibly multi-line) script to a file and run it via a
+            # mounted path. This overrides image ENTRYPOINTs that aren't a shell
+            # (e.g. heudiconv, fmriprep, qsiprep) and avoids fragile multi-layer
+            # shell quoting when the run command is sent over SSH.
+            ssh.write_file(f"{job_dir}/scripts/run.sh", cmd, mode=0o755)
+            docker_args.append(f"-v {job_dir}/scripts/run.sh:/nir_run.sh:ro")
+            docker_args.append("--entrypoint /bin/bash")
             docker_args.append(image)
-            docker_args.append(f'bash -c "{cmd}"')
+            docker_args.append("/nir_run.sh")
         else:
             docker_args.append(image)
 
