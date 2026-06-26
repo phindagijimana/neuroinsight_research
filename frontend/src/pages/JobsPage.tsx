@@ -289,8 +289,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
           <div className="mb-6 rounded-xl border border-emerald-100/80 bg-emerald-50/50 px-4 py-3 sm:px-5 sm:py-3.5">
             <h3 className="text-xs font-semibold tracking-wide text-emerald-800/90">Sample EEG demos</h3>
             <p className="text-sm text-emerald-900/85 mt-1 leading-relaxed">
-              Synthetic data jobs below open the Viewer: <span className="font-medium">EEG preprocessing</span> → Signal View;{' '}
-              <span className="font-medium">EEG source localization</span> → Multimodal View.
+              Sample jobs that open in the Viewer.
             </p>
           </div>
         )}
@@ -360,7 +359,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                           </div>
                           <div className="mt-1 text-xs text-gray-500 truncate">
                             {job.is_sample_job ? (
-                              <span>Bundled synthetic EEG (and toy T1 for the source demo)</span>
+                              <span>Bundled sample data</span>
                             ) : (
                               <>Input: {job.input_files[0] || 'N/A'}</>
                             )}

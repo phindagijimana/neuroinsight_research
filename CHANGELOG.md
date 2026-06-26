@@ -8,6 +8,13 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 ## [Unreleased]
 
 ### Changed
+- **Cleaner UI — moved teaching copy into the User Guide.** Trimmed verbose
+  in-app explanations (home capability blurbs, page subtitles, viewer/sample
+  hint banners, the HPC VPN/Duo banner, the control-center license blurb) down to
+  concise labels. Added a **User Guide** button in the control center (Settings)
+  and a shared `USER_GUIDE_URL`; the removed how-to (incl. VPN/MFA-Duo/saved-host
+  HPC connect details) now lives in `docs/USER_GUIDE.md`. First pass of an
+  app-wide de-clutter.
 - **Tool licenses (FreeSurfer/MELD) moved into the control center** ("Settings",
   where the Engine lives) instead of a separate web Settings page. The control
   center now has a Tool-licenses card (status, paste/file upload, replace/remove,

@@ -380,3 +380,16 @@ input[type="text"] {
   border-radius: 6px;
   box-sizing: border-box;
 }
+
+/* Header actions (User Guide link + engine badge) */
+.topbar-actions { display: flex; align-items: center; gap: 12px; }
+.ghostbtn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ghostbtn:hover { background: rgba(255, 255, 255, 0.14); }

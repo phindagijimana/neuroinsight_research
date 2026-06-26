@@ -21,17 +21,17 @@ const CAPABILITIES = [
   {
     icon: Brain,
     title: 'Pipelines & workflows',
-    desc: 'Curated neuroimaging tools — MELD lesion detection, FreeSurfer, dcm2niix — run as versioned, reproducible jobs.',
+    desc: 'MELD, FreeSurfer, dcm2niix — reproducible jobs.',
   },
   {
     icon: Server,
     title: 'Compute anywhere',
-    desc: 'Run on this computer with Docker, on your HPC cluster via SLURM, or a cloud server — the same workflow.',
+    desc: 'This computer, your HPC cluster, or the cloud.',
   },
   {
     icon: Shield,
     title: 'Your data stays in place',
-    desc: 'Browse and process data where it lives — local disk, HPC filesystem, or a connected repository.',
+    desc: 'Process data where it lives.',
   },
 ];
 

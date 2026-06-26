@@ -19,7 +19,10 @@
           <p class="subtitle">Engine, checks &amp; preferences</p>
         </div>
       </div>
-      <div id="engineBadge" class="badge badge-off">Engine: stopped</div>
+      <div class="topbar-actions">
+        <button id="btnUserGuide" class="ghostbtn" title="Open the User Guide">User Guide</button>
+        <div id="engineBadge" class="badge badge-off">Engine: stopped</div>
+      </div>
     </header>
 
     <div id="startupBanner" class="banner banner-muted">Running startup checks…</div>
@@ -55,7 +58,7 @@
       <!-- Tool licenses (FreeSurfer, MELD, …) — some pipelines need these. -->
       <section class="card" id="toolLicensesCard">
         <h2>Tool licenses</h2>
-        <p class="meta">Upload the third-party licenses some pipelines need (FreeSurfer, MELD). Stored privately in your data folder; jobs use them automatically — locally and on HPC.</p>
+        <p class="meta">Licenses some pipelines need (FreeSurfer, MELD). <a href="#" id="lnkLicensesHelp">User Guide →</a></p>
         <div id="toolLicensesList"></div>
         <p id="toolLicensesHint" class="meta" hidden></p>
       </section>

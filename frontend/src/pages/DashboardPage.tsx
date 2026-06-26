@@ -147,9 +147,6 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
               <BarChart className="w-8 h-8 text-navy-600" />
               <h1 className="text-3xl font-bold text-gray-900">Results</h1>
             </div>
-            <p className="text-gray-600">
-              Detailed view of completed job results, files, and statistics
-            </p>
           </div>
           <Button variant="secondary" onClick={fetchJobs}>
             <RefreshCw className="w-4 h-4" />
@@ -196,9 +193,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
               No Completed Jobs Yet
             </h3>
-            <p className="text-gray-600 mb-6">
-              Submit and complete a processing job to view detailed results here
-            </p>
+            <p className="text-gray-600 mb-6">Run a job to see results here.</p>
             <Button onClick={() => setActivePage('jobs')}>Go to Jobs</Button>
           </div>
         )}
@@ -243,9 +238,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
               </div>
               {eegEnabled && selectedJob.is_sample_job && selectedJob.status === 'completed' && (
                 <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
-                  Open in Viewer picks the right mode for this sample (Signal View or Multimodal View). Use{' '}
-                  <strong>Show files</strong> in the Viewer if you want to open the demo FIF or NIfTI
-                  manually.
+                  Open in Viewer picks the right mode for this sample.
                 </p>
               )}
             </div>

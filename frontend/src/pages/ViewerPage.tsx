@@ -445,25 +445,20 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
             <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Add a brain volume</h3>
-            <p className="text-gray-600 mb-2">
-              Multimodal View needs a NIfTI / MGZ volume for the imaging pane. Pick one from files,
-              then optionally add a signal file (.edf, .fif, …) for Signal View above.
-            </p>
+            <p className="text-gray-600 mb-2">Pick a NIfTI / MGZ volume from files.</p>
             <EegViewerPanel jobId={selectedJobId} eegRelativePath={eegFileRelPath} compact />
           </div>
         )}
 
         {viewerReady && imageUrl && viewerTab === 'imaging' && (
           <div className="mt-6 py-3 px-4 bg-navy-600/10 border border-navy-600/20 rounded-lg text-center text-sm text-gray-700">
-            <span className="font-medium text-navy-600">L/R</span> markers indicate patient
-            orientation. Use files to load a different volume.
+            <span className="font-medium text-navy-600">L/R</span> = patient orientation.
           </div>
         )}
 
         {viewerTab === 'eeg-brain' && imageUrl && (
           <div className="mt-6 py-3 px-4 bg-navy-600/10 border border-navy-600/20 rounded-lg text-center text-sm text-gray-700">
-            Multimodal View: Signal View (MNE preview, first seconds) above; Imaging View (Niivue)
-            below — anatomy or source-level maps from your pipeline outputs.
+            Signal View (top) · Imaging View (bottom).
           </div>
         )}
       </div>
