@@ -39,6 +39,19 @@ class WorkflowJobFatal(Exception):
     """Non-retryable workflow validation/setup error (maps to Celery Reject)."""
 
 
+def _shell_value(value):
+    """Render a parameter value for a shell command template.
+
+    Python bools must become lowercase ``true``/``false`` — command templates
+    compare with ``[ "{flag}" = "true" ]``, and ``str(True)`` is ``"True"``
+    (capital T), which silently fails the test and drops the flag (e.g.
+    dcm2niix ``compress=true`` would fall through to ``-z n``).
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
 def _params_for_shell_template(resolved: dict) -> dict:
     """Keys like _workflow_steps must not be substituted into shell command templates."""
     return {k: v for k, v in resolved.items() if not str(k).startswith("_")}
@@ -523,7 +536,7 @@ def run_docker_job(self, job_id: str, spec_dict: dict) -> dict:
             # Substitute parameters into command template with shell-safe escaping
             command = command_template
             for key, value in _params_for_shell_template(resolved_params).items():
-                safe_value = _sanitize_param(str(value))
+                safe_value = _sanitize_param(_shell_value(value))
                 command = command.replace(f"{{{key}}}", safe_value)
                 command = command.replace(f"${{{key}}}", safe_value)
         elif spec_dict.get("execution_mode") == "plugin":
@@ -1025,7 +1038,7 @@ def execute_workflow_job_impl(celery_task, job_id: str, spec_dict: dict) -> dict
         if cmd_template:
             command = cmd_template
             for key, value in _params_for_shell_template(resolved_params).items():
-                safe_value = _sanitize_param(str(value))
+                safe_value = _sanitize_param(_shell_value(value))
                 command = command.replace(f"{{{key}}}", safe_value)
                 command = command.replace(f"${{{key}}}", safe_value)
             wf_id = spec_dict.get("parameters", {}).get("_workflow_id") or spec_dict.get("workflow_id")
