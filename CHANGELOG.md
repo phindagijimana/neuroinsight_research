@@ -7,6 +7,24 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-06-26
+
+### Fixed
+- **App crashed on launch (macOS)** — the startup update-check had
+  `autoDownload=true`, so electron-updater's `MacUpdater` tried to download the
+  update and threw `ZIP file not provided` for a dmg-only, unsigned release, and
+  the unhandled rejection killed the app before it reached the workspace. The
+  updater now only checks + logs availability (`autoDownload=false`,
+  `autoInstallOnAppQuit=false`); downloads happen only on explicit action once
+  signing + a `.zip` artifact exist. The mac build now also emits a `zip` target
+  so signed auto-update works when enabled.
+
+### Notes
+- Builds remain **unsigned** (pilot). First launch: macOS **right-click → Open**
+  (Sequoia: **System Settings → Privacy & Security → Open Anyway**); Windows
+  **More info → Run anyway**. Verify integrity with the published
+  `desktop-release-sha256-<platform>.txt`.
+
 ## [0.1.10] - 2026-06-25
 
 ### Fixed
