@@ -542,7 +542,7 @@ function registerIpc() {
     "license:importFile",
     wrap(async () => {
       const res = await dialog.showOpenDialog(mainWindow, {
-        title: "Import NIR license token",
+        title: "Import NeuroInsight license token",
         properties: ["openFile"],
         filters: [{ name: "License", extensions: ["txt", "json"] }],
       });
