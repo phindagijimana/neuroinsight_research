@@ -340,6 +340,28 @@ EEG-related workflows (for example basic detection, source localization, and mul
 
 ---
 
+## Plugins and Workflows
+
+In the **Docs** tab you can browse the available tools:
+
+- **Plugin** — a single neuroimaging tool running in one container. Use it for an
+  individual processing step or when you want full control.
+- **Workflow** — a sequence of plugins that work together; dependencies are
+  managed automatically. Recommended for complete analysis pipelines.
+
+Some **utility plugins are hidden** in the catalog but run inside workflows for
+specialized tasks. For the Tuberous Sclerosis Detection workflow these are:
+
+| Hidden plugin | What it does |
+|---|---|
+| TSC Data Preparation | Validates and standardizes T1/T2/FLAIR inputs into a workflow-ready layout. |
+| TSC Skull Stripping (SynthStrip) | Brain extraction and mask generation for downstream steps. |
+| TSC T2 Super-Resolution (NiftyMIC) | Combines axial/coronal T2 when available; otherwise single-T2 passthrough. |
+| TSC Registration (ANTs) | Bias correction, resampling, and registration into MNI space. |
+| TSC Tuber Segmentation (TSCCNN3D) | CNN-based tuber segmentation and tuber-burden quantification. |
+
+---
+
 ## Connecting to a Remote Server
 
 NeuroInsight can run neuroimaging jobs on any SSH-accessible Linux machine with Docker installed. This is useful for offloading processing to a more powerful server, a cloud VM (AWS, GCP, Azure), or a lab workstation.

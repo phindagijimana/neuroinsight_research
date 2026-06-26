@@ -357,21 +357,6 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
         </div>
       </div>
 
-      {/* Description line */}
-      <p className="text-xs text-gray-500 mb-3">
-        {isPlatformSelected && activeDataSource === 'pennsieve' && 'Browse and download data from Pennsieve, then process on chosen compute backend.'}
-        {isPlatformSelected && activeDataSource === 'xnat' && 'Browse and download data from XNAT, then process on chosen compute backend.'}
-        {!isPlatformSelected && dataSource === 'local' && selectedBackend === 'local' && 'Data and processing on this machine using Docker.'}
-        {!isPlatformSelected && dataSource === 'local' && selectedBackend === 'remote' && 'Browse data locally, process on a remote Docker server via SSH.'}
-        {!isPlatformSelected && dataSource === 'local' && selectedBackend === 'remote_hpc' && 'Browse data locally, process on HPC via SLURM.'}
-        {!isPlatformSelected && dataSource === 'remote' && selectedBackend === 'local' && 'Browse data on remote server via SSH, process locally with Docker.'}
-        {!isPlatformSelected && dataSource === 'remote' && selectedBackend === 'remote' && 'Data and processing on a remote SSH server.'}
-        {!isPlatformSelected && dataSource === 'remote' && selectedBackend === 'remote_hpc' && 'Browse data on remote server, process on HPC via SLURM.'}
-        {!isPlatformSelected && dataSource === 'hpc' && selectedBackend === 'local' && 'Browse data on HPC filesystem via SSH, process locally with Docker.'}
-        {!isPlatformSelected && dataSource === 'hpc' && selectedBackend === 'remote' && 'Browse data on HPC filesystem, process on remote Docker server.'}
-        {!isPlatformSelected && dataSource === 'hpc' && selectedBackend === 'remote_hpc' && 'Data and processing on HPC cluster via SLURM.'}
-      </p>
-
       {/* SSH Configuration -- shown when either data source or compute needs SSH */}
       {needsSSH && (
         <div className="border-t border-gray-200 pt-3 mt-1 flex-1 overflow-y-auto">

@@ -380,7 +380,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
                       max={Math.min(8, resources.cpus)}
                       step={1}
                       onChange={(v) => update('omp_nthreads', v)}
-                      hint="Per-process thread pool (--omp-nthreads). Keep low for multi-process pipelines."
+                      hint="Threads per process (--omp-nthreads)."
                     />
                   )}
                 </>
@@ -388,7 +388,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
 
               {!resources.parallel && (
                 <p className="text-[10px] text-gray-400 ml-1">
-                  Pipeline will run single-threaded. Enable to use multiple CPU cores.
+                  Single-threaded — enable to use more cores.
                 </p>
               )}
             </div>

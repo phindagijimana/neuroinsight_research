@@ -334,11 +334,8 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
               <label className="flex items-center gap-1.5 text-[11px] text-gray-600 cursor-pointer select-none">
                 <input type="checkbox" checked={xnatSkipSsl} onChange={e => setXnatSkipSsl(e.target.checked)}
                   className="rounded border-gray-300 text-navy-500 focus:ring-navy-500 h-3 w-3" />
-                Skip SSL verification (for self-signed certificates)
+                Skip SSL verification
               </label>
-              <p className="text-[10px] text-gray-400">
-                Enter your XNAT instance URL and credentials. The server must be reachable from this machine.
-              </p>
             </>
           )}
 
