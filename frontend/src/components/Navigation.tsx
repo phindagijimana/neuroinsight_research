@@ -12,6 +12,10 @@ interface NavigationProps {
 }
 
 const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) => {
+  // In the desktop app the control center ("Settings") owns engine + licenses,
+  // so we hide the web Settings tab there. In a browser deployment there's no
+  // control center, so we show it (for tool licenses, etc.).
+  const isDesktop = typeof window !== 'undefined' && !!(window as { nir?: unknown }).nir;
 
   return (
     <header className="bg-white border-b border-navy-100 shadow-sm sticky top-0 z-50">
@@ -75,6 +79,16 @@ const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) =>
             >
               Docs
             </button>
+            {!isDesktop && (
+              <button
+                onClick={() => setActivePage('settings')}
+                className={`transition border-none bg-transparent ${
+                  activePage === 'settings' ? 'text-navy-600 font-semibold' : 'text-gray-600 hover:text-navy-600'
+                }`}
+              >
+                Settings
+              </button>
+            )}
           </nav>
         </div>
       </div>

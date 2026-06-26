@@ -7,6 +7,13 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+### Added
+- **Deployment-aware Settings.** In a browser/web-hosted deployment the app shows
+  a **Settings** tab (tool licenses), since there's no desktop control center. In
+  the desktop app that tab is hidden — the control center owns engine + licenses.
+  Detected via the `window.nir` desktop bridge. Fixes web users losing the
+  licenses UI after it moved into the control center.
+
 ### Changed
 - **Cleaner UI — moved teaching copy into the User Guide.** Trimmed verbose
   in-app explanations (home capability blurbs, page subtitles, viewer/sample
