@@ -66,6 +66,10 @@ async function refreshStatus() {
   }
 
   renderRuntimeRows(await nir.backend.runtime());
+
+  // Tool licenses live behind the engine API; refresh them whenever engine
+  // state changes (start/stop/refresh) so the cards reflect availability.
+  refreshToolLicenses();
 }
 
 // Render runtime info as clean labelled rows (instead of a raw JSON dump).
@@ -347,6 +351,125 @@ async function loadPlatform() {
   } catch (_e) {
     $("platformLine").textContent = "Platform: unknown";
   }
+}
+
+// ---- Tool licenses (FreeSurfer / MELD) -----------------------------------
+async function refreshToolLicenses() {
+  const list = $("toolLicensesList");
+  const hint = $("toolLicensesHint");
+  if (!list) return;
+  const res = await nir.licenses.list();
+  // wrap() returns { ok:false, error } when the engine isn't running.
+  if (!res || res.ok === false || !Array.isArray(res.licenses)) {
+    list.innerHTML = "";
+    hint.hidden = false;
+    hint.textContent = (res && res.error) || "Start the engine to manage tool licenses.";
+    return;
+  }
+  hint.hidden = true;
+  list.innerHTML = "";
+  res.licenses.forEach((lic) => list.appendChild(renderLicenseItem(lic)));
+}
+
+function renderLicenseItem(lic) {
+  const item = document.createElement("div");
+  item.className = "lic-item";
+
+  const head = document.createElement("div");
+  head.className = "lic-head";
+  const name = document.createElement("span");
+  name.className = "lic-name";
+  name.textContent = lic.name;
+  const status = document.createElement("span");
+  status.className = lic.installed ? "lic-badge lic-ok" : "lic-badge lic-no";
+  status.textContent = lic.installed ? "● Installed" : "○ Not installed";
+  head.appendChild(name);
+  head.appendChild(status);
+  item.appendChild(head);
+
+  const desc = document.createElement("p");
+  desc.className = "meta";
+  desc.textContent = (lic.description || "") +
+    (lic.required_by && lic.required_by.length ? `  ·  Required by: ${lic.required_by.join(", ")}` : "");
+  item.appendChild(desc);
+
+  const detail = document.createElement("p");
+  detail.className = "meta";
+  item.appendChild(detail);
+
+  let textarea = null;
+  if (!lic.installed) {
+    textarea = document.createElement("textarea");
+    textarea.placeholder = `Paste your ${lic.filename} contents here…`;
+    textarea.rows = 3;
+    item.appendChild(textarea);
+  }
+
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.style.display = "none";
+  fileInput.addEventListener("change", () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => saveLicense(lic.id, String(reader.result || ""), detail);
+    reader.readAsText(f);
+  });
+  item.appendChild(fileInput);
+
+  const actions = document.createElement("div");
+  actions.className = "actions";
+
+  const get = document.createElement("button");
+  get.textContent = "Get a license…";
+  get.addEventListener("click", () => nir.shell.openExternal(lic.registration_url));
+  actions.appendChild(get);
+
+  const fileBtn = document.createElement("button");
+  fileBtn.textContent = lic.installed ? "Replace file…" : "Choose file…";
+  fileBtn.addEventListener("click", () => fileInput.click());
+  actions.appendChild(fileBtn);
+
+  if (lic.installed) {
+    const rm = document.createElement("button");
+    rm.textContent = "Remove";
+    rm.addEventListener("click", () => removeLicense(lic.id, detail));
+    actions.appendChild(rm);
+  } else {
+    const save = document.createElement("button");
+    save.textContent = "Save license";
+    save.addEventListener("click", () => saveLicense(lic.id, textarea ? textarea.value : "", detail));
+    actions.appendChild(save);
+  }
+
+  item.appendChild(actions);
+  return item;
+}
+
+async function saveLicense(id, content, detailEl) {
+  if (!content || !content.trim()) {
+    detailEl.textContent = "Paste your license, or choose a file.";
+    return;
+  }
+  detailEl.textContent = "Saving…";
+  const res = await nir.licenses.upload(id, content);
+  if (res && res.ok === false) {
+    detailEl.textContent = `Error: ${res.error || "save failed"}`;
+    return;
+  }
+  toast("License saved.");
+  refreshToolLicenses();
+}
+
+async function removeLicense(id, detailEl) {
+  detailEl.textContent = "Removing…";
+  const res = await nir.licenses.remove(id);
+  if (res && res.ok === false) {
+    detailEl.textContent = `Error: ${res.error || "remove failed"}`;
+    return;
+  }
+  toast("License removed.");
+  refreshToolLicenses();
 }
 
 // ---- Wire up -------------------------------------------------------------
