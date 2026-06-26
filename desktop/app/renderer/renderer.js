@@ -472,8 +472,17 @@ async function removeLicense(id, detailEl) {
   refreshToolLicenses();
 }
 
+// Public User Guide — keeps the UI uncluttered; deep guidance lives here.
+const USER_GUIDE_URL =
+  "https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/USER_GUIDE.md";
+
 // ---- Wire up -------------------------------------------------------------
 function init() {
+  const openGuide = (e) => { if (e) e.preventDefault(); nir.shell.openExternal(USER_GUIDE_URL); };
+  $("btnUserGuide").addEventListener("click", openGuide);
+  const licHelp = $("lnkLicensesHelp");
+  if (licHelp) licHelp.addEventListener("click", openGuide);
+
   $("btnStart").addEventListener("click", startBackend);
   $("btnStop").addEventListener("click", stopBackend);
   $("btnOpenUI").addEventListener("click", openUI);

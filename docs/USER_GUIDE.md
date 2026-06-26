@@ -616,6 +616,19 @@ The app will use these as defaults whenever you connect.
 4. Click **Connect**
 5. A green "Connected" badge appears on success
 
+#### Connecting from the app: VPN, saved hosts, and MFA/Duo
+
+- **VPN first.** If your cluster is on a private/campus network, connect your
+  institution's **VPN** before clicking Connect (otherwise the host is unreachable).
+- **Saved hosts.** The connect form has a **"Saved host (from ~/.ssh/config)"**
+  dropdown — pick an alias you already use (it fills in host/user/port). Aliases,
+  `ProxyJump`, and keys from your `~/.ssh/config` are honored.
+- **Key-based clusters** connect with **no password** — leave the password field blank.
+- **MFA / Duo clusters** (e.g. CIRC/BlueHive): enter your **password**, then
+  **approve the Duo push on your phone** to finish connecting. The desktop app
+  performs the SSH from the host (broker), so it inherits your working auth
+  (agent key, Kerberos, Duo).
+
 ### Step 4: Configure SLURM Settings
 
 After connecting:
