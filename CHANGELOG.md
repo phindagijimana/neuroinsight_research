@@ -7,6 +7,8 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-06-26
+
 ### Added
 - **Deployment-aware Settings.** In a browser/web-hosted deployment the app shows
   a **Settings** tab (tool licenses), since there's no desktop control center. In
