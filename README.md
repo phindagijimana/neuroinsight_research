@@ -6,9 +6,70 @@ A **plugin** wraps a single neuroimaging tool (e.g., FreeSurfer, fMRIPrep) so it
 
 ## Desktop app (end users)
 
-Most users want the **desktop app** — download an installer for macOS, Windows,
-or Linux; the only prerequisite is Docker Desktop. See **[docs/INSTALL.md](docs/INSTALL.md)**
-for step-by-step instructions and system requirements.
+Most users want the **desktop app** — a one-click installer for macOS, Windows,
+or Linux. The only prerequisite is **Docker Desktop** (running). On first launch
+the app downloads its engine image (~1.8 GB) once, then everything runs locally.
+
+Full step-by-step guide: **[docs/INSTALL.md](docs/INSTALL.md)**. Quick version:
+
+### 1. Download
+
+From the [**Releases**](https://github.com/phindagijimana/neuroinsight_research/releases) page, grab the file for your OS **plus its checksum file**:
+
+| OS | Installer | Checksum file |
+|---|---|---|
+| macOS (Apple Silicon) | `NeuroInsight-<ver>-arm64.dmg` | `desktop-release-sha256-macos.txt` |
+| Windows | `NeuroInsight.Setup.<ver>.exe` | `desktop-release-sha256-windows.txt` |
+| Linux | `NeuroInsight-<ver>.AppImage` or `…_amd64.deb` | `desktop-release-sha256-linux.txt` |
+
+### 2. Verify the checksum (then allow it to run)
+
+The builds are **not code-signed yet**, so your OS will block them on first run.
+Verifying the SHA-256 checksum is how you confirm the file is the **authentic,
+untampered release** — do this first, then tell your OS to run it.
+
+**Easiest:** download all the release files into one folder and run the helper
+for your OS — it verifies the checksums and installs:
+`install-nir-macos.sh` · `install-nir-linux.sh` · `install-nir-windows.ps1`.
+
+**Manual check:**
+
+```bash
+# macOS / Linux
+shasum -a 256 NeuroInsight-*.dmg        # or .AppImage / .deb
+#   compare the hash to the line in desktop-release-sha256-macos.txt (or -linux.txt)
+```
+```powershell
+# Windows (PowerShell)
+Get-FileHash .\NeuroInsight.Setup.*.exe -Algorithm SHA256
+#   compare to the line in desktop-release-sha256-windows.txt
+```
+
+### 3. Run an unsigned build (one-time per install)
+
+Once the checksum matches, allow the app past the OS warning:
+
+- **macOS** — right-click the app → **Open** → **Open** (or System Settings →
+  Privacy & Security → **Open Anyway**).
+- **Windows** — if it **doesn't run / SmartScreen blocks it** ("Windows protected
+  your PC"), click **More info → Run anyway**. *(This is expected for an unsigned
+  installer — it's why the Windows app appears not to launch; verify the checksum
+  above, then Run anyway.)* You can also right-click the `.exe` → Properties →
+  **Unblock**.
+- **Linux** — `chmod +x NeuroInsight-*.AppImage` then run it, or `sudo dpkg -i nir-desktop-app_*_amd64.deb`.
+
+### 4. Launch & use
+
+1. Make sure **Docker Desktop is running**, then open NeuroInsight (first launch pulls the engine image once).
+2. **Settings → Licenses** — upload FreeSurfer / MELD license files if your pipelines need them (uploaded once; used automatically).
+3. **Jobs** — pick a data source, a plugin or workflow, choose **Local / Remote / HPC**, set resources, and **Submit**.
+4. **Results / Viewer** — monitor progress and open outputs in the built-in NIfTI viewer.
+
+> Signing/notarization will remove the step-3 warnings in a future release; until
+> then the checksum is your authenticity guarantee. See
+> [docs/SIGNING_AND_TRUST.md](docs/SIGNING_AND_TRUST.md).
+
+---
 
 The sections below are for **developers/contributors** running from source.
 
