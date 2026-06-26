@@ -393,6 +393,17 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
             </h4>
           </div>
 
+          {selectedBackend === 'remote_hpc' && connectionStatus !== 'connected' && (
+            <div className="mb-3 px-2.5 py-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800 flex items-start gap-1.5">
+              <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+              <span>
+                If your cluster is on a private network, connect your institution's <strong>VPN</strong> first.
+                Key-based clusters connect with no password; for <strong>MFA / Duo</strong> clusters, enter your
+                password below and approve the push on your phone.
+              </span>
+            </div>
+          )}
+
           <div className="space-y-3">
             {sshHosts.length > 0 && (
               <div>
