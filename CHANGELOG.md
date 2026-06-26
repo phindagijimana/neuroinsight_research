@@ -7,6 +7,15 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-06-26
+
+### Fixed
+- **macOS app icon looked oversized** — the icon art was full-bleed
+  (squircle edge-to-edge), so it rendered ~20% larger than other apps in the
+  Dock/Finder. Rebuilt `icon.icns` to Apple's icon grid (824px body on the
+  1024 canvas, ~100px transparent margin). Windows `.ico` / Linux `.png` stay
+  full-bleed (those platforms don't mask icons).
+
 ## [0.1.11] - 2026-06-26
 
 ### Fixed

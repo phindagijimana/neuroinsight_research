@@ -1,6 +1,6 @@
 {
   "name": "nir-desktop-app",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "NeuroInsight Desktop \u2014 thin Electron orchestration client",
   "private": true,
   "main": "src/main.js",
