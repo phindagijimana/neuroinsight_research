@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
+import { USER_GUIDE_URL } from '../userGuide';
 import {
   FileText,
   Zap,
@@ -69,33 +70,6 @@ interface WorkflowDoc {
   yaml: string;
 }
 
-const TSC_HIDDEN_PLUGIN_NOTES = [
-  {
-    id: 'tsc_data_preparation',
-    name: 'TSC Data Preparation',
-    purpose: 'Validates and standardizes T1/T2/FLAIR input files into a workflow-ready layout.',
-  },
-  {
-    id: 'tsc_skull_strip_synthstrip',
-    name: 'TSC Skull Stripping (SynthStrip)',
-    purpose: 'Performs brain extraction and mask generation for downstream processing.',
-  },
-  {
-    id: 'tsc_t2_combine_niftymic',
-    name: 'TSC T2 Super-Resolution (NiftyMIC)',
-    purpose: 'Combines axial/coronal T2 when available; otherwise falls back to single-T2 passthrough.',
-  },
-  {
-    id: 'tsc_registration_ants',
-    name: 'TSC Registration (ANTs)',
-    purpose: 'Applies bias correction, resampling, and registration into MNI space.',
-  },
-  {
-    id: 'tsc_segmentation_tsccnn3d',
-    name: 'TSC Tuber Segmentation (TSCCNN3D)',
-    purpose: 'Runs CNN-based tuber segmentation and quantifies tuber burden outputs.',
-  },
-];
 
 const domainLabel = (domain: string) => {
   switch (domain) {
@@ -774,34 +748,12 @@ const DocsPage: React.FC<DocsPageProps> = () => {
       </div>
 
       {/* Quick Reference footer */}
-      <div className="mt-4 flex-shrink-0 bg-gray-50 border border-gray-200 rounded-lg px-5 py-3">
-        <h4 className="text-sm font-semibold text-gray-700 mb-2">Quick Reference</h4>
-        <div className="space-y-2 text-sm text-gray-600">
-          <div className="flex gap-2">
-            <span className="font-semibold text-navy-600 min-w-[72px]">Plugin:</span>
-            <span>Single neuroimaging tool running one container. Use for individual processing steps or full control.</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="font-semibold text-navy-600 min-w-[72px]">Workflow:</span>
-            <span>Sequence of plugins working together. Manages dependencies automatically. Recommended for complete analysis pipelines.</span>
-          </div>
-          <div className="flex gap-2 pt-2 border-t border-gray-200">
-            <span className="font-semibold text-gray-500 min-w-[72px]">Note:</span>
-            <span className="text-gray-500 italic">Some utility plugins are hidden but work within workflows for specialized tasks.</span>
-          </div>
-        </div>
-
-        <div className="mt-3 pt-3 border-t border-gray-200">
-          <h5 className="text-sm font-semibold text-gray-700 mb-2">Tuberous Sclerosis Detection Hidden Plugins</h5>
-          <div className="space-y-1.5 text-sm text-gray-600">
-            {TSC_HIDDEN_PLUGIN_NOTES.map((item) => (
-              <div key={item.id} className="flex gap-2">
-                <span className="font-semibold text-navy-600 min-w-[220px]">{item.name}:</span>
-                <span>{item.purpose}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="mt-4 flex-shrink-0 bg-gray-50 border border-gray-200 rounded-lg px-5 py-3 text-sm text-gray-600">
+        <span className="font-semibold text-gray-700">Plugin</span> = one tool ·{' '}
+        <span className="font-semibold text-gray-700">Workflow</span> = a sequence of plugins.{' '}
+        <a href={USER_GUIDE_URL} target="_blank" rel="noreferrer" className="text-navy-600 hover:underline">
+          User Guide →
+        </a>
       </div>
     </div>
   );
