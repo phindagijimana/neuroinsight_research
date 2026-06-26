@@ -44,6 +44,14 @@ from backend.execution.workflow_nir_env import apply_workflow_nir_input_root_com
 logger = logging.getLogger(__name__)
 
 
+def _shell_value(value):
+    """Render a param for a shell template: Python bools -> lowercase true/false
+    (templates test `[ "{flag}" = "true" ]`; str(True) is "True" and would fail)."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
 class SLURMBackend(ExecutionBackend):
     """SLURM HPC execution backend.
     
@@ -1558,7 +1566,7 @@ class SLURMBackend(ExecutionBackend):
             result = template
             for key, value in all_params.items():
                 if not str(key).startswith("_"):
-                    safe_val = "".join(c for c in str(value) if c not in dangerous_chars)
+                    safe_val = "".join(c for c in _shell_value(value) if c not in dangerous_chars)
                     result = result.replace(f"{{{key}}}", safe_val)
                     result = result.replace(f"${{{key}}}", safe_val)
             return result

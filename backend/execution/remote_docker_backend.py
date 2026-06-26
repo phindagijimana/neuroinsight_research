@@ -46,6 +46,14 @@ from backend.core.ssh_manager import (
 logger = logging.getLogger(__name__)
 
 
+def _shell_value(value):
+    """Render a param for a shell template: Python bools -> lowercase true/false
+    (templates test `[ "{flag}" = "true" ]`; str(True) is "True" and would fail)."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
 # Map Docker container states to our JobStatus
 _DOCKER_STATE_MAP = {
     "created": JobStatus.PENDING,
@@ -193,7 +201,7 @@ class RemoteDockerBackend(ExecutionBackend):
             dangerous = set(";|&`$(){}!><\n\r")
             for key, value in spec.parameters.items():
                 if not key.startswith("_"):
-                    safe_val = "".join(c for c in str(value) if c not in dangerous)
+                    safe_val = "".join(c for c in _shell_value(value) if c not in dangerous)
                     cmd = cmd.replace(f"{{{key}}}", safe_val)
                     cmd = cmd.replace(f"${{{key}}}", safe_val)
             docker_args.append(image)
@@ -428,7 +436,7 @@ class RemoteDockerBackend(ExecutionBackend):
         def _sub(template: str) -> str:
             result = template
             for key, value in resolved_params.items():
-                safe_val = "".join(c for c in str(value) if c not in dangerous)
+                safe_val = "".join(c for c in _shell_value(value) if c not in dangerous)
                 result = result.replace(f"{{{key}}}", safe_val)
                 result = result.replace(f"${{{key}}}", safe_val)
             return result

@@ -7,6 +7,16 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+### Fixed
+- **Boolean plugin parameters were ignored** across all execution backends
+  (local Docker, SLURM/HPC, remote Docker). Command templates test
+  `[ "{flag}" = "true" ]`, but Python `True` was substituted as `"True"`
+  (capital T) via `str()`, so the test always failed and the flag was dropped —
+  e.g. dcm2niix `compress=true` silently ran `-z n` and produced a `.nii`
+  instead of `.nii.gz`. Bools now render as lowercase `true`/`false`
+  (`_shell_value`) at every template-substitution site. Verified end-to-end:
+  dcm2niix now runs `-z y` and emits `.nii.gz`.
+
 ## [0.1.12] - 2026-06-26
 
 ### Fixed
