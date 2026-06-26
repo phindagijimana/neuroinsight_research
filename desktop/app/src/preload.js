@@ -67,4 +67,10 @@ contextBridge.exposeInMainWorld("nir", {
     export: () => invoke("diagnostics:export"),
     reveal: (filePath) => invoke("diagnostics:reveal", filePath),
   },
+  // Tool licenses (FreeSurfer/MELD) — proxied to the engine's /api/licenses.
+  licenses: {
+    list: () => invoke("licenses:list"),
+    upload: (id, content) => invoke("licenses:upload", id, content),
+    remove: (id) => invoke("licenses:remove", id),
+  },
 });

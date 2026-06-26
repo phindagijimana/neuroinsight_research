@@ -469,6 +469,43 @@ function registerIpc() {
   // Open the live NIR UI inside the desktop window
   ipcMain.handle("backend:openUI", wrap(() => navigateToNIR()));
 
+  // Tool licenses (FreeSurfer/MELD) — proxy to the engine's /api/licenses so the
+  // control center manages them next to the Engine. The backend owns the
+  // registry + data-dir resolution; a main-process fetch avoids CORS from the
+  // file:// renderer. Requires the engine to be running.
+  async function licensesBase() {
+    const status = await backendManager.getStatus();
+    if (!status.backend || !status.backend.healthy || !status.backend.url) {
+      const err = new Error("Start the engine to manage tool licenses.");
+      err.code = "ENGINE_DOWN";
+      throw err;
+    }
+    return String(status.backend.url).replace(/\/$/, "");
+  }
+  ipcMain.handle("licenses:list", wrap(async () => {
+    const res = await fetch(`${await licensesBase()}/api/licenses`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }));
+  ipcMain.handle("licenses:upload", wrap(async (id, content) => {
+    const res = await fetch(`${await licensesBase()}/api/licenses/${encodeURIComponent(id)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    if (!res.ok) {
+      let detail;
+      try { detail = (await res.json()).detail; } catch (_e) { /* non-JSON */ }
+      throw new Error(detail || `HTTP ${res.status}`);
+    }
+    return res.json();
+  }));
+  ipcMain.handle("licenses:remove", wrap(async (id) => {
+    const res = await fetch(`${await licensesBase()}/api/licenses/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }));
+
   // Return to the control center
   ipcMain.handle("ui:control", wrap(() => navigateToControl()));
 

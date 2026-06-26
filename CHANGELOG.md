@@ -7,6 +7,15 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+### Changed
+- **Tool licenses (FreeSurfer/MELD) moved into the control center** ("Settings",
+  where the Engine lives) instead of a separate web Settings page. The control
+  center now has a Tool-licenses card (status, paste/file upload, replace/remove,
+  "Get a license"), proxied to the engine's `/api/licenses` over a new
+  `nir.licenses` IPC bridge. The standalone web Settings page + nav item were
+  removed so there's a single Settings surface. Verified end-to-end: paste/file
+  upload writes `license.txt` to the data dir where jobs read it; remove deletes it.
+
 ### Fixed
 - **Remote Docker backend couldn't run single-plugin jobs.** Two bugs: (1) the
   command was run as `docker run <image> bash -c …` with no `--entrypoint`, so

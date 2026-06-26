@@ -75,14 +75,6 @@ const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) =>
             >
               Docs
             </button>
-            <button
-              onClick={() => setActivePage('settings')}
-              className={`transition border-none bg-transparent ${
-                activePage === 'settings' ? 'text-navy-600 font-semibold' : 'text-gray-600 hover:text-navy-600'
-              }`}
-            >
-              Settings
-            </button>
           </nav>
         </div>
       </div>

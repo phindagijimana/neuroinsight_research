@@ -51,6 +51,14 @@
         </div>
         <ul id="preflightList" class="checks"></ul>
       </section>
+
+      <!-- Tool licenses (FreeSurfer, MELD, …) — some pipelines need these. -->
+      <section class="card" id="toolLicensesCard">
+        <h2>Tool licenses</h2>
+        <p class="meta">Upload the third-party licenses some pipelines need (FreeSurfer, MELD). Stored privately in your data folder; jobs use them automatically — locally and on HPC.</p>
+        <div id="toolLicensesList"></div>
+        <p id="toolLicensesHint" class="meta" hidden></p>
+      </section>
     </main>
 
     <!-- Advanced: power-user / support tools, collapsed by default. -->
