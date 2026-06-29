@@ -59,7 +59,6 @@
       "icon": "assets/icon.png"
     },
     "afterPack": "build/after_pack.js",
-    "afterSign": "build/notarize.js",
     "afterAllArtifactBuild": "build/after_all_artifact_build.js",
     "mac": {
       "target": [
