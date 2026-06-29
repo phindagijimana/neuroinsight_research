@@ -2,12 +2,12 @@
  * electron-builder afterAllArtifactBuild hook.
  *
  *  1. On macOS, notarize + staple each final .dmg (when Apple credentials are
- *     present). The .app was already notarized/stapled in the afterSign hook,
- *     but the .dmg is a distinct artifact that needs its own ticket — Apple
- *     recommends stapling the distributed installer and verify_trust.js enforces
- *     it. Stapling changes the .dmg bytes, so this runs BEFORE checksums and
- *     best-effort-refreshes the .dmg hash in latest-mac.yml. (macOS auto-update
- *     uses the .zip, which is unaffected.)
+ *     present). Submitting the .dmg notarizes its nested .app too, so this single
+ *     submission covers both the installer (stapled ticket, enforced by
+ *     verify_trust.js) and the app (Gatekeeper-trusted). Stapling changes the
+ *     .dmg bytes, so this runs BEFORE checksums and best-effort-refreshes the
+ *     .dmg hash in latest-mac.yml. (macOS auto-update uses the .zip, which is
+ *     unaffected.)
  *  2. Write SHA256SUMS.txt next to the installers on EVERY build (local and CI)
  *     as the integrity mechanism for downloads and the bundled install helpers.
  *     The file uses the standard `sha256sum` line format ("<hash>  <name>").

@@ -1,11 +1,13 @@
 /**
  * Shared macOS notarization helper for the electron-builder hooks.
  *
- * Why a shared util: BOTH the .app (afterSign) and the final .dmg
- * (afterAllArtifactBuild) must be notarized and stapled. The .app staple makes
- * the app trusted offline once extracted (it travels in the auto-update .zip);
- * the .dmg staple makes the fresh-download installer trusted, which Apple
- * recommends and which verify_trust.js enforces.
+ * We notarize + staple ONLY the final .dmg (in afterAllArtifactBuild). Apple's
+ * notary service recursively notarizes the nested code, so submitting the .dmg
+ * also registers the .app's cdhash — the app stays trusted via Gatekeeper, and
+ * the .dmg gets its own stapled ticket (Apple's recommendation for the
+ * distributed installer, and what verify_trust.js enforces). We deliberately do
+ * NOT also notarize the .app separately: that would be a second, sequential
+ * Apple submission, doubling exposure to a slow notary queue.
  *
  * Resilience: Apple's notary service can stay "In Progress" for 1-2h, and
  * GitHub macOS runners intermittently drop their connection to
@@ -23,7 +25,9 @@ const os = require("os");
 const { execFileSync } = require("child_process");
 
 const POLL_INTERVAL_MS = 30_000;
-const OVERALL_TIMEOUT_MS = 90 * 60_000;
+// Apple's notary queue latency is highly variable (seen 20-100+ min). Give a
+// single submission a generous ceiling so a slow-but-healthy queue still wins.
+const OVERALL_TIMEOUT_MS = 150 * 60_000;
 const SUBMIT_RETRIES = 3;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
