@@ -1601,38 +1601,38 @@ def get_jobs_progress(db: Session = Depends(get_db)):
                 except Exception:
                     db.rollback()
 
-            elif j.backend_type == "remote_docker":
-                new_status = remote_statuses.get(j.id)
-                if new_status and new_status != status:
-                    status = new_status
-                    j.status = status
-                    if status == "running" and not j.started_at:
-                        from datetime import datetime
+        elif j.backend_type == "remote_docker":
+            new_status = remote_statuses.get(j.id)
+            if new_status and new_status != status:
+                status = new_status
+                j.status = status
+                if status == "running" and not j.started_at:
+                    from datetime import datetime
 
-                        j.started_at = datetime.utcnow()
-                        if not j.current_phase:
-                            phase = "Running on remote server"
-                            j.current_phase = phase
-                    if status in ("completed", "failed", "cancelled"):
-                        from datetime import datetime
+                    j.started_at = datetime.utcnow()
+                    if not j.current_phase:
+                        phase = "Running on remote server"
+                        j.current_phase = phase
+                if status in ("completed", "failed", "cancelled"):
+                    from datetime import datetime
 
-                        j.completed_at = datetime.utcnow()
-                        if status == "completed":
-                            progress = 100
-                            phase = "Completed"
-                            j.progress = 100
-                            j.current_phase = "Completed"
-                            if j.exit_code is None:
-                                j.exit_code = 0
-                        elif status == "failed":
-                            if not j.error_message:
-                                j.error_message = "Remote job reported FAILED"
-                            if j.exit_code is None:
-                                j.exit_code = 1
-                    try:
-                        db.commit()
-                    except Exception:
-                        db.rollback()
+                    j.completed_at = datetime.utcnow()
+                    if status == "completed":
+                        progress = 100
+                        phase = "Completed"
+                        j.progress = 100
+                        j.current_phase = "Completed"
+                        if j.exit_code is None:
+                            j.exit_code = 0
+                    elif status == "failed":
+                        if not j.error_message:
+                            j.error_message = "Remote job reported FAILED"
+                        if j.exit_code is None:
+                            j.exit_code = 1
+                try:
+                    db.commit()
+                except Exception:
+                    db.rollback()
 
             if status == "running" and _t.time() < _progress_deadline:
                 prog_result = _poll_slurm_progress(j)
