@@ -24,9 +24,10 @@ From the [**Releases**](https://github.com/phindagijimana/neuroinsight_research/
 
 ### 2. Verify the checksum (then allow it to run)
 
-The builds are **not code-signed yet**, so your OS will block them on first run.
-Verifying the SHA-256 checksum is how you confirm the file is the **authentic,
-untampered release** — do this first, then tell your OS to run it.
+The **macOS** build is code-signed (Developer ID) and **notarized**, so it opens
+normally. **Windows** is not yet signed (you'll clear a one-time SmartScreen
+prompt), and Linux installers aren't signed by convention. Either way, verifying
+the SHA-256 checksum confirms the file is the **authentic, untampered release**.
 
 **Easiest:** download all the release files into one folder and run the helper
 for your OS — it verifies the checksums and installs:
@@ -45,17 +46,14 @@ Get-FileHash .\NeuroInsight.Setup.*.exe -Algorithm SHA256
 #   compare to the line in desktop-release-sha256-windows.txt
 ```
 
-### 3. Run an unsigned build (one-time per install)
+### 3. First-launch notes
 
-Once the checksum matches, allow the app past the OS warning:
-
-- **macOS** — right-click the app → **Open** → **Open** (or System Settings →
-  Privacy & Security → **Open Anyway**).
-- **Windows** — if it **doesn't run / SmartScreen blocks it** ("Windows protected
-  your PC"), click **More info → Run anyway**. *(This is expected for an unsigned
-  installer — it's why the Windows app appears not to launch; verify the checksum
-  above, then Run anyway.)* You can also right-click the `.exe` → Properties →
-  **Unblock**.
+- **macOS** — **opens normally.** The app is signed with a Developer ID and
+  notarized by Apple, so there's no Gatekeeper workaround to do.
+- **Windows** — if SmartScreen blocks it ("Windows protected your PC"), click
+  **More info → Run anyway**. *(Expected for an unsigned installer — verify the
+  checksum above, then Run anyway.)* You can also right-click the `.exe` →
+  Properties → **Unblock**.
 - **Linux** — `chmod +x NeuroInsight-*.AppImage` then run it, or `sudo dpkg -i nir-desktop-app_*_amd64.deb`.
 
 ### 4. Launch & use
@@ -65,8 +63,8 @@ Once the checksum matches, allow the app past the OS warning:
 3. **Jobs** — pick a data source, a plugin or workflow, choose **Local / Remote / HPC**, set resources, and **Submit**.
 4. **Results / Viewer** — monitor progress and open outputs in the built-in NIfTI viewer.
 
-> Signing/notarization will remove the step-3 warnings in a future release; until
-> then the checksum is your authenticity guarantee. See
+> macOS builds are signed and notarized (no first-run warning). Windows signing
+> is planned; until then the checksum is your authenticity guarantee. See
 > [docs/SIGNING_AND_TRUST.md](docs/SIGNING_AND_TRUST.md).
 
 ---

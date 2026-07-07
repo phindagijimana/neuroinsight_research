@@ -12,7 +12,7 @@ Complete guide for deploying and using the NeuroInsight Research platform for ne
 
 ## NIR Desktop installer (optional)
 
-If you install **NIR Desktop** from a downloaded build (`.exe`, `.dmg`/`.app`, `.AppImage`/`.deb`), the OS may block or warn on first launch because the file was downloaded from the internet. This is normal for unsigned or pilot builds. Use the steps for your platform **with the real path and filename** of your download (names vary by version and architecture).
+The **macOS** build is signed and notarized, so it opens normally. On **Windows** (not yet signed) — and in some download scenarios — the OS may block or warn on first launch because the file came from the internet. Use the steps for your platform **with the real path and filename** of your download (names vary by version and architecture).
 
 ### Windows (PowerShell)
 
@@ -40,7 +40,7 @@ You can also **right‑click** the file in File Explorer → **Properties** → 
 
 ### macOS (Terminal)
 
-Gatekeeper may quarantine downloaded apps. After you copy **NeuroInsight Research.app** into `/Applications` (or before opening the installer), clear **quarantine** extended attributes:
+The current macOS build is signed and notarized, so it opens normally — no workaround needed. Only if you're on an older/unsigned build or hit a Gatekeeper quarantine error, clear the **quarantine** attribute after copying **NeuroInsight.app** into `/Applications`:
 
 ```bash
 xattr -cr "/Applications/NeuroInsight Research.app"
@@ -54,7 +54,7 @@ xattr -d com.apple.quarantine ~/Downloads/nir-desktop-0.1.0-mac-x64.dmg
 
 Then open the disk image or drag the app to **Applications**, and run `xattr -cr` on the installed `.app` if needed.
 
-**Note:** Fully trusted distribution uses Apple notarization and Developer ID signing; pilot/unsigned builds may still require a **right‑click → Open** the first time.
+**Note:** The current release is distributed with Apple notarization and Developer ID signing, so it opens without a right‑click workaround. Only older pilot/unsigned builds may still need **right‑click → Open** the first time.
 
 ### Linux
 

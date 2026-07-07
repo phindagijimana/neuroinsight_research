@@ -59,14 +59,11 @@ shasum -a 256 -c desktop-release-sha256-macos.txt    # or -linux.txt
 - **Linux:** `chmod +x NeuroInsight-*.AppImage && ./NeuroInsight-*.AppImage`, or
   `sudo dpkg -i NeuroInsight-*.deb`.
 
-> **Heads-up: current builds are not code-signed.** The app is safe (verify with
-> `SHA256SUMS.txt` above), but the OS shows a one-time warning the first time you
-> open it:
-> - **macOS:** if you see *"NeuroInsight can't be opened because Apple cannot
->   check it…"*, **right-click (or Control-click) the app → Open → Open**. You
->   only need to do this once. (Or: System Settings → Privacy & Security → "Open
->   Anyway".)
-> - **Windows:** if SmartScreen appears, click **More info → Run anyway**.
+> **Trust note.**
+> - **macOS:** the build is code-signed (Developer ID) and **notarized**, so it
+>   opens normally — no right-click/Gatekeeper workaround needed.
+> - **Windows:** not yet signed. If SmartScreen appears, click **More info → Run
+>   anyway** (the app is safe — verify with `SHA256SUMS.txt` above).
 > - **Linux:** no warning — AppImage/.deb aren't signed by convention.
 
 ## 4. First launch
