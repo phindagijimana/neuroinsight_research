@@ -26,12 +26,10 @@ function getUpdater() {
   }
   if (!wired) {
     wired = true;
-    // Do NOT auto-download. We only *check* and log availability. Auto-download
-    // breaks on macOS unless the release ships a signed `.zip` (Squirrel.Mac):
-    // electron-updater's MacUpdater throws "ZIP file not provided" for a
-    // dmg-only, unsigned release, and the async rejection surfaces to the user.
-    // Downloads should only happen on an explicit, user-initiated update once
-    // code signing + the zip artifact are in place.
+    // Never auto-download. We check, then download ONLY after the user confirms
+    // (see promptAndUpdate in main.js). Safe now that signed releases ship a
+    // signed `.zip` (Squirrel.Mac needs it on macOS); before signing, downloading
+    // threw "ZIP file not provided" at users.
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = false;
     autoUpdater.on("error", (e) => desktopState.appendLog("updater_error", { error: String(e) }));
@@ -66,4 +64,49 @@ async function checkForUpdates({ silent = true } = {}) {
   }
 }
 
-module.exports = { checkForUpdates, getUpdater };
+/** Download the already-detected update. Resolves when fully downloaded. */
+function downloadUpdate() {
+  const u = getUpdater();
+  if (!u) return Promise.reject(new Error("updater unavailable"));
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      u.removeListener("update-downloaded", onDone);
+      u.removeListener("error", onErr);
+    };
+    const onDone = (info) => {
+      cleanup();
+      resolve(info);
+    };
+    const onErr = (err) => {
+      cleanup();
+      reject(err);
+    };
+    u.once("update-downloaded", onDone);
+    u.once("error", onErr);
+    Promise.resolve()
+      .then(() => u.downloadUpdate())
+      .catch(onErr);
+  });
+}
+
+/** When true, a downloaded update installs automatically on next quit. */
+function setInstallOnQuit(enabled) {
+  const u = getUpdater();
+  if (u) u.autoInstallOnAppQuit = Boolean(enabled);
+}
+
+/** Quit and install a downloaded update, relaunching afterwards. */
+function quitAndInstall() {
+  const u = getUpdater();
+  if (!u) return;
+  // Defer so the calling IPC/menu handler can return before the app quits.
+  setImmediate(() => u.quitAndInstall(false, true));
+}
+
+module.exports = {
+  checkForUpdates,
+  getUpdater,
+  downloadUpdate,
+  setInstallOnQuit,
+  quitAndInstall,
+};
