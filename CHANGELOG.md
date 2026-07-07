@@ -7,6 +7,25 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-07-07
+
+### Added
+- **User-confirmed auto-update (desktop).** Now that releases are signed and ship
+  a signed `.zip`, the app can update itself — and never downloads without
+  consent. On startup (or via **Help → Check for Updates…**) it prompts when a
+  new version is available, downloads on confirmation, then offers to **Restart
+  Now** or install on next quit.
+- **Remote-Docker job status monitoring.** Jobs run on a remote Docker server
+  over SSH now report live status (pending → running → completed/failed) in the
+  UI, matching the existing local and HPC/SLURM behavior. Validated end-to-end
+  against a live remote host.
+
+### Changed
+- **Signed & notarized macOS releases** are now the norm (Developer ID +
+  notarization/stapling), so macOS no longer shows the Gatekeeper
+  "unidentified developer" block. Notarization is resilient to Apple notary
+  backlogs.
+
 ## [0.1.13] - 2026-06-26
 
 ### Added
