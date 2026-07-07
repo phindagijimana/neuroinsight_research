@@ -38,6 +38,59 @@ const appLock = require("./appLock");
 const platformAdapter = require("./platformAdapter");
 const updater = require("./updater");
 
+// Update flow: check → confirm → download → confirm → restart. A download NEVER
+// happens without explicit user confirmation. With { silent: true } (startup),
+// only an actual available update surfaces UI; "up to date"/errors stay quiet.
+async function promptAndUpdate({ silent = false } = {}) {
+  const win = mainWindow || null;
+  const res = await updater.checkForUpdates({ silent });
+  if (!res || !res.ok) {
+    if (!silent && win)
+      dialog.showMessageBox(win, { type: "warning", message: `Update check failed: ${res && res.error}` });
+    return;
+  }
+  if (res.skipped) {
+    if (!silent && win) dialog.showMessageBox(win, { type: "info", message: `Updates: ${res.skipped}.` });
+    return;
+  }
+  if (!res.version) {
+    if (!silent && win) dialog.showMessageBox(win, { type: "info", message: "You are on the latest version." });
+    return;
+  }
+
+  // An update is available — confirm before downloading.
+  const ask = await dialog.showMessageBox(win, {
+    type: "info",
+    buttons: ["Download & Install", "Later"],
+    defaultId: 0,
+    cancelId: 1,
+    message: `NeuroInsight ${res.version} is available.`,
+    detail: "Download the update now? You'll be asked to restart once it's ready.",
+  });
+  if (ask.response !== 0) return;
+
+  desktopState.appendLog("update_download_started", { version: res.version });
+  try {
+    await updater.downloadUpdate();
+  } catch (e) {
+    desktopState.appendLog("update_download_failed", { error: String(e) });
+    if (win) dialog.showMessageBox(win, { type: "error", message: "Update download failed.", detail: String(e) });
+    return;
+  }
+
+  // Downloaded — install on next quit regardless, and offer to restart now.
+  updater.setInstallOnQuit(true);
+  const restart = await dialog.showMessageBox(win, {
+    type: "info",
+    buttons: ["Restart Now", "Later"],
+    defaultId: 0,
+    cancelId: 1,
+    message: `NeuroInsight ${res.version} is ready to install.`,
+    detail: "Restart now to finish updating, or it will install the next time you quit.",
+  });
+  if (restart.response === 0) updater.quitAndInstall();
+}
+
 let mainWindow = null;
 let splashWindow = null;
 let stateDir = null;
@@ -397,19 +450,7 @@ function buildAppMenu() {
     submenu: [
       {
         label: "Check for Updates…",
-        click: async () => {
-          const res = await updater.checkForUpdates({ silent: false });
-          if (mainWindow) {
-            const msg = res.skipped
-              ? `Updates: ${res.skipped}.`
-              : res.ok
-              ? res.version
-                ? `Update available: ${res.version} (downloading).`
-                : "You are on the latest version."
-              : `Update check failed: ${res.error}`;
-            dialog.showMessageBox(mainWindow, { type: "info", message: msg });
-          }
-        },
+        click: () => promptAndUpdate({ silent: false }),
       },
       { type: "separator" },
       {
@@ -801,10 +842,11 @@ app.whenReady().then(async () => {
   tryAutoImportLicense();
   buildAppMenu();
 
-  // Silent auto-update check (no-op in dev / when no feed is published).
-  updater.checkForUpdates({ silent: true }).then((r) => {
-    if (r && (r.version || r.skipped)) desktopState.appendLog("update_check", r);
-  });
+  // On startup, silently check; if an update is available, prompt with
+  // confirmation once the UI has settled. Never downloads without user consent.
+  setTimeout(() => {
+    promptAndUpdate({ silent: true }).catch((e) => desktopState.appendLog("update_check", { error: String(e) }));
+  }, 4000);
 
   createSplash();
   createWindow({ show: false });

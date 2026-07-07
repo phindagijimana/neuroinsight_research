@@ -1550,6 +1550,10 @@ def get_jobs_progress(db: Session = Depends(get_db)):
     if slurm_jobs:
         slurm_statuses = _poll_slurm_status_batch(list(slurm_jobs.keys()))
 
+    # Poll remote-Docker job statuses over SSH (mirror of the SLURM path above).
+    remote_active = [j for j in active_jobs if j.backend_type == "remote_docker"]
+    remote_statuses: dict[str, str] = _poll_remote_docker_status_batch(remote_active)
+
     import time as _t
     _progress_deadline = _t.time() + 12  # max 12s on log polling
 
@@ -1592,6 +1596,39 @@ def get_jobs_progress(db: Session = Depends(get_db)):
                             j.exit_code = 130
                     _slurm_progress_cache.pop(j.id, None)
                     _slurm_progress_state.pop(j.id, None)
+                try:
+                    db.commit()
+                except Exception:
+                    db.rollback()
+
+        elif j.backend_type == "remote_docker":
+            new_status = remote_statuses.get(j.id)
+            if new_status and new_status != status:
+                status = new_status
+                j.status = status
+                if status == "running" and not j.started_at:
+                    from datetime import datetime
+
+                    j.started_at = datetime.utcnow()
+                    if not j.current_phase:
+                        phase = "Running on remote server"
+                        j.current_phase = phase
+                if status in ("completed", "failed", "cancelled"):
+                    from datetime import datetime
+
+                    j.completed_at = datetime.utcnow()
+                    if status == "completed":
+                        progress = 100
+                        phase = "Completed"
+                        j.progress = 100
+                        j.current_phase = "Completed"
+                        if j.exit_code is None:
+                            j.exit_code = 0
+                    elif status == "failed":
+                        if not j.error_message:
+                            j.error_message = "Remote job reported FAILED"
+                        if j.exit_code is None:
+                            j.exit_code = 1
                 try:
                     db.commit()
                 except Exception:
@@ -1822,6 +1859,49 @@ def _reconcile_active_slurm_jobs_on_startup() -> int:
         if updated:
             db.commit()
     return updated
+
+
+def _poll_remote_docker_status_batch(jobs: list["Job"]) -> dict[str, str]:
+    """Query live status for remote-Docker jobs over SSH (mirror of the SLURM poller).
+
+    For jobs that ran on the ``remote_docker`` backend, ask the active backend
+    for the container / workflow status and map it to a DB status string. This
+    closes the gap where remote-Docker jobs stayed "pending"/"running" in the UI
+    because nothing polled their status after submission (local jobs are updated
+    by Celery; SLURM jobs by ``_poll_slurm_status_batch``).
+
+    Best-effort: on any error, or when the active backend is not remote_docker,
+    the job's status is left unchanged. Returns ``{job_id: db_status}`` only for
+    jobs whose status could be determined (``unknown`` is skipped). Total SSH
+    time is bounded so this stays safe on the ~2-3s progress-polling path.
+    """
+    out: dict[str, str] = {}
+    if not jobs:
+        return out
+    try:
+        backend = get_backend()
+    except Exception as e:  # pragma: no cover - defensive
+        logger.debug("remote_docker poll: backend unavailable (%s)", e)
+        return out
+    # Only the remote_docker backend holds the SSH connection + per-job metadata.
+    if getattr(backend, "backend_type", None) != "remote_docker":
+        return out
+
+    import time as _t
+
+    deadline = _t.time() + 12  # bound total SSH time, like the SLURM poller
+    for j in jobs:
+        if _t.time() >= deadline:
+            break
+        try:
+            st = backend.get_job_status(j.id)
+        except Exception as e:
+            logger.debug("remote_docker status poll failed for %s: %s", j.id[:8], e)
+            continue
+        val = getattr(st, "value", None)
+        if val and val != "unknown":
+            out[j.id] = val
+    return out
 
 
 def _poll_slurm_status_batch(slurm_job_ids: list[str]) -> dict[str, str]:
