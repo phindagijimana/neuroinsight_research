@@ -1,0 +1,10 @@
+#!/bin/sh
+# Strip AI attribution trailers (Cursor/Claude) so they never reach GitHub.
+# Cursor/Claude keep working normally — only the commit-message stamp is removed.
+#
+# Enable once per clone:  git config core.hooksPath .githooks
+f="$1"
+sed -i.bak -E '/Made-with:[[:space:]]*Cursor/Id; /[Cc]o-[Aa]uthored-[Bb]y:.*([Cc]ursor|[Cc]laude)/Id; /cursoragent@cursor\.com/Id; /noreply@anthropic\.com/Id; /Generated with \[Claude/Id' "$f"
+rm -f "$f.bak"
+perl -0pi -e 's/\n{2,}\z/\n/' "$f" 2>/dev/null || true
+exit 0
