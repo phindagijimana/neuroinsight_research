@@ -60,8 +60,9 @@ singularity_cache/
 *.swo
 *~
 
-# Claude Code (local session data)
+# AI editor/agent local data
 .claude/
+.cursor/
 
 # OS
 .DS_Store
