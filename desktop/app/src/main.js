@@ -15,6 +15,32 @@ const path = require("path");
 const crypto = require("crypto");
 const { app, BrowserWindow, Menu, ipcMain, shell, dialog, crashReporter } = require("electron");
 
+// macOS/Linux GUI apps (launched from Finder/Dock/DMG) inherit a stripped PATH
+// (/usr/bin:/bin:/usr/sbin:/sbin) that omits /usr/local/bin, /opt/homebrew/bin,
+// etc. — so `docker`, `node`, `npm`, `celery` aren't found even when installed,
+// and preflight wrongly reports "Docker is not running". Add the standard tool
+// locations so checks and spawns work regardless of how the app was launched.
+// Best-effort and no-op on Windows.
+if (process.platform !== "win32") {
+  try {
+    const extraPaths = [
+      "/usr/local/bin",
+      "/usr/local/sbin",
+      "/opt/homebrew/bin",
+      "/opt/homebrew/sbin",
+      "/opt/local/bin",
+      "/Applications/Docker.app/Contents/Resources/bin",
+    ];
+    if (process.env.HOME) extraPaths.push(path.join(process.env.HOME, ".docker/bin"));
+    const current = (process.env.PATH || "").split(path.delimiter).filter(Boolean);
+    const seen = new Set(current);
+    const merged = current.concat(extraPaths.filter((p) => !seen.has(p)));
+    process.env.PATH = merged.join(path.delimiter);
+  } catch (_e) {
+    // best-effort — never block startup on PATH setup
+  }
+}
+
 // Collect native crash minidumps locally (never uploaded — no server). Stored
 // under userData/Crashpad. Must start before app is ready.
 try {
