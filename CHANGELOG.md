@@ -7,6 +7,17 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-08-20
+
+### Fixed
+- **macOS GUI launch PATH (Docker/Node/npm/Celery detection).** Apps launched from
+  Finder, Dock, or a DMG inherit a stripped `PATH` (`/usr/bin:/bin:…`) that omits
+  `/usr/local/bin`, `/opt/homebrew/bin`, and Docker Desktop's bundled `bin`, so
+  preflight reported "Docker is not running" (and Node/npm/Celery checks failed)
+  even when those tools were installed and running. The desktop app now prepends
+  the standard tool locations to `process.env.PATH` at startup so every spawn finds
+  them regardless of launch method.
+
 ## [0.1.14] - 2026-07-07
 
 ### Added
