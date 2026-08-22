@@ -29,20 +29,20 @@ WorkflowMilestone = Tuple[str, int, str]
 #  FreeSurfer recon-all  (~6-8 hours)
 # ══════════════════════════════════════════════════════════════════════
 FREESURFER_RECON: List[PhaseMilestone] = [
-    ("recon-all", 2, "Initializing recon-all"),
+    ("fs-check-version", 2, "Initializing recon-all"),
     ("SUBJECTS_DIR", 3, "Setting up subject directory"),
 
-    # autorecon1
-    ("MotionCorrect", 5, "Motion correction"),
-    ("mri_convert", 6, "Converting input format"),
-    ("Talairach", 8, "Talairach registration"),
-    ("NUIntensityCorrection", 10, "Intensity correction (N3)"),
-    ("SkullStripping", 14, "Skull stripping"),
+    # autorecon1 (FreeSurfer 7.4 logs use #@# stage headers)
+    ("#@# MotionCor", 5, "Motion correction"),
+    ("mri_convert.*T1w", 6, "Converting input format"),
+    ("#@# Talairach", 8, "Talairach registration"),
+    ("#@# Nu Intensity Correction", 10, "Intensity correction (N3)"),
+    ("#@# Skull Stripping", 14, "Skull stripping"),
 
     # autorecon2
-    ("EMRegister", 18, "EM registration"),
-    ("CANormalize", 20, "CA normalize"),
-    ("CARegister", 25, "CA register (atlas)"),
+    ("#@# EM Registration", 18, "EM registration"),
+    ("#@# CA Normalize", 20, "CA normalize"),
+    ("#@# CA Reg", 25, "CA register (atlas)"),
     ("SubCortSeg", 30, "Subcortical segmentation"),
     ("IntensityNormalization2", 33, "Intensity normalization 2"),
     ("WhiteMatterSegmentation", 36, "White matter segmentation"),
@@ -82,16 +82,16 @@ FREESURFER_VOLONLY: List[PhaseMilestone] = [
     ("SUBJECTS_DIR", 6, "Setting up subject directory"),
 
     # autorecon1
-    ("MotionCorrect", 10, "Motion correction"),
-    ("mri_convert", 12, "Converting input format"),
-    ("Talairach", 18, "Talairach registration"),
-    ("NUIntensityCorrection", 25, "Intensity correction (N3)"),
-    ("SkullStripping", 35, "Skull stripping"),
+    ("#@# MotionCor", 10, "Motion correction"),
+    ("mri_convert.*T1w", 12, "Converting input format"),
+    ("#@# Talairach", 18, "Talairach registration"),
+    ("#@# Nu Intensity Correction", 25, "Intensity correction (N3)"),
+    ("#@# Skull Stripping", 35, "Skull stripping"),
 
     # autorecon2-volonly (no surface stages)
-    ("EMRegister", 42, "EM registration"),
-    ("CANormalize", 48, "CA normalize"),
-    ("CARegister", 55, "CA register (atlas)"),
+    ("#@# EM Registration", 42, "EM registration"),
+    ("#@# CA Normalize", 48, "CA normalize"),
+    ("#@# CA Reg", 55, "CA register (atlas)"),
     ("SubCortSeg", 65, "Subcortical segmentation"),
     ("IntensityNormalization2", 72, "Intensity normalization 2"),
     ("WhiteMatterSegmentation", 80, "White matter segmentation"),

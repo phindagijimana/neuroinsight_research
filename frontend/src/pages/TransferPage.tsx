@@ -35,7 +35,7 @@ interface PlatformTabDef {
 }
 
 const PLATFORM_TABS: PlatformTabDef[] = [
-  { id: 'local',     label: 'Local Server',  icon: <Monitor className="h-3.5 w-3.5" />,  activeClass: 'border-navy-600 bg-navy-50 text-navy-700' },
+  { id: 'local',     label: 'Local',  icon: <Monitor className="h-3.5 w-3.5" />,  activeClass: 'border-navy-600 bg-navy-50 text-navy-700' },
   { id: 'remote',    label: 'Remote',        icon: <Cloud className="h-3.5 w-3.5" />,    activeClass: 'border-green-600 bg-green-50 text-green-700' },
   { id: 'hpc',       label: 'HPC',           icon: <Server className="h-3.5 w-3.5" />,   activeClass: 'border-navy-600 bg-navy-50 text-navy-700' },
   { id: 'pennsieve', label: 'Pennsieve',     icon: <Database className="h-3.5 w-3.5" />, activeClass: 'border-navy-600 bg-navy-50 text-navy-700' },
@@ -57,7 +57,7 @@ function TransferPage() {
   const [rightPlatform, setRightPlatform] = useState<PlatformType>('remote');
 
   // Pane paths (for backend platforms, used as source_path / dest_path)
-  const [leftPath, setLeftPath] = useState('/home');
+  const [leftPath, setLeftPath] = useState('~');
   const [rightPath, setRightPath] = useState('~');
 
   // Selected files in each pane
@@ -364,6 +364,7 @@ function TransferPage() {
           <div className="flex-1 min-h-0">
             {leftConnected ? (
               <FileBrowserPane
+                key={`left-${leftPlatform}-${leftConnected}`}
                 platform={leftPlatform}
                 side="source"
                 selectedFiles={leftSelected}
@@ -487,6 +488,7 @@ function TransferPage() {
           <div className="flex-1 min-h-0">
             {rightConnected ? (
               <FileBrowserPane
+                key={`right-${rightPlatform}-${rightConnected}`}
                 platform={rightPlatform}
                 side="destination"
                 selectedFiles={rightSelected}

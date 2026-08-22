@@ -732,6 +732,56 @@ def _normalize_submission_parameters_for_plugins(plugin_ids: List[str], params: 
     return normalized
 
 
+def _plugin_default_resources(plugin) -> dict:
+    """Extract default resource dict from a plugin definition."""
+    if not plugin:
+        return {}
+    profiles = getattr(plugin, "resource_profiles", None) or {}
+    if profiles.get("default"):
+        return dict(profiles["default"])
+    flat = getattr(plugin, "resources", None)
+    if isinstance(flat, dict):
+        if "profiles" in flat:
+            return dict(flat.get("profiles", {}).get("default", {}))
+        return dict(flat)
+    return {}
+
+
+def _resolve_job_resources(
+    plugin,
+    custom_resources: Optional[dict] = None,
+    base_resources: Optional[dict] = None,
+) -> "ResourceSpec":
+    """Merge plugin defaults with UI overrides into a ResourceSpec."""
+    from backend.core.execution import ResourceSpec
+
+    res = dict(base_resources) if base_resources else _plugin_default_resources(plugin)
+    if custom_resources:
+        cr = dict(custom_resources)
+        # Normalize UI keys; strip fields that are not Docker/SLURM limits.
+        if "memory_gb" in cr:
+            cr["mem_gb"] = cr["memory_gb"]
+        for key in (
+            "threads", "parallel", "omp_nthreads",
+            "partition", "qos", "account", "nodes",
+        ):
+            cr.pop(key, None)
+        res = {**res, **cr}
+
+    memory_gb = res.get("memory_gb", res.get("mem_gb", 8))
+    cpus = res.get("cpus", 4)
+    time_hours = res.get("time_hours", 6)
+    gpu_val = res.get("gpu", res.get("gpus", 0))
+    gpu = bool(gpu_val) if isinstance(gpu_val, bool) else (int(gpu_val or 0) > 0)
+
+    return ResourceSpec(
+        memory_gb=int(memory_gb),
+        cpus=int(cpus),
+        time_hours=float(time_hours),
+        gpu=gpu,
+    )
+
+
 def _enforce_disk_guard_for_submission(plugin_ids: List[str], submission_label: str) -> None:
     """Block heavy submissions when free disk is below safety threshold."""
     if os.getenv("NIR_ALLOW_LOW_DISK_SUBMIT", "").lower() in {"1", "true", "yes"}:
@@ -769,24 +819,15 @@ def submit_plugin_job(plugin_id: str, request: PluginJobSubmitRequest, db: Sessi
     _check_licenses([plugin_id])
     _enforce_disk_guard_for_submission([plugin_id], f"plugin '{plugin.name}'")
 
-    # Resolve resources from plugin profile or direct dict
-    res = plugin.resources if isinstance(plugin.resources, dict) else {}
-    if "profiles" in res:
-        res = res.get("profiles", {}).get("default", res)
-    if request.custom_resources:
-        res = {**res, **request.custom_resources}
-
-    resources = ResourceSpec(
-        memory_gb=res.get("memory_gb", res.get("mem_gb", 8)),
-        cpus=res.get("cpus", 4),
-        time_hours=res.get("time_hours", 6),
-        gpu=res.get("gpu", res.get("gpus", 0) > 0 if isinstance(res.get("gpus"), int) else False),
-    )
+    # Resolve resources from plugin profile + optional UI overrides
+    resources = _resolve_job_resources(plugin, request.custom_resources)
 
     job_id = str(uuid.uuid4())
     output_dir = str(Path(settings.data_dir) / "outputs" / job_id)
 
     params = _normalize_submission_parameters_for_plugins([plugin_id], dict(request.parameters))
+    if request.custom_resources and request.custom_resources.get("threads"):
+        params["threads"] = int(request.custom_resources["threads"])
     params["_plugin_id"] = plugin_id
 
     spec = JobSpec(
@@ -871,7 +912,7 @@ def submit_workflow_job(workflow_id: str, request: WorkflowJobSubmitRequest, db:
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
-    # Compute resources from all steps: sum time_hours, take max of mem/cpus
+    # Compute resources from all workflow steps, then merge UI overrides
     first_plugin = pw_registry.get_plugin(workflow.steps[0].uses)
     total_time = 0
     max_mem = 8
@@ -879,24 +920,22 @@ def submit_workflow_job(workflow_id: str, request: WorkflowJobSubmitRequest, db:
     any_gpu = False
     for step in workflow.steps:
         sp = pw_registry.get_plugin(step.uses)
-        if sp and sp.resource_profiles:
-            rp = sp.resource_profiles.get("default", {})
+        rp = _plugin_default_resources(sp)
+        if rp:
             total_time += rp.get("time_hours", 0)
-            max_mem = max(max_mem, rp.get("mem_gb", 0))
+            max_mem = max(max_mem, rp.get("mem_gb", rp.get("memory_gb", 0)))
             max_cpus = max(max_cpus, rp.get("cpus", 0))
-            any_gpu = any_gpu or rp.get("gpus", 0) > 0
+            gpus = rp.get("gpus", 0)
+            any_gpu = any_gpu or (int(gpus or 0) > 0)
     if total_time == 0:
         total_time = 6
-    res = {"memory_gb": max_mem, "cpus": max_cpus, "time_hours": total_time, "gpu": any_gpu}
-    if request.custom_resources:
-        res = {**res, **request.custom_resources}
-
-    resources = ResourceSpec(
-        memory_gb=res.get("memory_gb", 8),
-        cpus=res.get("cpus", 4),
-        time_hours=res.get("time_hours", 6),
-        gpu=res.get("gpu", False),
-    )
+    workflow_res = {
+        "mem_gb": max_mem,
+        "cpus": max_cpus,
+        "time_hours": total_time,
+        "gpus": 1 if any_gpu else 0,
+    }
+    resources = _resolve_job_resources(None, request.custom_resources, base_resources=workflow_res)
 
     job_id = str(uuid.uuid4())
     output_dir = str(Path(settings.data_dir) / "outputs" / job_id)
@@ -1014,18 +1053,9 @@ def submit_workflow_batch(workflow_id: str, request: WorkflowBatchSubmitRequest,
             detail=f"No sub-* directories found in {bids_dir}",
         )
 
-    # Resolve resources from first step plugin
+    # Resolve resources from first step plugin + UI overrides
     first_plugin = pw_registry.get_plugin(workflow.steps[0].uses)
-    res = first_plugin.resources if isinstance(first_plugin.resources, dict) else {}
-    if request.custom_resources:
-        res = {**res, **request.custom_resources}
-
-    resources = ResourceSpec(
-        memory_gb=res.get("memory_gb", 8),
-        cpus=res.get("cpus", 4),
-        time_hours=res.get("time_hours", 6),
-        gpu=res.get("gpu", False),
-    )
+    resources = _resolve_job_resources(first_plugin, request.custom_resources)
 
     normalized_base_params = _normalize_submission_parameters_for_plugins(step_plugin_ids, dict(request.parameters))
 

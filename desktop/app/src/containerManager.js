@@ -147,6 +147,12 @@ function buildRunArgs(c) {
     args.push("-v", `${home}:${home}:ro`);
     args.push("-e", `NIR_HOST_HOME=${home}`);
   }
+  // Host CPU/RAM for /api/system/resources — the engine container only sees its
+  // own cgroup limits via /proc, not the Mac/PC the user actually has.
+  const hostCpus = os.cpus().length;
+  const hostMemGb = Math.max(1, Math.round(os.totalmem() / (1024 ** 3)));
+  args.push("-e", `NIR_HOST_CPU_COUNT=${hostCpus}`);
+  args.push("-e", `NIR_HOST_MEMORY_GB=${hostMemGb}`);
   // macOS external drives (/Volumes/...) — optional read-only mount.
   if (process.platform === "darwin" && fs.existsSync("/Volumes")) {
     args.push("-v", "/Volumes:/Volumes:ro");

@@ -6,7 +6,7 @@
  * from previously completed jobs.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   AlertCircle, FolderOpen, File, FileText,
   ChevronRight, ArrowUp, CheckCircle2,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { isDesktopApp, pickLocalInputPath } from '../lib/desktopBridge';
+import { resolveBrowseRoot } from '../lib/browseRoots';
 import { Spinner } from './LoadingState';
 
 type BrowseMode = 'local' | 'remote' | 'hpc';
@@ -41,6 +42,8 @@ interface SingleFileUploadProps {
   browseMode?: BrowseMode;
   /** Current execution context — enables "Previous Results" filtering */
   executionContext?: { type: 'plugin' | 'workflow'; id: string } | null;
+  /** SSH connected (remote/HPC data source on Jobs page). */
+  sshConnected?: boolean;
 }
 
 const isNifti = (name: string) => /\.(nii|nii\.gz)$/i.test(name);
@@ -74,6 +77,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
   onFileUploaded,
   browseMode = 'local',
   executionContext,
+  sshConnected = true,
 }) => {
   const defaultPath = browseMode === 'local' ? './data' : '~';
 
@@ -94,17 +98,48 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
   const [selectedPrevResult, setSelectedPrevResult] = useState<ReusableOutput | null>(null);
 
   useEffect(() => {
-    const p = browseMode === 'local' ? './data' : '~';
-    setBrowserPath(p);
     setSelectedPath(null);
     setManualPath('');
     setSelectedPrevResult(null);
-    if (browseMode === 'local') {
-      apiService.getBrowseRoot()
-        .then(({ local_root }) => setBrowserPath(local_root))
-        .catch(() => { /* keep default */ });
+    setBrowserOpen(false);
+    setEntries([]);
+
+    if ((browseMode === 'remote' || browseMode === 'hpc') && !sshConnected) {
+      return;
     }
-  }, [browseMode]);
+
+    let cancelled = false;
+    (async () => {
+      const root = await resolveBrowseRoot(browseMode);
+      if (cancelled || !root) return;
+      setBrowserPath(root);
+      setLoading(true);
+      setBrowserError(null);
+      try {
+        const data = await apiService.browseDirectory(root, browseMode);
+        if (cancelled) return;
+        const dirs: BrowseEntry[] = (data.directories || []).map((d: any) => ({
+          name: d.name, path: d.path, type: 'directory' as const,
+        }));
+        const files: BrowseEntry[] = (data.files || []).map((f: any) => ({
+          name: f.name, path: f.path, type: 'file' as const, size: f.size,
+        }));
+        setEntries([...dirs, ...files]);
+        setBrowserPath(data.path || root);
+        setBrowserParent(data.parent || null);
+        setBrowserOpen(true);
+      } catch (err: any) {
+        if (!cancelled) {
+          setBrowserError(err.response?.data?.detail || 'Failed to browse');
+          setEntries([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [browseMode, sshConnected]);
 
   useEffect(() => {
     if (browserOpen) loadDir(browserPath);
@@ -115,7 +150,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
     if (prevResultsOpen) loadPreviousResults();
   }, [prevResultsOpen, executionContext?.id]);
 
-  const loadDir = async (path: string) => {
+  const loadDir = useCallback(async (path: string) => {
     setLoading(true);
     setBrowserError(null);
     try {
@@ -135,7 +170,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [browseMode]);
 
   const loadPreviousResults = async () => {
     setPrevLoading(true);
@@ -227,7 +262,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
             type="text"
             value={manualPath}
             onChange={e => { setManualPath(e.target.value); setSelectedPath(null); setSelectedPrevResult(null); }}
-            placeholder={browseMode === 'local' ? './data/sub-001/T1w.nii.gz' : '/scratch/username/sub-001'}
+            placeholder={browseMode === 'local' ? 'Choose… or paste an absolute path' : '/scratch/username/sub-001'}
             aria-label="Subject path"
             className="flex-1 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-navy-600 focus:border-navy-600"
           />

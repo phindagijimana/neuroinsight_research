@@ -98,6 +98,17 @@ def reap_stale_jobs(
                 if status == "exited":
                     reason = f"Container exited with code {exit_code} (orphaned)"
 
+                    started_at_str = container.attrs.get("State", {}).get("StartedAt", "")
+                    if started_at_str and not job.started_at:
+                        try:
+                            from datetime import timezone
+                            started = datetime.fromisoformat(
+                                started_at_str.replace("Z", "+00:00")
+                            ).replace(tzinfo=None)
+                            job.started_at = started
+                        except Exception:
+                            pass
+
                     try:
                         logs = container.logs(tail=50).decode("utf-8", errors="replace")
                         from pathlib import Path

@@ -10,6 +10,11 @@ Common issues and solutions for NeuroInsight.
 | App behaves oddly after opening from DMG | **Drag `NeuroInsight.app` to `/Applications`** and launch from there (avoids App Translocation). |
 | Engine won't start | Docker Desktop must be **running**; then **Settings → Engine → Start engine**. |
 | **Input file not found** (Local Docker) | Use **Choose…** (desktop) or an absolute path under your home folder. After upgrading to **v0.1.17+**, restart the engine (**Settings → Engine → Restart engine**). External drives: macOS `/Volumes/...` is supported in v0.1.17+; on Windows/Linux use a path under your user profile or copy files into `~/Documents`. |
+| **FreeSurfer fails** (`Container exited with code 1`, ~CA registration) | Upgrade to **v0.1.18+** and restart the engine. Older builds used `-parallel`, which breaks in Docker. Allow **8+ hours** and **16–32 GB RAM** under Customize. |
+| **FreeSurfer "re-run existing subject with -i"** | v0.1.18+ auto-picks `subject_2`, `subject_3`, … if the folder exists. Or delete the partial folder under `~/.nir/data/outputs/<job-id>/native/freesurfer/SUBJECTS_DIR/`. |
+| **Progress stuck at 0%** (FreeSurfer running) | Upgrade to **v0.1.18+** for fixed milestone patterns. Progress updates as stages log `#@# MotionCor`, `#@# Talairach`, etc. |
+| **Resource panel shows too little RAM/CPU** | Upgrade to **v0.1.18+** and restart the engine — host limits were wrong when the API ran inside the engine container. |
+| **Runtime shows 0m** for long jobs | Fixed in **v0.1.18+** (timestamp fallback). Refresh the Jobs list. |
 | macOS Gatekeeper / quarantine (old unsigned builds) | Current releases are signed and notarized — upgrade. Legacy workaround: `xattr -cr "/Applications/NeuroInsight.app"`. |
 | Windows SmartScreen blocks installer | **More info → Run anyway** after verifying the SHA-256 checksum from the release. |
 
@@ -61,7 +66,9 @@ See [INSTALL.md](INSTALL.md) for first-time setup.
 |---------|----------|
 | "Docker daemon not running" | Start Docker: `sudo systemctl start docker` |
 | "Permission denied" on Docker socket | Add your user to the `docker` group: `sudo usermod -aG docker $USER`, then log out and back in |
-| Container exits immediately | Check container logs: `docker logs <container_id>` |
+| Container exits immediately | Check container logs in `~/.nir/data/outputs/<job-id>/logs/container.log` |
+| FreeSurfer recon-all needs many hours | Set **Time limit ≥ 8 h**, **Memory ≥ 16 GB**, **CPUs 4–8** under Resource Configuration → Customize. On Apple Silicon expect 6–8 h per subject. |
+| Job used fewer resources than Customize showed | Upgrade to **v0.1.18+** and restart the engine (host resource detection fix). |
 
 ## Frontend / UI
 

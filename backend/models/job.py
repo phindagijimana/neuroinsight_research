@@ -80,11 +80,13 @@ class Job(Base):
         """Calculate job runtime in seconds.
 
         For running jobs: start to now. For completed: start to completion.
+        Falls back to submitted_at when started_at was never recorded.
         """
-        if not self.started_at:
+        if not self.started_at and not self.submitted_at:
             return None
+        start = self.started_at or self.submitted_at
         end_time = self.completed_at if self.completed_at else datetime.now()
-        return int((end_time - self.started_at).total_seconds())
+        return max(0, int((end_time - start).total_seconds()))
 
     @property
     def runtime_formatted(self) -> str:

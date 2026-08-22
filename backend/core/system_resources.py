@@ -113,6 +113,28 @@ def detect_all() -> Dict[str, Any]:
     cpu = detect_cpus()
     memory = detect_memory()
     gpu = detect_gpus()
+
+    # Desktop engine runs inside Docker and only sees container cgroup limits.
+    # containerManager passes the real host totals via env vars.
+    host_cpus = os.getenv("NIR_HOST_CPU_COUNT")
+    host_mem_gb = os.getenv("NIR_HOST_MEMORY_GB")
+    if host_cpus:
+        try:
+            logical = int(host_cpus)
+            cpu["logical_cores"] = logical
+            cpu["physical_cores"] = logical
+            cpu["recommended_max"] = max(1, logical - 1)
+        except ValueError:
+            pass
+    if host_mem_gb:
+        try:
+            total = float(host_mem_gb)
+            memory["total_gb"] = total
+            memory["available_gb"] = total
+            memory["recommended_max_gb"] = max(1, int(total - 2))
+        except ValueError:
+            pass
+
     return {
         "cpu": cpu,
         "memory": memory,

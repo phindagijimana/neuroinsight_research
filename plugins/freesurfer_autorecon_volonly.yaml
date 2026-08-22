@@ -109,7 +109,6 @@ execution:
           -s {subject_id} \
           -autorecon1 \
           -autorecon2-volonly \
-          -parallel \
           -openmp {threads} \
           $EXTRA_ARGS
 

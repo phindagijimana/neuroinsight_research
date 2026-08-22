@@ -242,11 +242,28 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
   };
 
   const formatRuntime = (seconds?: number) => {
-    if (!seconds) return 'N/A';
+    if (seconds == null || seconds < 0) return 'N/A';
+    if (seconds < 60) return '<1m';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     if (hours > 0) return `${hours}h ${minutes}m`;
     return `${minutes}m`;
+  };
+
+  const jobRuntimeSeconds = (job: {
+    runtime_seconds?: number;
+    started_at?: string | null;
+    completed_at?: string | null;
+    submitted_at?: string | null;
+  }) => {
+    if (job.runtime_seconds != null && job.runtime_seconds > 0) {
+      return job.runtime_seconds;
+    }
+    const start = job.started_at || job.submitted_at;
+    const end = job.completed_at;
+    if (!start || !end) return undefined;
+    const secs = Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 1000);
+    return secs > 0 ? secs : undefined;
   };
 
   return (
@@ -350,12 +367,15 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                             <span>ID: {job.id.slice(0, 8)}</span>
                             <span>-</span>
                             <span>Compute: {job.backend_type === 'local_docker' ? 'Local Docker' : job.backend_type === 'slurm' ? 'HPC (SLURM)' : job.backend_type === 'remote_docker' ? 'Remote Docker' : job.backend_type}</span>
-                            {!!job.runtime_seconds && (
+                            {(() => {
+                              const runtime = jobRuntimeSeconds(job);
+                              return runtime != null ? (
                               <>
                                 <span>-</span>
-                                <span>Runtime: {formatRuntime(job.runtime_seconds)}</span>
+                                <span>Runtime: {formatRuntime(runtime)}</span>
                               </>
-                            )}
+                              ) : null;
+                            })()}
                           </div>
                           <div className="mt-1 text-xs text-gray-500 truncate">
                             {job.is_sample_job ? (

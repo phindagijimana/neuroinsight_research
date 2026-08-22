@@ -40,6 +40,14 @@ interface SelectedExecution {
   name: string;
 }
 
+/**
+ * Build plugin parameters from resource config (threads, etc.).
+ */
+function resourceParams(customResources: ResourceConfig | null): Record<string, unknown> {
+  if (!customResources?.threads) return {};
+  return { threads: customResources.threads };
+}
+
 export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack }) => {
   const toast = useToast();
   // Data source (where data lives)
@@ -50,6 +58,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
   // Processing target (where to run the job)
   const [selectedBackend, setSelectedBackend] = useState<BackendType>('local');
   const [sshConfig, setSSHConfig] = useState<SSHConfig>({ host: '', username: '', port: 22 });
+  const [sshConnected, setSSHConnected] = useState(false);
 
   // Transfer state
   const [transferId, setTransferId] = useState<string | null>(null);
@@ -154,7 +163,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
       for (const file of files) {
         const filePath = `${inputDir}/${file}`;
         if (selectedExecution?.type === 'plugin' && selectedExecution.id) {
-          const result = await apiService.submitPluginJob(selectedExecution.id, [filePath], {}, customResources || undefined);
+          const result = await apiService.submitPluginJob(selectedExecution.id, [filePath], resourceParams(customResources), customResources || undefined);
           jobIds.push(result.job_id);
         } else if (selectedExecution?.type === 'workflow' && selectedExecution.id) {
           const inputs = [filePath];
@@ -224,7 +233,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
     try {
       const wfP: Record<string, string> = {};
       if (selectedExecution?.type === 'plugin' && selectedExecution.id) {
-        const result = await apiService.submitPluginJob(selectedExecution.id, [uploadedFilePath], {}, customResources || undefined);
+        const result = await apiService.submitPluginJob(selectedExecution.id, [uploadedFilePath], resourceParams(customResources), customResources || undefined);
         onJobsSubmitted([result.job_id]);
       } else if (selectedExecution?.type === 'workflow' && selectedExecution.id) {
         const inputs = [uploadedFilePath];
@@ -260,7 +269,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
       const wfP: Record<string, string> = {};
       const pathsForSubmit = inputFiles;
       if (selectedExecution?.type === 'plugin' && selectedExecution.id) {
-        const result = await apiService.submitPluginJob(selectedExecution.id, inputFiles, {}, customResources || undefined, srcPlatform, srcDatasetId);
+        const result = await apiService.submitPluginJob(selectedExecution.id, inputFiles, resourceParams(customResources), customResources || undefined, srcPlatform, srcDatasetId);
         onJobsSubmitted([result.job_id]);
       } else if (selectedExecution?.type === 'workflow' && selectedExecution.id) {
         const result = await apiService.submitWorkflowJob(
@@ -299,6 +308,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
     platformConnection,
     onPlatformConnect: setPlatformConnection,
     onPlatformDisconnect: () => { setPlatformConnection(null); resetPlatformFlow(); },
+    onSSHConnectionChange: setSSHConnected,
     showPlatformTabs: true,
   };
 
@@ -473,6 +483,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
                 {mode === 'directory' ? (
                   <DirectorySelector
                     mode={dataSource === 'hpc' ? 'hpc' : dataSource === 'remote' ? 'remote' : 'local'}
+                    sshConnected={dataSource === 'local' ? true : sshConnected}
                     onSubmit={handleBatchSubmit}
                     onBidsSubmit={handleBidsBatchSubmit}
                   />
@@ -480,6 +491,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
                   <>
                     <SingleFileUpload
                       browseMode={dataSource === 'hpc' ? 'hpc' : dataSource === 'remote' ? 'remote' : 'local'}
+                      sshConnected={dataSource === 'local' ? true : sshConnected}
                       onFileUploaded={(path) => { setUploadedFilePath(path); setError(null); }}
                       executionContext={selectedExecution ? { type: selectedExecution.type, id: selectedExecution.id } : null}
                     />

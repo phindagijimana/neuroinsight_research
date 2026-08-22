@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { isDesktopApp, pickLocalInputPath } from '../lib/desktopBridge';
+import { resolveBrowseRoot } from '../lib/browseRoots';
 import type { DirectoryInfo } from '../types';
 import { Spinner } from './LoadingState';
 
@@ -27,6 +28,8 @@ interface DirectorySelectorProps {
   onSubmit: (inputDir: string, outputDir: string, files: string[]) => void;
   /** When set, the component passes subject IDs back through onBidsSubmit instead. */
   onBidsSubmit?: (bidsDir: string, subjectIds: string[]) => void;
+  /** SSH connected (remote/HPC on Jobs page). */
+  sshConnected?: boolean;
 }
 
 interface BrowseEntry {
@@ -42,6 +45,7 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
   mode,
   onSubmit,
   onBidsSubmit,
+  sshConnected = true,
 }) => {
   const [inputDir, setInputDir] = useState('');
   const [directoryInfo, setDirectoryInfo] = useState<DirectoryInfo | null>(null);
@@ -88,13 +92,49 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
     }
   }, [browserOpen]);
 
+  // Auto-navigate when data source is selected (and SSH connected for remote/HPC)
   useEffect(() => {
-    if (mode === 'local') {
-      apiService.getBrowseRoot()
-        .then(({ local_root }) => setBrowserPath(local_root))
-        .catch(() => { /* keep default */ });
+    setInputDir('');
+    setDirectoryInfo(null);
+    setBidsSubjects([]);
+    setBrowserOpen(false);
+
+    if ((mode === 'remote' || mode === 'hpc') && !sshConnected) {
+      return;
     }
-  }, [mode]);
+
+    let cancelled = false;
+    (async () => {
+      const root = await resolveBrowseRoot(mode);
+      if (cancelled || !root) return;
+      setBrowserPath(root);
+      setBrowserOpen(true);
+      setBrowserLoading(true);
+      setBrowserError(null);
+      try {
+        const data = await apiService.browseDirectory(root, mode);
+        if (cancelled) return;
+        const dirs: BrowseEntry[] = (data.directories || []).map((d: any) => ({
+          name: d.name, path: d.path, type: 'directory' as const,
+        }));
+        const files: BrowseEntry[] = (data.files || []).map((f: any) => ({
+          name: f.name, path: f.path, type: 'file' as const, size: f.size,
+        }));
+        setBrowserEntries([...dirs, ...files]);
+        setBrowserPath(data.path || root);
+        setBrowserParent(data.parent || null);
+      } catch (err: any) {
+        if (!cancelled) {
+          setBrowserError(err.response?.data?.detail || 'Failed to browse');
+          setBrowserEntries([]);
+        }
+      } finally {
+        if (!cancelled) setBrowserLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [mode, sshConnected]);
 
   const handleBrowserSelect = (dirPath: string) => {
     setInputDir(dirPath);

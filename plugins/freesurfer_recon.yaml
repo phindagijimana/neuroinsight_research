@@ -102,24 +102,34 @@ execution:
         mkdir -p $SUBJECTS_DIR
         mkdir -p /data/outputs/logs/freesurfer
 
-        # Run recon-all
+        SUBJ="{subject_id}"
+        if [ -d "$SUBJECTS_DIR/$SUBJ" ]; then
+          n=2
+          while [ -d "$SUBJECTS_DIR/${SUBJ}_${n}" ]; do
+            n=$((n + 1))
+          done
+          SUBJ="${SUBJ}_${n}"
+          echo "Subject directory already exists; writing results to $SUBJ instead"
+        fi
+        echo "$SUBJ" > /data/outputs/native/freesurfer/actual_subject_id.txt
+
+        # Run recon-all (-openmp only; -parallel re-invokes recon-all -i and fails in containers)
         recon-all \
           -i /data/inputs/T1w.nii.gz \
-          -subject {subject_id} \
+          -subject "$SUBJ" \
           -all \
-          -parallel \
           -openmp {threads}
 
         # Optional: hippocampal subfields segmentation
         if [ "{hippocampal_subfields}" = "true" ]; then
           echo "Running hippocampal subfields segmentation..."
-          segmentHA_T1.sh {subject_id}
+          segmentHA_T1.sh "$SUBJ"
         fi
 
         # Optional: brainstem substructures segmentation
         if [ "{brainstem}" = "true" ]; then
           echo "Running brainstem substructures segmentation..."
-          segmentBS.sh {subject_id}
+          segmentBS.sh "$SUBJ"
         fi
 
         echo "FreeSurfer recon-all completed"

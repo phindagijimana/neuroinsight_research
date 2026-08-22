@@ -21,6 +21,8 @@ import {
   Monitor, Cloud, Server, Database, Globe, HardDrive,
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import { isDesktopApp, pickLocalInputPath } from '../lib/desktopBridge';
+import { resolveBrowseRoot } from '../lib/browseRoots';
 import { Spinner } from './LoadingState';
 
 type PlatformType = 'local' | 'remote' | 'hpc' | 'pennsieve' | 'xnat';
@@ -42,7 +44,7 @@ interface FileBrowserPaneProps {
 }
 
 const PLATFORM_META: Record<PlatformType, { label: string; icon: React.ReactNode; defaultPath: string }> = {
-  local:     { label: 'Local Server',  icon: <Monitor className="h-4 w-4" />,  defaultPath: './data' },
+  local:     { label: 'Local',         icon: <Monitor className="h-4 w-4" />,  defaultPath: './data' },
   remote:    { label: 'Remote Server', icon: <Cloud className="h-4 w-4" />,    defaultPath: '~' },
   hpc:       { label: 'HPC',           icon: <Server className="h-4 w-4" />,   defaultPath: '~' },
   pennsieve: { label: 'Pennsieve',     icon: <Database className="h-4 w-4" />, defaultPath: '/' },
@@ -88,34 +90,6 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
 
   const selectedSet = new Set(selectedFiles.map(f => f.path || f.id || f.name));
 
-  // Reset when platform changes
-  useEffect(() => {
-    const m = PLATFORM_META[platform];
-    setCurrentPath(m.defaultPath);
-    setAddressBar(m.defaultPath);
-    setEntries([]);
-    setParentPath(null);
-    setError(null);
-    onSelectionChange([]);
-    if (!isBackend(platform)) {
-      setPlatformView('datasets');
-      setPlatformDatasets([]);
-      setPlatformDatasetId(null);
-      setPlatformPathStack(['/']);
-    }
-  }, [platform]);
-
-  // Load on mount / path change
-  useEffect(() => {
-    if (isBackend(platform)) {
-      loadBackendDirectory(currentPath);
-    } else if (platformView === 'datasets') {
-      loadPlatformDatasets();
-    }
-  }, [platform, currentPath]);
-
-  // ---- Backend (local/remote/hpc) browsing ----
-
   const loadBackendDirectory = useCallback(async (path: string) => {
     setLoading(true);
     setError(null);
@@ -145,9 +119,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
     }
   }, [platform, onPathChange]);
 
-  // ---- Platform (pennsieve/xnat) browsing ----
-
-  const loadPlatformDatasets = async () => {
+  const loadPlatformDatasets = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -159,7 +131,50 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [platform]);
+
+  // Reset when platform changes; local starts at host home when available
+  useEffect(() => {
+    setEntries([]);
+    setParentPath(null);
+    setError(null);
+    onSelectionChange([]);
+    if (!isBackend(platform)) {
+      const m = PLATFORM_META[platform];
+      setCurrentPath(m.defaultPath);
+      setAddressBar(m.defaultPath);
+      setPlatformView('datasets');
+      setPlatformDatasets([]);
+      setPlatformDatasetId(null);
+      setPlatformPathStack(['/']);
+      return;
+    }
+    const applyPath = (path: string) => {
+      setCurrentPath(path);
+      setAddressBar(path);
+    };
+    if (platform === 'local') {
+      resolveBrowseRoot('local').then((root) => applyPath(root || PLATFORM_META.local.defaultPath));
+    } else {
+      applyPath(PLATFORM_META[platform].defaultPath);
+    }
+  }, [platform]);
+
+  // Load backend directories when path changes
+  useEffect(() => {
+    if (isBackend(platform)) {
+      loadBackendDirectory(currentPath);
+    }
+  }, [platform, currentPath, loadBackendDirectory]);
+
+  // Load platform datasets when a platform tab is selected and connected
+  useEffect(() => {
+    if (!isBackend(platform) && platformView === 'datasets') {
+      loadPlatformDatasets();
+    }
+  }, [platform, platformView, loadPlatformDatasets]);
+
+  // ---- Platform (pennsieve/xnat) browsing ----
 
   const browsePlatformDataset = async (
     datasetId: string,
@@ -256,6 +271,20 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
     }
   };
 
+  const handleChooseLocal = async () => {
+    if (platform !== 'local' || !isDesktopApp()) return;
+    const result = await pickLocalInputPath();
+    if (!result || result.canceled || !result.ok || !result.path) return;
+    let dir = result.path;
+    if (!result.isDirectory) {
+      const sep = dir.includes('\\') ? '\\' : '/';
+      const parts = dir.split(sep);
+      parts.pop();
+      dir = parts.join(sep) || sep;
+    }
+    loadBackendDirectory(dir);
+  };
+
   // ---- Selection ----
 
   const toggleSelect = (entry: FileEntry) => {
@@ -310,6 +339,17 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
         <button onClick={handleRefresh} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-navy-600" title="Refresh" aria-label="Refresh">
           <RefreshCw className="h-3.5 w-3.5" />
         </button>
+        {platform === 'local' && isDesktopApp() && (
+          <button
+            onClick={handleChooseLocal}
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 text-gray-600 hover:text-navy-600 text-[10px] font-medium"
+            title="Choose folder with Finder / Explorer"
+            aria-label="Choose local folder"
+          >
+            <FolderOpen className="h-3.5 w-3.5" />
+            Choose…
+          </button>
+        )}
         {isBackend(platform) && (
           <button
             onClick={() => setShowNewFolder(!showNewFolder)}

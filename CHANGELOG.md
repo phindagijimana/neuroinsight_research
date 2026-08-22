@@ -7,6 +7,30 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.18] - 2026-08-22
+
+### Added
+- **Transfer page parity with Jobs** — home-directory browse root, desktop **Choose…**
+  picker, and auto-open file browser when selecting Local or connecting Remote/HPC.
+- **FreeSurfer subject-folder collision handling** — uses `subject_2`, `subject_3`, …
+  when the requested subject ID already exists in `SUBJECTS_DIR`.
+
+### Fixed
+- **FreeSurfer local Docker jobs failing mid-run** — removed `-parallel` from
+  `freesurfer_recon` and `freesurfer_autorecon_volonly` commands (incompatible with
+  containerized `-i` re-runs).
+- **Progress bar stuck at 0% during FreeSurfer** — phase milestones match FreeSurfer
+  7.4 `#@#` stage headers.
+- **Resource panel under-reporting host RAM/CPU (desktop)** — engine now receives
+  `NIR_HOST_CPU_COUNT` and `NIR_HOST_MEMORY_GB` from the desktop app instead of
+  reading the engine container's cgroup limits.
+- **Job resource merge** — plugin profile defaults and Customize UI overrides merge
+  correctly (`mem_gb` / `memory_gb`); thread count passed to FreeSurfer `-openmp`.
+- **Job runtime showing 0m** — `runtime_seconds` falls back to submitted→completed;
+  `started_at` set on first running transition; stale reaper reads container start time.
+- **Misleading Subject Path placeholder** — local mode now says "Choose… or paste an
+  absolute path" instead of `./data/sub-001/…`.
+
 ## [0.1.17] - 2026-08-21
 
 ### Added

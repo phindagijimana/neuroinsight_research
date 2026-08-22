@@ -40,6 +40,8 @@ interface BackendSelectorProps {
   platformConnection?: PlatformConnection | null;
   onPlatformConnect?: (conn: PlatformConnection) => void;
   onPlatformDisconnect?: () => void;
+  /** Fired when SSH connect/disconnect state changes (remote / HPC). */
+  onSSHConnectionChange?: (connected: boolean) => void;
   showPlatformTabs?: boolean;
 }
 
@@ -69,6 +71,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
   platformConnection,
   onPlatformConnect,
   onPlatformDisconnect,
+  onSSHConnectionChange,
   showPlatformTabs = true,
 }) => {
   const [isConnecting, setIsConnecting] = useState(false);
@@ -110,6 +113,11 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
   const computeNeedsSSH = selectedBackend === 'remote' || selectedBackend === 'remote_hpc';
   const needsSSH = !isPlatformSelected && (dataSourceNeedsSSH || computeNeedsSSH);
 
+  const setSSHConnected = (value: boolean) => {
+    setConnectionStatus(value ? 'connected' : 'disconnected');
+    onSSHConnectionChange?.(value);
+  };
+
   useEffect(() => { checkCurrentBackend(); }, []);
 
   // Load saved Host aliases from ~/.ssh/config once SSH is needed.
@@ -142,7 +150,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
         const statusResp = await fetch(`${apiService.getBaseUrl()}/api/hpc/status`);
         const status = await statusResp.json();
         if (status.connected) {
-          setConnectionStatus('connected');
+          setSSHConnected(true);
           if (status.host) setHost(status.host);
           if (status.username) setUsername(status.username);
           fetchPartitions();
@@ -152,7 +160,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
         const statusResp = await fetch(`${apiService.getBaseUrl()}/api/hpc/status`);
         const status = await statusResp.json();
         if (status.connected) {
-          setConnectionStatus('connected');
+          setSSHConnected(true);
           if (status.host) setHost(status.host);
           if (status.username) setUsername(status.username);
         }
@@ -172,7 +180,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
       });
       const data = await resp.json();
       if (data.connected) {
-        setConnectionStatus('connected');
+        setSSHConnected(true);
         if (selectedBackend === 'remote_hpc') fetchPartitions();
         if (computeNeedsSSH) {
           switchToRemote(true);
@@ -245,9 +253,10 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
         body: JSON.stringify({ backend_type: 'local' }),
       });
       onBackendChange('local');
-      setConnectionStatus('disconnected');
+      setSSHConnected(false);
     } catch {
       onBackendChange('local');
+      setSSHConnected(false);
     } finally {
       setIsSwitching(false);
     }
@@ -257,7 +266,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
     try {
       await fetch(`${apiService.getBaseUrl()}/api/hpc/disconnect`, { method: 'POST' });
     } catch { /* ignore */ }
-    setConnectionStatus('disconnected');
+    setSSHConnected(false);
     setPartitions([]);
   };
 

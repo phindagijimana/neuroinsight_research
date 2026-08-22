@@ -116,6 +116,8 @@ def _sync_job_to_db(job_id: str, status: str, **kwargs) -> None:
 
             job.status = status
 
+            if status == "running" and job.started_at is None and "started_at" not in kwargs:
+                job.started_at = datetime.utcnow()
             if "started_at" in kwargs:
                 job.started_at = kwargs["started_at"]
             if "completed_at" in kwargs:
