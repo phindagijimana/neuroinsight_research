@@ -395,6 +395,25 @@ async function openDataDialog() {
   openVolumeFromPath(res.filePaths[0]);
 }
 
+/** Native file/folder picker for job input paths (desktop local mode). */
+async function pickInputPath() {
+  if (!mainWindow) return { ok: false, error: "No window" };
+  const res = await dialog.showOpenDialog(mainWindow, {
+    title: "Select input file or folder",
+    properties: ["openFile", "openDirectory"],
+    filters: [{ name: "Imaging", extensions: ["nii", "gz", "mgz", "mgh", "edf"] }],
+  });
+  if (res.canceled || !res.filePaths[0]) return { ok: false, canceled: true };
+  const picked = res.filePaths[0];
+  let isDirectory = false;
+  try {
+    isDirectory = fs.statSync(picked).isDirectory();
+  } catch (_e) {
+    /* best effort */
+  }
+  return { ok: true, path: picked, isDirectory };
+}
+
 // --------------------------------------------------------------------------
 // Native application menu — always-available navigation + backend controls.
 // This is the supported way back to the control center after opening the NIR UI.
@@ -578,6 +597,8 @@ function registerIpc() {
 
   // Native open-data dialog (also available via File > Open Data… / Cmd+O)
   ipcMain.handle("data:openDialog", wrap(() => openDataDialog()));
+  // Native file/folder picker for local job inputs (Jobs page)
+  ipcMain.handle("data:pickInputPath", wrap(() => pickInputPath()));
 
   // Open a URL in the OS browser (http/https only — never file:// or custom schemes)
   ipcMain.handle(

@@ -18,6 +18,7 @@ import {
   ChevronRight, ArrowUp, FileText, Users,
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import { isDesktopApp, pickLocalInputPath } from '../lib/desktopBridge';
 import type { DirectoryInfo } from '../types';
 import { Spinner } from './LoadingState';
 
@@ -87,6 +88,14 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
     }
   }, [browserOpen]);
 
+  useEffect(() => {
+    if (mode === 'local') {
+      apiService.getBrowseRoot()
+        .then(({ local_root }) => setBrowserPath(local_root))
+        .catch(() => { /* keep default */ });
+    }
+  }, [mode]);
+
   const handleBrowserSelect = (dirPath: string) => {
     setInputDir(dirPath);
     setBrowserOpen(false);
@@ -128,6 +137,24 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
   };
 
   const handleBrowseInput = () => scanDirectory(inputDir);
+
+  const handleBrowseClick = async () => {
+    if (mode === 'local' && isDesktopApp()) {
+      const result = await pickLocalInputPath();
+      if (!result || result.canceled) return;
+      if (result.ok && result.path) {
+        if (!result.isDirectory) {
+          setError('Batch mode needs a folder — pick a directory, or use Single input mode for one file.');
+          return;
+        }
+        setInputDir(result.path);
+        setBrowserOpen(false);
+        scanDirectory(result.path);
+      }
+      return;
+    }
+    setBrowserOpen(!browserOpen);
+  };
 
   const toggleSubject = (sid: string) => {
     setSelectedSubjects(prev => {
@@ -197,12 +224,12 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
             onKeyDown={(e) => e.key === 'Enter' && handleBrowseInput()}
           />
           <button
-            onClick={() => setBrowserOpen(!browserOpen)}
+            onClick={handleBrowseClick}
             className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700 flex items-center gap-1"
-            title="Open visual browser"
+            title={mode === 'local' && isDesktopApp() ? 'Choose folder with Finder / Explorer' : 'Open visual browser'}
           >
             <FolderOpen className="h-3.5 w-3.5" />
-            Browse
+            {mode === 'local' && isDesktopApp() ? 'Choose…' : 'Browse'}
           </button>
           <button
             onClick={handleBrowseInput}
@@ -221,7 +248,7 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
           <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
             <FolderOpen className="h-3.5 w-3.5 text-navy-600" />
             <span className="text-xs font-semibold text-gray-700">
-              {mode === 'local' ? 'Server' : mode === 'remote' ? 'Remote' : 'HPC'} File Browser
+              {mode === 'local' && isDesktopApp() ? 'Local' : mode === 'local' ? 'Server' : mode === 'remote' ? 'Remote' : 'HPC'} File Browser
             </span>
             <span className="text-[10px] text-gray-400 ml-auto">Click a folder to select it as input</span>
           </div>

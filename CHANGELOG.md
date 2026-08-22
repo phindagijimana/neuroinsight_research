@@ -7,6 +7,20 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-08-21
+
+### Added
+- **Native file/folder picker for local jobs (desktop).** Jobs → **Choose…** opens the
+  OS file dialog (Finder on macOS, Explorer on Windows, native picker on Linux)
+  instead of only the in-app tree rooted at `./data`.
+- **Host home directory mounted into the engine container** so local input paths
+  under your profile resolve for Local Docker jobs (`NIR_HOST_HOME` + read-only
+  home bind mount). macOS also mounts `/Volumes` read-only for external drives.
+
+### Fixed
+- **"Input file not found" for valid local paths** — the engine could not see host
+  files outside `~/.nir/data` when submitting Local Docker jobs from the desktop app.
+
 ## [0.1.16] - 2026-08-21
 
 ### Fixed

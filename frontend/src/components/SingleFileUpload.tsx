@@ -13,6 +13,7 @@ import {
   History,
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import { isDesktopApp, pickLocalInputPath } from '../lib/desktopBridge';
 import { Spinner } from './LoadingState';
 
 type BrowseMode = 'local' | 'remote' | 'hpc';
@@ -98,6 +99,11 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
     setSelectedPath(null);
     setManualPath('');
     setSelectedPrevResult(null);
+    if (browseMode === 'local') {
+      apiService.getBrowseRoot()
+        .then(({ local_root }) => setBrowserPath(local_root))
+        .catch(() => { /* keep default */ });
+    }
   }, [browseMode]);
 
   useEffect(() => {
@@ -183,7 +189,26 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
     }
   };
 
-  const modeLabel = browseMode === 'local' ? 'Server' : browseMode === 'hpc' ? 'HPC' : 'Remote';
+  const handleBrowseClick = async () => {
+    if (browseMode === 'local' && isDesktopApp()) {
+      const result = await pickLocalInputPath();
+      if (!result || result.canceled) return;
+      if (result.ok && result.path) {
+        if (result.isDirectory) {
+          selectFolder(result.path);
+        } else {
+          selectFile({ name: result.path.split(/[/\\]/).pop() || result.path, path: result.path, type: 'file' });
+        }
+      }
+      return;
+    }
+    setBrowserOpen(!browserOpen);
+    setPrevResultsOpen(false);
+  };
+
+  const modeLabel = browseMode === 'local'
+    ? (isDesktopApp() ? 'Local' : 'Server')
+    : browseMode === 'hpc' ? 'HPC' : 'Remote';
   const niftiInBrowser = entries.filter(e => e.type === 'file' && isNifti(e.name)).length;
   const dirsInBrowser = entries.filter(e => e.type === 'directory').length;
 
@@ -207,12 +232,12 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
             className="flex-1 px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-navy-600 focus:border-navy-600"
           />
           <button
-            onClick={() => { setBrowserOpen(!browserOpen); setPrevResultsOpen(false); }}
+            onClick={handleBrowseClick}
             type="button"
             className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-md hover:bg-gray-50 text-gray-700 flex items-center gap-1"
           >
             <FolderOpen className="h-3.5 w-3.5" />
-            Browse
+            {browseMode === 'local' && isDesktopApp() ? 'Choose…' : 'Browse'}
           </button>
           <button
             onClick={() => { setPrevResultsOpen(!prevResultsOpen); setBrowserOpen(false); }}

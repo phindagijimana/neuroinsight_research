@@ -140,6 +140,17 @@ function buildRunArgs(c) {
   // Tell the in-container backend the real host path of /data so sibling job
   // containers (Docker-out-of-Docker) get host-resolvable bind mounts.
   args.push("-e", `NIR_HOST_DATA_DIR=${c.dataDir}`);
+  // Local job inputs are host paths (e.g. ~/Documents/...). Mount the home
+  // directory read-only so the in-container backend can stat and stage them.
+  const home = os.homedir();
+  if (home && fs.existsSync(home)) {
+    args.push("-v", `${home}:${home}:ro`);
+    args.push("-e", `NIR_HOST_HOME=${home}`);
+  }
+  // macOS external drives (/Volumes/...) — optional read-only mount.
+  if (process.platform === "darwin" && fs.existsSync("/Volumes")) {
+    args.push("-v", "/Volumes:/Volumes:ro");
+  }
   // Reach the host (and thus the SSH broker) on Linux too; Docker Desktop
   // provides host.docker.internal natively, this is a harmless no-op there.
   args.push("--add-host", "host.docker.internal:host-gateway");

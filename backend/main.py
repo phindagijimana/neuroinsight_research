@@ -2437,6 +2437,15 @@ def browse_directory(path: str = ".", backend_type: str = "local"):
     }
 
 
+@app.get("/api/browse/root")
+def browse_root():
+    """Return the default local browse root for the in-app file tree."""
+    data_dir = os.getenv("DATA_DIR", "/data")
+    host_home = os.getenv("NIR_HOST_HOME")
+    local_root = host_home if host_home else data_dir
+    return {"local_root": local_root, "data_dir": data_dir}
+
+
 # ---------------------------------------------------------------------------
 # DICOM De-identification
 # ---------------------------------------------------------------------------

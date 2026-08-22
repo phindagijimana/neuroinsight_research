@@ -561,6 +561,12 @@ export const apiService = {
     return response.data;
   },
 
+  /** Default local browse root (host home in desktop container mode, else ./data). */
+  async getBrowseRoot(): Promise<{ local_root: string; data_dir: string }> {
+    const response = await api.get('/api/browse/root');
+    return response.data;
+  },
+
   /**
    * Upload file to server
    * 

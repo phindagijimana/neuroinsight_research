@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld("nir", {
     return () => ipcRenderer.removeListener("nir:openVolume", handler);
   },
   openDataDialog: () => invoke("data:openDialog"),
+  pickInputPath: () => invoke("data:pickInputPath"),
   shell: {
     openExternal: (url) => invoke("shell:openExternal", url),
   },
