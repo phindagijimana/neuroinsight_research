@@ -69,7 +69,7 @@ test.describe("control center", () => {
   });
 
   test("loads the control center shell", async () => {
-    await expect(page.locator("h1")).toContainText("Settings");
+    await expect(page.locator("h1")).toContainText("Control Center");
     await expect(page.locator("#startupBanner")).toBeVisible();
   });
 
@@ -122,12 +122,11 @@ test.describe("control center", () => {
   test("manual: start backend, become healthy, open the NIR UI", async () => {
     test.skip(process.env.NIR_E2E_BACKEND !== "1", "set NIR_E2E_BACKEND=1 (needs repo venv)");
     await page.locator("#btnStart").click();
-    await expect(page.locator("#backendStatus")).toContainText("Running (healthy)", { timeout: 90_000 });
+    await expect(page.locator("#backendStatus")).toContainText("Ready", { timeout: 90_000 });
     await expect(page.locator("#btnOpenUI")).toBeEnabled();
     await page.locator("#btnOpenUI").click();
     await page.waitForURL(/127\.0\.0\.1:\d+|localhost:\d+/, { timeout: 30_000 });
-    // the persistent status bar is injected into the workspace
-    await expect(page.locator("#nir-desktop-statusbar")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('[data-testid="nir-engine-status"]')).toBeVisible({ timeout: 15_000 });
   });
 });
 
@@ -138,15 +137,15 @@ test.describe("smooth launch (default flow)", () => {
 
   test.beforeAll(async () => {
     app = await launch(); // no NIR_START_IN_CONTROL: exercise the real launch
-    page = await pageWithSelector(app, "#nir-desktop-statusbar", 120_000);
+    page = await pageWithSelector(app, '[data-testid="nir-engine-status"]', 120_000);
   });
   test.afterAll(async () => {
     if (app) await app.close();
   });
 
   test("splash -> auto-start backend -> lands directly in the NIR workspace", async () => {
-    await expect(page.locator("#nir-desktop-statusbar")).toBeVisible();
-    await expect(page.locator("#nir-engine")).toContainText(/healthy|starting/);
+    await expect(page.locator('[data-testid="nir-engine-status"]')).toBeVisible();
+    await expect(page.locator('[data-testid="nir-engine-status"]')).toContainText(/ready|starting|stopped/i);
     expect(page.url()).toMatch(/127\.0\.0\.1:\d+|localhost:\d+/);
   });
 
@@ -193,8 +192,8 @@ test.describe("container runtime (all-in-one)", () => {
       NIR_DATA_DIR: path.join(os.tmpdir(), "nir-e2e-ctr"),
     });
     // First container run (init + migrations) can take a while.
-    const page = await pageWithSelector(app, "#nir-desktop-statusbar", 180_000);
-    await expect(page.locator("#nir-desktop-statusbar")).toBeVisible();
+    const page = await pageWithSelector(app, '[data-testid="nir-engine-status"]', 180_000);
+    await expect(page.locator('[data-testid="nir-engine-status"]')).toBeVisible();
     expect(page.url()).toMatch(/127\.0\.0\.1:\d+|localhost:\d+/);
   });
 });

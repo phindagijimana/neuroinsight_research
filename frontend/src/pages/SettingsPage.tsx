@@ -7,6 +7,8 @@
  */
 import { useEffect, useState } from 'react';
 import { apiService, type LicenseInfo } from '../services/api';
+import WorkspacePageHeader from '../components/WorkspacePageHeader';
+import { LoadingState } from '../components/LoadingState';
 
 const LicenseCard: React.FC<{ lic: LicenseInfo; onChange: () => void }> = ({ lic, onChange }) => {
   const [text, setText] = useState('');
@@ -53,6 +55,18 @@ const LicenseCard: React.FC<{ lic: LicenseInfo; onChange: () => void }> = ({ lic
       </div>
       <p className="text-sm text-gray-500 mt-2 leading-relaxed">{lic.description}</p>
       <p className="text-xs text-gray-400 mt-1">Required by: {lic.required_by.join(' · ')}</p>
+      {lic.installed && (lic.path || lic.installed_at) && (
+        <p className="text-xs text-gray-500 mt-2 font-mono">
+          {lic.path}
+          {lic.installed_at && (
+            <span className="text-gray-400">
+              {' '}
+              · saved {new Date(lic.installed_at).toLocaleString()}
+              {lic.size ? ` · ${lic.size} bytes` : ''}
+            </span>
+          )}
+        </p>
+      )}
 
       {!lic.installed && (
         <textarea
@@ -106,26 +120,27 @@ const SettingsPage: React.FC = () => {
   useEffect(load, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="max-w-3xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+    <div className="mx-auto max-w-3xl px-6 py-8 sm:py-10">
+      <WorkspacePageHeader
+        title="Settings"
+        subtitle="Manage tool licenses for the web workspace. In the desktop app, use Control Center for engine and licenses."
+      />
 
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mt-8 mb-1">Licenses</h2>
-        <p className="text-sm text-gray-500 mb-4 leading-relaxed">
-          Upload each license once — jobs that need it use it automatically (locally and on HPC).
-          Stored privately in your data folder; never uploaded anywhere.
-        </p>
+      <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Licenses</h2>
+      <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+        Upload each license once — jobs that need it use it automatically (locally and on HPC).
+        Stored privately in your data folder; never uploaded anywhere.
+      </p>
 
-        {loading ? (
-          <p className="text-sm text-gray-400">Loading…</p>
-        ) : (
+      {loading ? (
+        <LoadingState message="Loading licenses…" className="py-8" />
+      ) : (
           licenses.map((lic) => <LicenseCard key={lic.id} lic={lic} onChange={load} />)
         )}
 
         <p className="text-xs text-gray-400 mt-2">
           More licenses appear here automatically as new pipelines require them.
         </p>
-      </main>
     </div>
   );
 };

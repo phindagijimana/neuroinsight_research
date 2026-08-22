@@ -193,7 +193,9 @@
  */
 
 import { useState, useEffect, lazy, Suspense, type DragEvent } from 'react';
-import Navigation from './components/Navigation';
+import AppShell from './components/AppShell';
+import LoadingState from './components/LoadingState';
+import { isDesktopApp } from './lib/desktopBridge';
 import {
   clearViewerQueryParam,
   setViewerQueryParam,
@@ -215,11 +217,15 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 type NavigateOptions = { viewerTab?: ViewerTab };
 
+function defaultPage(): Page {
+  if (typeof window === 'undefined') return 'home';
+  if (shouldOpenViewerFromUrl(window.location.search)) return 'viewer';
+  if (isDesktopApp()) return 'jobs';
+  return 'home';
+}
+
 function App() {
-  const [activePage, setActivePage] = useState<Page>(() => {
-    if (typeof window === 'undefined') return 'home';
-    return shouldOpenViewerFromUrl(window.location.search) ? 'viewer' : 'home';
-  });
+  const [activePage, setActivePage] = useState<Page>(defaultPage);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   /** Bumps when navigating to Viewer so the page re-reads `?viewer=` (e.g. header while already on Viewer). */
   const [viewerNavEpoch, setViewerNavEpoch] = useState(0);
@@ -287,64 +293,62 @@ function App() {
   }, []);
 
   return (
-    <div
-      className="min-h-screen bg-gray-50"
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      {isDragging && (
-        <div className="fixed inset-0 z-50 bg-navy-600/70 flex items-center justify-center pointer-events-none">
-          <div className="bg-white rounded-2xl px-10 py-8 text-center shadow-2xl border-2 border-dashed border-navy-600">
-            <p className="text-2xl font-bold text-navy-600 mb-1">Drop to view</p>
-            <p className="text-gray-600">Release a NIfTI (.nii/.nii.gz) or MGZ file to open it in the Viewer</p>
+    <AppShell activePage={activePage} onNavigate={navigateTo}>
+      <div
+        className="relative min-h-full"
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {isDragging && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-600/70 pointer-events-none">
+            <div className="rounded-2xl border-2 border-dashed border-navy-600 bg-white px-10 py-8 text-center shadow-2xl">
+              <p className="mb-1 text-2xl font-bold text-navy-600">Drop to view</p>
+              <p className="text-gray-600">
+                Release a NIfTI (.nii/.nii.gz) or MGZ file to open it in the Viewer
+              </p>
+            </div>
           </div>
-        </div>
-      )}
-      <Navigation activePage={activePage} setActivePage={navigateTo} />
-
-      <Suspense fallback={
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-gray-500 text-lg">Loading...</div>
-        </div>
-      }>
-        {activePage === 'home' && <HomePage setActivePage={navigateTo} setSelectedJobId={setSelectedJobId} onOpenLocal={openLocalVolume} />}
-        
-        {activePage === 'jobs' && (
-          <JobsPage 
-            setActivePage={navigateTo} 
-            setSelectedJobId={setSelectedJobId}
-          />
-        )}
-        
-        {activePage === 'dashboard' && (
-          <DashboardPage 
-            selectedJobId={selectedJobId}
-            setSelectedJobId={setSelectedJobId}
-            setActivePage={navigateTo}
-          />
         )}
 
-        {activePage === 'viewer' && (
-          <ViewerPage
-            selectedJobId={selectedJobId}
-            setSelectedJobId={setSelectedJobId}
-            viewerNavEpoch={viewerNavEpoch}
-            localVolume={localVolume}
-          />
-        )}
+        <Suspense fallback={<LoadingState message="Loading workspace…" className="min-h-[50vh]" />}>
+          {activePage === 'home' && (
+            <HomePage
+              setActivePage={navigateTo}
+              setSelectedJobId={setSelectedJobId}
+              onOpenLocal={openLocalVolume}
+            />
+          )}
 
-        {activePage === 'transfer' && (
-          <TransferPage />
-        )}
+          {activePage === 'jobs' && (
+            <JobsPage setActivePage={navigateTo} setSelectedJobId={setSelectedJobId} />
+          )}
 
-        {activePage === 'docs' && (
-          <DocsPage setActivePage={navigateTo} />
-        )}
+          {activePage === 'dashboard' && (
+            <DashboardPage
+              selectedJobId={selectedJobId}
+              setSelectedJobId={setSelectedJobId}
+              setActivePage={navigateTo}
+            />
+          )}
 
-        {activePage === 'settings' && <SettingsPage />}
-      </Suspense>
-    </div>
+          {activePage === 'viewer' && (
+            <ViewerPage
+              selectedJobId={selectedJobId}
+              setSelectedJobId={setSelectedJobId}
+              viewerNavEpoch={viewerNavEpoch}
+              localVolume={localVolume}
+            />
+          )}
+
+          {activePage === 'transfer' && <TransferPage />}
+
+          {activePage === 'docs' && <DocsPage setActivePage={navigateTo} />}
+
+          {activePage === 'settings' && <SettingsPage />}
+        </Suspense>
+      </div>
+    </AppShell>
   );
 }
 

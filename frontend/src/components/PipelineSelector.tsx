@@ -4,12 +4,13 @@
  * Allows users to select plugins (single tools) or workflows (plugin chains)
  */
 
-import React, { useState, useEffect } from 'react';
-import { Zap, GitBranch } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Zap, GitBranch, Search } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import type { Pipeline } from '../types';
 import { Spinner } from './LoadingState';
+import { inputProfileFromApi } from '../lib/inputFormat';
 
 // Categories hidden from the catalog when the EEG feature is disabled.
 const EEG_CATEGORIES: PipelineCategory[] = ['eeg', 'multimodal'];
@@ -17,7 +18,14 @@ const EEG_CATEGORIES: PipelineCategory[] = ['eeg', 'multimodal'];
 interface PipelineSelectorProps {
   onPipelineSelect: (pipeline: Pipeline | null) => void;
   selectedPipeline: Pipeline | null;
-  onExecutionSelect?: (execution: { type: 'plugin' | 'workflow'; id: string; name: string } | null) => void;
+  onExecutionSelect?: (execution: {
+    type: 'plugin' | 'workflow';
+    id: string;
+    name: string;
+    inputFormatName?: string;
+    inputFormatDescription?: string;
+    requiresBidsDir?: boolean;
+  } | null) => void;
 }
 
 type SelectionMode = 'plugins' | 'workflows';
@@ -42,6 +50,7 @@ interface Plugin {
   input_format_name?: string;
   input_format_description?: string;
   input_format_example?: string;
+  requires_bids_dir?: boolean;
 }
 
 interface Workflow {
@@ -54,6 +63,7 @@ interface Workflow {
   input_format_name?: string;
   input_format_description?: string;
   input_format_example?: string;
+  requires_bids_dir?: boolean;
 }
 
 /** Map backend `domain` (from plugins/*.yaml) to UI category labels. */
@@ -384,6 +394,121 @@ const getCategoryLabel = (category: string) => {
   }
 };
 
+interface CatalogRow {
+  id: string;
+  name: string;
+  version: string;
+  category: PipelineCategory;
+  meta?: string;
+  inputFormatName?: string;
+  description?: string;
+}
+
+function filterCatalog(items: CatalogRow[], query: string): CatalogRow[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return items;
+  return items.filter(
+    (item) =>
+      item.name.toLowerCase().includes(q) ||
+      item.id.toLowerCase().includes(q) ||
+      getCategoryLabel(item.category).toLowerCase().includes(q) ||
+      (item.meta && item.meta.toLowerCase().includes(q)) ||
+      (item.inputFormatName && item.inputFormatName.toLowerCase().includes(q))
+  );
+}
+
+const PipelineCatalogList: React.FC<{
+  label: string;
+  items: CatalogRow[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  searchPlaceholder?: string;
+}> = ({ label, items, selectedId, onSelect, searchPlaceholder = 'Search by name, category, or input type…' }) => {
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => filterCatalog(items, query), [items, query]);
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-medium text-gray-700">
+        {label} <span className="text-red-500">*</span>
+      </label>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={searchPlaceholder}
+          aria-label={`Search ${label.toLowerCase()}`}
+          className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm shadow-sm focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-600/20"
+        />
+      </div>
+      <div
+        className="max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-inner"
+        role="listbox"
+        aria-label={label}
+      >
+        {filtered.length === 0 ? (
+          <p className="px-3 py-6 text-center text-xs text-gray-500">No matches — try a different search.</p>
+        ) : (
+          filtered.map((item) => {
+            const selected = item.id === selectedId;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => onSelect(item.id)}
+                className={`flex w-full flex-col gap-0.5 border-b border-gray-100 px-3 py-2.5 text-left transition-colors last:border-b-0 ${
+                  selected
+                    ? 'bg-navy-50 ring-1 ring-inset ring-navy-600/25'
+                    : 'hover:bg-gray-50'
+                }`}
+              >
+                <span className="flex items-start justify-between gap-2">
+                  <span className={`text-sm font-semibold leading-snug ${selected ? 'text-navy-800' : 'text-gray-900'}`}>
+                    {item.name}
+                  </span>
+                  <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600">
+                    {getCategoryLabel(item.category)}
+                  </span>
+                </span>
+                <span className="text-[11px] text-gray-500">
+                  v{item.version}
+                  {item.meta ? ` · ${item.meta}` : ''}
+                  {item.inputFormatName ? ` · ${item.inputFormatName}` : ''}
+                </span>
+              </button>
+            );
+          })
+        )}
+      </div>
+      <p className="text-[11px] text-gray-400">
+        {filtered.length === items.length
+          ? `${items.length} available`
+          : `${filtered.length} of ${items.length} shown`}
+      </p>
+    </div>
+  );
+};
+
+const SelectedInputHint: React.FC<{ formatName?: string; description?: string }> = ({
+  formatName,
+  description,
+}) => {
+  if (!formatName) return null;
+  return (
+    <div className="mt-3 rounded-lg border border-navy-100 bg-navy-50/50 px-3 py-2.5">
+      <p className="text-xs font-semibold text-navy-800">Expects: {formatName}</p>
+      {description && (
+        <p className="mt-1 text-[11px] leading-relaxed text-navy-900/75">{description}</p>
+      )}
+    </div>
+  );
+};
+
 export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   onPipelineSelect,
   selectedPipeline,
@@ -396,8 +521,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   const [selectedPluginId, setSelectedPluginId] = useState<string | null>(null);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
   const [usingLiveData, setUsingLiveData] = useState(false);
-  
-  // Live data from API (or fallback to mock)
+  const [catalogEpoch, setCatalogEpoch] = useState(0);
   const [livePlugins, setLivePlugins] = useState<Plugin[]>([]);
   const [liveWorkflows, setLiveWorkflows] = useState<Workflow[]>([]);
   // Decide which data source to use. When EEG is disabled, drop EEG/multimodal
@@ -406,6 +530,36 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   const activePlugins = (usingLiveData ? livePlugins : MOCK_PLUGINS).filter(p => categoryAllowed(p.category));
   const activeWorkflows = (usingLiveData ? liveWorkflows : MOCK_WORKFLOWS).filter(w => categoryAllowed(w.category));
   const userSelectablePlugins = activePlugins.filter(p => p.user_selectable !== false);
+
+  const pluginCatalog: CatalogRow[] = useMemo(
+    () =>
+      userSelectablePlugins.map((p) => ({
+        id: p.id,
+        name: p.name,
+        version: p.version,
+        category: p.category,
+        inputFormatName: p.input_format_name,
+        description: p.input_format_description,
+      })),
+    [userSelectablePlugins]
+  );
+
+  const workflowCatalog: CatalogRow[] = useMemo(
+    () =>
+      activeWorkflows.map((w) => ({
+        id: w.id,
+        name: w.name,
+        version: w.version,
+        category: w.category,
+        meta: `${w.plugins.length} step${w.plugins.length !== 1 ? 's' : ''}`,
+        inputFormatName: w.input_format_name,
+        description: w.input_format_description,
+      })),
+    [activeWorkflows]
+  );
+
+  const selectedPlugin = activePlugins.find((p) => p.id === selectedPluginId);
+  const selectedWorkflow = activeWorkflows.find((w) => w.id === selectedWorkflowId);
 
   useEffect(() => {
     async function fetchData() {
@@ -420,26 +574,39 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
         if (rawPlugins.length > 0) {
           setError(null);
           // Map API response to our Plugin interface
-          const apiPlugins: Plugin[] = rawPlugins.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            version: p.version,
-            container: p.container_image,
-            description: '',
-            category: mapDomainToCategory(p.domain),
-            user_selectable: p.user_selectable,
-          }));
+          const apiPlugins: Plugin[] = rawPlugins.map((p: any) => {
+            const profile = inputProfileFromApi(p);
+            return {
+              id: p.id,
+              name: p.name,
+              version: p.version,
+              container: p.container_image,
+              description: p.description || '',
+              category: mapDomainToCategory(p.domain),
+              user_selectable: p.user_selectable,
+              input_format_name: profile.inputFormatName,
+              input_format_description: profile.inputFormatDescription,
+              input_format_example: p.input_format?.example_structure,
+              requires_bids_dir: profile.requiresBidsDir,
+            };
+          });
 
           const rawWfs = workflowsRes.workflows ?? [];
-          // Map API response to our Workflow interface
-          const apiWorkflows: Workflow[] = rawWfs.map((w: any) => ({
-            id: w.id,
-            name: w.name,
-            version: w.version,
-            description: '',
-            plugins: w.plugin_ids || [],
-            category: mapDomainToCategory(w.domain),
-          }));
+          const apiWorkflows: Workflow[] = rawWfs.map((w: any) => {
+            const profile = inputProfileFromApi(w);
+            return {
+              id: w.id,
+              name: w.name,
+              version: w.version,
+              description: w.description || '',
+              plugins: w.plugin_ids || [],
+              category: mapDomainToCategory(w.domain),
+              input_format_name: profile.inputFormatName,
+              input_format_description: profile.inputFormatDescription,
+              input_format_example: w.input_format?.example_structure,
+              requires_bids_dir: profile.requiresBidsDir,
+            };
+          });
 
           setLivePlugins(apiPlugins);
           setLiveWorkflows(apiWorkflows);
@@ -475,7 +642,14 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
           version: wf.version,
           description: '',
         } as Pipeline);
-        onExecutionSelect?.({ type: 'workflow', id: wf.id, name: wf.name });
+        onExecutionSelect?.({
+          type: 'workflow',
+          id: wf.id,
+          name: wf.name,
+          inputFormatName: wf.input_format_name,
+          inputFormatDescription: wf.input_format_description,
+          requiresBidsDir: wf.requires_bids_dir,
+        });
       }
     }
   }, [loading, usingLiveData]);
@@ -483,23 +657,30 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   const handlePluginSelect = (pluginId: string) => {
     setSelectedPluginId(pluginId);
     setSelectedWorkflowId(null);
-    
+
     const plugin = activePlugins.find(p => p.id === pluginId);
     if (plugin) {
       onPipelineSelect({
         name: plugin.name,
         version: plugin.version,
-        description: '',
+        description: plugin.description || '',
         container_image: plugin.container,
       } as Pipeline);
-      onExecutionSelect?.({ type: 'plugin', id: plugin.id, name: plugin.name });
+      onExecutionSelect?.({
+        type: 'plugin',
+        id: plugin.id,
+        name: plugin.name,
+        inputFormatName: plugin.input_format_name,
+        inputFormatDescription: plugin.input_format_description,
+        requiresBidsDir: plugin.requires_bids_dir,
+      });
     }
   };
 
   const handleWorkflowSelect = (workflowId: string) => {
     setSelectedWorkflowId(workflowId);
     setSelectedPluginId(null);
-    
+
     const workflow = activeWorkflows.find(w => w.id === workflowId);
     if (workflow) {
       const pluginContainers = workflow.plugins
@@ -508,10 +689,17 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
       onPipelineSelect({
         name: workflow.name,
         version: workflow.version,
-        description: '',
+        description: workflow.description || '',
         container_image: pluginContainers.join(', '),
       } as Pipeline);
-      onExecutionSelect?.({ type: 'workflow', id: workflow.id, name: workflow.name });
+      onExecutionSelect?.({
+        type: 'workflow',
+        id: workflow.id,
+        name: workflow.name,
+        inputFormatName: workflow.input_format_name,
+        inputFormatDescription: workflow.input_format_description,
+        requiresBidsDir: workflow.requires_bids_dir,
+      });
     }
   };
 
@@ -526,55 +714,35 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
     );
   }
 
-  if (error) {
-    return (
-      <div className="rounded-xl border border-gray-100 bg-white p-5 flex flex-col shadow-sm">
-        {/* Mode Toggle */}
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setMode('plugins')}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
-              mode === 'plugins'
-                ? 'bg-navy-600 text-white shadow-sm'
-                : 'bg-slate-100/80 text-gray-700 hover:bg-slate-100'
-            }`}
-          >
-            <Zap className="w-4 h-4 inline mr-2" />
-            Plugins
-          </button>
-          <button
-            onClick={() => setMode('workflows')}
-            className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition ${
-              mode === 'workflows'
-                ? 'bg-navy-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <GitBranch className="w-4 h-4 inline mr-2" />
-            Workflows
-          </button>
-        </div>
+  const switchToPlugins = () => {
+    setMode('plugins');
+    setCatalogEpoch((e) => e + 1);
+    const first = userSelectablePlugins[0];
+    if (first) handlePluginSelect(first.id);
+    else {
+      setSelectedPluginId(null);
+      setSelectedWorkflowId(null);
+    }
+  };
 
-        {/* Using mock data since API failed */}
-        <div className="text-sm text-gray-600 bg-amber-50/80 border border-amber-100/80 rounded-lg px-3 py-2.5">
-          <span className="font-medium text-amber-900/90">Offline catalog.</span> Connect the backend for live plugins.
-        </div>
-      </div>
-    );
-  }
+  const switchToWorkflows = () => {
+    setMode('workflows');
+    setCatalogEpoch((e) => e + 1);
+    const first = activeWorkflows[0];
+    if (first) handleWorkflowSelect(first.id);
+    else {
+      setSelectedPluginId(null);
+      setSelectedWorkflowId(null);
+    }
+  };
 
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-5 flex flex-col shadow-sm">
-      {/* Mode Toggle */}
       <div className="flex gap-2 mb-4">
         <button
-          onClick={() => {
-            setMode('plugins');
-            const firstSelectablePlugin = userSelectablePlugins[0];
-            setSelectedPluginId(firstSelectablePlugin?.id || null);
-            setSelectedWorkflowId(null);
-          }}
-          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
+          type="button"
+          onClick={switchToPlugins}
+          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition border-none ${
             mode === 'plugins'
               ? 'bg-navy-600 text-white shadow-sm'
               : 'bg-slate-100/80 text-gray-700 hover:bg-slate-100'
@@ -584,12 +752,9 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
           Plugins
         </button>
         <button
-          onClick={() => {
-            setMode('workflows');
-            setSelectedWorkflowId(activeWorkflows[0]?.id || null);
-            setSelectedPluginId(null);
-          }}
-          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
+          type="button"
+          onClick={switchToWorkflows}
+          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition border-none ${
             mode === 'workflows'
               ? 'bg-navy-600 text-white shadow-sm'
               : 'bg-slate-100/80 text-gray-700 hover:bg-slate-100'
@@ -602,50 +767,42 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
 
       {error && (
         <div className="text-sm text-amber-900/90 bg-amber-50/80 border border-amber-100/80 rounded-lg px-3 py-2.5 mb-3">
-          {error}
+          <span className="font-medium">Offline catalog.</span> {error}
         </div>
       )}
 
-      {/* Plugin Selector */}
       {mode === 'plugins' && (
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
-            Select Plugin <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={selectedPluginId || ''}
-            onChange={(e) => handlePluginSelect(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-navy-600 text-base"
-          >
-            {userSelectablePlugins.map((plugin) => (
-              <option key={plugin.id} value={plugin.id}>
-                {plugin.name} (v{plugin.version}) - {getCategoryLabel(plugin.category)}
-              </option>
-            ))}
-          </select>
-        </div>
+        <PipelineCatalogList
+          key={`plugins-${catalogEpoch}`}
+          label="Select plugin"
+          items={pluginCatalog}
+          selectedId={selectedPluginId}
+          onSelect={handlePluginSelect}
+        />
       )}
 
-      {/* Workflow Selector */}
       {mode === 'workflows' && (
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
-            Select Workflow <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={selectedWorkflowId || ''}
-            onChange={(e) => handleWorkflowSelect(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-navy-600 text-base"
-          >
-            {activeWorkflows.map((workflow) => (
-              <option key={workflow.id} value={workflow.id}>
-                {workflow.name} ({workflow.plugins.length} plugin{workflow.plugins.length > 1 ? 's' : ''}) - {getCategoryLabel(workflow.category)}
-              </option>
-            ))}
-          </select>
-        </div>
+        <PipelineCatalogList
+          key={`workflows-${catalogEpoch}`}
+          label="Select workflow"
+          items={workflowCatalog}
+          selectedId={selectedWorkflowId}
+          onSelect={handleWorkflowSelect}
+        />
       )}
 
+      {mode === 'plugins' && (
+        <SelectedInputHint
+          formatName={selectedPlugin?.input_format_name}
+          description={selectedPlugin?.input_format_description}
+        />
+      )}
+      {mode === 'workflows' && (
+        <SelectedInputHint
+          formatName={selectedWorkflow?.input_format_name}
+          description={selectedWorkflow?.input_format_description}
+        />
+      )}
     </div>
   );
 };

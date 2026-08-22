@@ -10,6 +10,7 @@ locally and (after staging) on HPC.
 Extensible by design: add an entry to ``LICENSE_REGISTRY`` and both the API and
 the Settings UI pick it up — including, in future, an app-activation license.
 """
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -50,9 +51,22 @@ def _path(meta: dict) -> Path:
     return Path(get_settings().data_dir).resolve() / meta["filename"]
 
 
+def _display_path(p: Path) -> str:
+    home = Path.home()
+    try:
+        rel = p.resolve().relative_to(home.resolve())
+        return f"~/{rel.as_posix()}"
+    except ValueError:
+        return str(p)
+
+
 def _entry(license_id: str, meta: dict) -> dict:
     p = _path(meta)
     installed = p.is_file()
+    installed_at = None
+    if installed:
+        mtime = p.stat().st_mtime
+        installed_at = datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
     return {
         "id": license_id,
         "name": meta["name"],
@@ -63,6 +77,8 @@ def _entry(license_id: str, meta: dict) -> dict:
         "format_hint": meta.get("format_hint", ""),
         "installed": installed,
         "size": p.stat().st_size if installed else 0,
+        "installed_at": installed_at,
+        "path": _display_path(p) if installed else None,
     }
 
 

@@ -183,6 +183,18 @@ async function runPreflight() {
   const containerMode = process.env.NIR_RUNTIME === "container";
 
   if (containerMode) {
+    // Host Python/Celery are irrelevant — the worker runs inside the engine container.
+    checks.python = {
+      ok: true,
+      skipped: true,
+      command: null,
+      detail: "Not required — engine runs in Docker",
+    };
+    checks.celery = {
+      ok: true,
+      skipped: true,
+      detail: "Worker runs inside the engine container",
+    };
     if (!checks.docker.ok) blockers.push("Docker is not running — install/start Docker Desktop to run NeuroInsight.");
   } else {
     if (!checks.python.ok) blockers.push("Python runtime not detected — the backend cannot start.");
@@ -214,6 +226,7 @@ async function runPreflight() {
     blockers,
     warnings,
     checks,
+    containerMode,
     generatedAt: new Date().toISOString(),
   };
 }

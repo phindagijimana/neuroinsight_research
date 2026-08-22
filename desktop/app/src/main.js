@@ -288,53 +288,8 @@ async function navigateToNIR() {
     await mainWindow.loadURL(status.backend.url);
     desktopState.updateSettings({ lastMode: "nir", lastKnownPort: status.backend.port });
     buildAppMenu();
-    injectStatusBar();
   }
   return { ok: true, url: status.backend.url };
-}
-
-/** Inject a persistent bottom status bar into the NIR workspace page: an engine
- *  health dot (polled) and a gear button back to the control center (Settings).
- *  The preload runs on this page too, so window.nir.* is available. */
-function injectStatusBar() {
-  if (!mainWindow) return;
-  mainWindow.webContents
-    .executeJavaScript(
-      `(function () {
-        if (document.getElementById('nir-desktop-statusbar')) return;
-        var bar = document.createElement('div');
-        bar.id = 'nir-desktop-statusbar';
-        bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;height:30px;z-index:2147483647;' +
-          'display:flex;align-items:center;justify-content:space-between;padding:0 12px;' +
-          'background:#0b1f3a;color:#cdd9ea;font:600 11px -apple-system,BlinkMacSystemFont,sans-serif;' +
-          'box-shadow:0 -1px 4px rgba(0,0,0,.25)';
-        bar.innerHTML =
-          '<span style="display:flex;align-items:center;gap:7px">' +
-            '<span id="nir-dot" style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block"></span>' +
-            '<span id="nir-engine">Engine: healthy</span></span>' +
-          '<button id="nir-settings" style="background:transparent;color:#cdd9ea;border:1px solid rgba(255,255,255,.25);' +
-            'border-radius:6px;padding:3px 10px;font:inherit;cursor:pointer">\\u2699 Settings</button>';
-        document.body.appendChild(bar);
-        document.body.style.paddingBottom = '34px';
-        document.getElementById('nir-settings').onclick = function () {
-          if (window.nir && window.nir.ui) window.nir.ui.control();
-        };
-        function refresh() {
-          if (!window.nir || !window.nir.backend) return;
-          window.nir.backend.status().then(function (s) {
-            var dot = document.getElementById('nir-dot');
-            var eng = document.getElementById('nir-engine');
-            if (!dot || !eng) return;
-            if (s.backend && s.backend.healthy) { dot.style.background = '#16a34a'; eng.textContent = 'Engine: healthy'; }
-            else if (s.backend && s.backend.running) { dot.style.background = '#d97706'; eng.textContent = 'Engine: starting'; }
-            else { dot.style.background = '#9ca3af'; eng.textContent = 'Engine: stopped'; }
-          }).catch(function () {});
-        }
-        refresh();
-        setInterval(refresh, 5000);
-      })();`
-    )
-    .catch(() => {});
 }
 
 // --------------------------------------------------------------------------

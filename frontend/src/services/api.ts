@@ -95,6 +95,8 @@ export interface LicenseInfo {
   format_hint?: string;
   installed: boolean;
   size: number;
+  installed_at?: string | null;
+  path?: string | null;
 }
 
 /**

@@ -173,6 +173,125 @@ body {
   color: var(--muted);
 }
 
+.card-hero {
+  grid-column: 1 / -1;
+  border-color: rgba(0, 61, 122, 0.12);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.card-span {
+  grid-column: 1 / -1;
+}
+
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.card-title-row h2 {
+  margin: 0;
+}
+
+.card-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.card-pill.ok {
+  background: #dcfce7;
+  color: var(--ok);
+}
+.card-pill.warn {
+  background: #fef3c7;
+  color: var(--warn);
+}
+.card-pill.bad {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.card-lead {
+  margin-top: 0;
+  margin-bottom: 10px;
+  line-height: 1.45;
+}
+
+.btn-hero {
+  padding: 11px 22px;
+  font-size: 14px;
+  min-width: 180px;
+}
+
+.rows-compact {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.summary {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.45;
+}
+
+.actions-primary {
+  margin-top: 16px;
+}
+.actions-secondary {
+  margin-top: 8px;
+}
+
+button.secondary {
+  background: #f3f4f6;
+  border-color: var(--border);
+  color: #374151;
+}
+button.secondary:hover {
+  background: #e5e7eb;
+}
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  font-weight: 500;
+}
+button.ghost:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.engine-details {
+  margin-top: 14px;
+  font-size: 13px;
+}
+.engine-details > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 600;
+  user-select: none;
+}
+.engine-details > summary:hover {
+  color: #111827;
+}
+.engine-details .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  margin-top: 8px;
+  word-break: break-all;
+}
+
+.lic-detail {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
 /* Runtime: labelled rows instead of a raw JSON dump. */
 .rows {
   margin: 0;
@@ -282,16 +401,41 @@ input[type="text"] {
 .checks li {
   display: flex;
   justify-content: space-between;
-  padding: 5px 0;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0;
   border-bottom: 1px solid #f3f4f6;
+}
+.check-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.check-name {
+  font-weight: 600;
+  color: #111827;
+}
+.check-help {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.35;
 }
 .checks .ok {
   color: var(--ok);
   font-weight: 600;
+  white-space: nowrap;
 }
 .checks .bad {
-  color: var(--warn);
+  color: #b91c1c;
   font-weight: 600;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.checks .na {
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .inlinewarn {

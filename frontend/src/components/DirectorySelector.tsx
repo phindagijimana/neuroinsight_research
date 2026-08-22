@@ -30,6 +30,8 @@ interface DirectorySelectorProps {
   onBidsSubmit?: (bidsDir: string, subjectIds: string[]) => void;
   /** SSH connected (remote/HPC on Jobs page). */
   sshConnected?: boolean;
+  /** BIDS App workflow — copy and submit path differ from flat NIfTI batch. */
+  bidsAppMode?: boolean;
 }
 
 interface BrowseEntry {
@@ -46,6 +48,7 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
   onSubmit,
   onBidsSubmit,
   sshConnected = true,
+  bidsAppMode = false,
 }) => {
   const [inputDir, setInputDir] = useState('');
   const [directoryInfo, setDirectoryInfo] = useState<DirectoryInfo | null>(null);
@@ -251,7 +254,10 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
           Batch Input Directory <span className="text-red-500">*</span>
         </label>
         <p className="text-[11px] text-gray-500">
-          BIDS dataset or folder with NIfTI files &mdash; one job per subject
+          BIDS dataset or folder with NIfTI files &mdash;{' '}
+          {bidsAppMode
+            ? 'one workflow job per selected subject (sessions handled inside each subject)'
+            : 'one job per subject or file'}
         </p>
         <div className="flex gap-2">
           <input

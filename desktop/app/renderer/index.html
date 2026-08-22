@@ -15,8 +15,8 @@
       <div class="brand">
         <span class="logo">NI</span>
         <div>
-          <h1>Settings</h1>
-          <p class="subtitle">Engine, checks &amp; preferences</p>
+          <h1>Control Center</h1>
+          <p class="subtitle">Engine, checks &amp; tool licenses</p>
         </div>
       </div>
       <div class="topbar-actions">
@@ -30,24 +30,36 @@
     <!-- Essentials: what a user needs to get into the workspace or fix a blocker. -->
     <main class="grid">
       <!-- Engine -->
-      <section class="card">
-        <h2>Engine</h2>
+      <section class="card card-hero" id="engineCard">
+        <div class="card-title-row">
+          <h2>Engine</h2>
+        </div>
         <div class="statusline">
           <span id="backendDot" class="dot dot-off"></span>
           <span id="backendStatus">Unknown</span>
         </div>
-        <p id="backendMeta" class="meta"></p>
-        <div class="actions">
-          <button id="btnOpenUI" class="primary" disabled>Open Workspace</button>
+        <p id="backendSummary" class="summary"></p>
+        <div class="actions actions-primary">
+          <button id="btnOpenUI" class="primary btn-hero" disabled>Open Workspace</button>
+        </div>
+        <div class="actions actions-secondary">
           <button id="btnStart" class="primary">Start engine</button>
           <button id="btnStop">Stop engine</button>
-          <button id="btnRefresh">Refresh</button>
+          <button id="btnRefresh" class="ghost">Refresh</button>
         </div>
+        <details id="engineDetails" class="engine-details">
+          <summary>Technical details</summary>
+          <p id="backendMeta" class="meta mono"></p>
+          <dl id="runtimeRows" class="rows rows-compact"></dl>
+        </details>
       </section>
 
       <!-- System checks -->
       <section class="card">
-        <h2>System checks</h2>
+        <div class="card-title-row">
+          <h2>System checks</h2>
+          <span id="preflightSummary" class="card-pill">Not run yet</span>
+        </div>
         <p id="platformLine" class="meta">Platform: …</p>
         <div class="actions">
           <button id="btnPreflight">Run checks</button>
@@ -56,9 +68,11 @@
       </section>
 
       <!-- Tool licenses (FreeSurfer, MELD, …) — some pipelines need these. -->
-      <section class="card" id="toolLicensesCard">
-        <h2>Tool licenses</h2>
-        <p class="meta">Licenses some pipelines need (FreeSurfer, MELD). <a href="#" id="lnkLicensesHelp">User Guide →</a></p>
+      <section class="card card-span" id="toolLicensesCard">
+        <div class="card-title-row">
+          <h2>Tool licenses</h2>
+        </div>
+        <p class="meta card-lead">FreeSurfer and MELD licenses live in your data folder — upload once, pipelines use them automatically. <a href="#" id="lnkLicensesHelp">User Guide →</a></p>
         <div id="toolLicensesList"></div>
         <p id="toolLicensesHint" class="meta" hidden></p>
       </section>
@@ -118,12 +132,6 @@
             <button id="btnRevealBundle" disabled>Show in folder</button>
           </div>
           <p id="diagnosticsDetail" class="meta"></p>
-        </section>
-
-        <!-- Runtime info -->
-        <section class="card">
-          <h2>Runtime</h2>
-          <dl id="runtimeRows" class="rows"></dl>
         </section>
       </div>
     </details>

@@ -8,7 +8,9 @@
  */
 import Brain from '../components/icons/Brain';
 import Shield from '../components/icons/Shield';
-import { Server } from 'lucide-react';
+import { Server, ArrowRight } from 'lucide-react';
+import WorkspacePageHeader from '../components/WorkspacePageHeader';
+import { isDesktopApp } from '../lib/desktopBridge';
 
 interface HomePageProps {
   // Kept for call-site compatibility; the intro page navigates via the app nav.
@@ -35,20 +37,32 @@ const CAPABILITIES = [
   },
 ];
 
-const HomePage: React.FC<HomePageProps> = () => {
+const HomePage: React.FC<HomePageProps> = ({ setActivePage }) => {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <main className="max-w-6xl w-full mx-auto px-8 py-16 text-center">
-        {/* Introduction */}
-        <div className="flex flex-col items-center">
+    <div className="min-h-full">
+      <div className="mx-auto max-w-6xl px-6 py-8 sm:px-8">
+        <WorkspacePageHeader
+          title="Overview"
+          subtitle="NeuroInsight runs reproducible neuroimaging pipelines locally, on HPC, or in the cloud."
+        />
+
+        <div className="flex flex-col items-center py-8 text-center">
           <div className="w-20 h-20 rounded-2xl bg-navy-600 text-white flex items-center justify-center font-extrabold text-3xl tracking-wide mb-6 shadow-sm">
             NI
           </div>
           <h1 className="text-4xl font-bold text-gray-900">NeuroInsight</h1>
-          <p className="text-lg text-gray-500 mt-4 max-w-2xl leading-relaxed">
+          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-gray-500">
             Run reproducible neuroimaging pipelines on your data — on this computer,
             your HPC cluster, or the cloud.
           </p>
+          <button
+            type="button"
+            onClick={() => setActivePage('jobs')}
+            className="mt-8 inline-flex items-center gap-2 rounded-lg bg-navy-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-navy-800 transition-colors border-none"
+          >
+            {isDesktopApp() ? 'Open Jobs' : 'Get started'}
+            <ArrowRight className="h-4 w-4" />
+          </button>
         </div>
 
         {/* What you can do */}
@@ -69,7 +83,7 @@ const HomePage: React.FC<HomePageProps> = () => {
             </div>
           ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 };

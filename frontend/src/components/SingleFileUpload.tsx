@@ -44,6 +44,8 @@ interface SingleFileUploadProps {
   executionContext?: { type: 'plugin' | 'workflow'; id: string } | null;
   /** SSH connected (remote/HPC data source on Jobs page). */
   sshConnected?: boolean;
+  inputFormatName?: string;
+  bidsAppMode?: boolean;
 }
 
 const isNifti = (name: string) => /\.(nii|nii\.gz)$/i.test(name);
@@ -78,6 +80,8 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
   browseMode = 'local',
   executionContext,
   sshConnected = true,
+  inputFormatName,
+  bidsAppMode = false,
 }) => {
   const defaultPath = browseMode === 'local' ? './data' : '~';
 
@@ -252,10 +256,18 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
       {/* Path input */}
       <div className="space-y-1.5">
         <label className="block text-xs font-semibold text-gray-700">
-          Subject Path <span className="text-red-500">*</span>
+          {bidsAppMode ? 'BIDS subject or file' : 'Subject path'}{' '}
+          <span className="text-red-500">*</span>
         </label>
         <p className="text-[11px] text-gray-500">
-          Browse to a subject folder, NIfTI file, or pick from previous results
+          {bidsAppMode ? (
+            <>
+              Browse to a <strong>sub-XXX</strong> folder, BIDS dataset root (single subject), or a{' '}
+              {inputFormatName?.toLowerCase().includes('nifti') ? 'NIfTI file' : 'scan file'}
+            </>
+          ) : (
+            'Browse to a subject folder, NIfTI file, or pick from previous results'
+          )}
         </p>
         <form onSubmit={handleManualSubmit} className="flex gap-2">
           <input

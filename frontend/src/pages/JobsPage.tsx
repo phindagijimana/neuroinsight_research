@@ -21,6 +21,7 @@ import SlurmQueueMonitor from '../components/SlurmQueueMonitor';
 import StatusBadge from '../components/StatusBadge';
 import Button from '../components/Button';
 import { LoadingState, Spinner } from '../components/LoadingState';
+import WorkspacePageHeader from '../components/WorkspacePageHeader';
 import type { ViewerTab } from '../utils/viewerQuery';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { useToast, useConfirm } from '../contexts/NotificationContext';
@@ -267,15 +268,26 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50/90 to-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-8">
-        {/* Submit jobs — single surface above metrics */}
-        <div className="relative z-10 mb-6 md:mb-8">
-          <FileUpload
-            onJobsSubmitted={handleJobsSubmitted}
-            onBack={() => setActivePage('home')}
-          />
-        </div>
+    <div className="bg-gradient-to-b from-slate-50/90 to-white min-h-full">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 md:py-8">
+        <WorkspacePageHeader
+          title="Jobs"
+          subtitle="Submit pipelines on local data, HPC, or cloud — then track progress here."
+          actions={
+            <Button variant="secondary" onClick={() => fetchJobs(true)} disabled={isRefreshing}>
+              {isRefreshing ? 'Refreshing…' : 'Refresh'}
+            </Button>
+          }
+        />
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12 xl:gap-8">
+          {/* Submit — sticky on wide screens */}
+          <div className="xl:col-span-5 xl:sticky xl:top-6 xl:self-start">
+            <FileUpload onJobsSubmitted={handleJobsSubmitted} />
+          </div>
+
+          {/* Monitor */}
+          <div className="space-y-6 xl:col-span-7">
 
         {/* Statistics — one quiet strip */}
         {stats.total > 0 && (
@@ -313,20 +325,15 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
 
         {/* Jobs List */}
         <div className="rounded-2xl border border-gray-200/90 bg-white shadow-sm">
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 tracking-tight">Jobs</h2>
-              <p className="text-sm text-gray-500 mt-0.5">
-                {lastRefreshTime ? (
-                  <>Updated {formatDate(lastRefreshTime.toISOString())} · completed jobs open in Results</>
-                ) : (
-                  'Completed jobs open in Results'
-                )}
-              </p>
-            </div>
-            <Button onClick={() => fetchJobs(true)} disabled={isRefreshing} className="shrink-0">
-              {isRefreshing ? 'Refreshing…' : 'Refresh'}
-            </Button>
+          <div className="border-b border-gray-100 px-4 py-4 sm:px-6">
+            <h2 className="text-lg font-semibold tracking-tight text-gray-900">Recent jobs</h2>
+            <p className="mt-0.5 text-sm text-gray-500">
+              {lastRefreshTime ? (
+                <>Updated {formatDate(lastRefreshTime.toISOString())} · open completed jobs in Results</>
+              ) : (
+                'Open completed jobs in Results'
+              )}
+            </p>
           </div>
 
           {jobsLoading ? (
@@ -337,7 +344,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
               <p className="text-gray-600">No jobs yet — submit a job to see it here.</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+            <div className="max-h-[min(32rem,calc(100vh-14rem))] divide-y divide-gray-100 overflow-y-auto">
               {sortedJobs.map((job) => (
                 <div
                   key={job.id}
@@ -450,6 +457,8 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
               ))}
             </div>
           )}
+        </div>
+          </div>
         </div>
       </div>
     </div>

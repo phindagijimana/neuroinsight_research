@@ -39,36 +39,56 @@ async function refreshStatus() {
   const status = await nir.backend.status();
   const dot = $("backendDot");
   const label = $("backendStatus");
+  const summary = $("backendSummary");
   const meta = $("backendMeta");
   const openBtn = $("btnOpenUI");
+  const startBtn = $("btnStart");
+  const stopBtn = $("btnStop");
+  const healthy = !!(status.backend && status.backend.healthy);
+  const running = !!(status.backend && status.backend.running);
 
-  if (status.backend && status.backend.healthy) {
+  if (healthy) {
     dot.className = "dot dot-on";
-    label.textContent = "Running (healthy)";
+    label.textContent = "Ready";
+    summary.textContent = "Engine is healthy. Open the workspace to run pipelines.";
     openBtn.disabled = false;
     setEngineBadge("healthy");
-  } else if (status.backend && status.backend.running) {
+  } else if (running) {
     dot.className = "dot dot-warn";
-    label.textContent = "Starting / not healthy yet";
+    label.textContent = "Starting…";
+    summary.textContent =
+      "Engine is starting. First run can take up to a minute while the image loads.";
     openBtn.disabled = true;
     setEngineBadge("starting");
   } else {
     dot.className = "dot dot-off";
     label.textContent = "Stopped";
+    summary.textContent = "Start the engine to use NeuroInsight.";
     openBtn.disabled = true;
     setEngineBadge("stopped");
   }
 
+  // Primary CTA when healthy; Start is primary only when stopped.
+  openBtn.classList.toggle("primary", healthy);
+  startBtn.classList.toggle("primary", !healthy && !running);
+  startBtn.classList.toggle("secondary", healthy || running);
+  stopBtn.classList.toggle("secondary", true);
+
   if (status.backend) {
-    meta.textContent = `${status.backend.url} · backend PID ${
-      status.backend.pid || "—"
-    } · worker ${status.celery && status.celery.running ? "running" : "stopped"}`;
+    const worker =
+      status.celery && status.celery.running ? "running" : "stopped";
+    meta.textContent = [
+      status.backend.url,
+      status.backend.container ? `container ${status.backend.container}` : null,
+      status.backend.pid ? `PID ${status.backend.pid}` : null,
+      `worker ${worker}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   renderRuntimeRows(await nir.backend.runtime());
 
-  // Tool licenses live behind the engine API; refresh them whenever engine
-  // state changes (start/stop/refresh) so the cards reflect availability.
   refreshToolLicenses();
 }
 
@@ -148,6 +168,21 @@ function renderBanner(report) {
   else banner.className = "banner banner-ok";
 }
 
+function renderPreflightSummary(report) {
+  const el = $("preflightSummary");
+  if (!el || !report) return;
+  if (!report.ready) {
+    el.textContent = `${report.blockers?.length || 0} blocker(s)`;
+    el.className = "card-pill bad";
+  } else if (report.warnings && report.warnings.length) {
+    el.textContent = `${report.warnings.length} warning(s)`;
+    el.className = "card-pill warn";
+  } else {
+    el.textContent = "All passed";
+    el.className = "card-pill ok";
+  }
+}
+
 async function runPreflight(silent) {
   $("btnPreflight").disabled = true;
   if (!silent) toast("Running checks…");
@@ -158,31 +193,75 @@ async function runPreflight(silent) {
   state.preflightReady = !!report.ready;
   applyStartGate();
   renderBanner(report);
+  renderPreflightSummary(report);
 
   const list = $("preflightList");
   list.innerHTML = "";
 
   const checks = report.checks || {};
+  const containerMode = !!report.containerMode;
   const rows = [
-    ["Docker", checks.docker && checks.docker.ok],
-    ["Node", checks.node && checks.node.ok],
-    ["npm", checks.npm && checks.npm.ok],
-    ["Python", checks.python && checks.python.ok],
-    ["Celery", checks.celery && checks.celery.ok],
-    ["Keychain", checks.keychain && checks.keychain.ok],
+    ["Docker", checks.docker, "Required to run the engine container."],
+    [
+      "Node",
+      checks.node,
+      containerMode ? "Build tooling only — not needed at runtime." : "Used for frontend tooling.",
+    ],
+    [
+      "npm",
+      checks.npm,
+      containerMode ? "Build tooling only — not needed at runtime." : "Used for frontend tooling.",
+    ],
+    [
+      "Python",
+      checks.python,
+      containerMode
+        ? "Not required — pipelines run inside the engine."
+        : "Runs the backend when not using container mode.",
+    ],
+    [
+      "Celery",
+      checks.celery,
+      containerMode
+        ? "Worker runs inside the engine container."
+        : "Processes jobs on the host backend.",
+    ],
+    ["Keychain", checks.keychain, "Secure storage for credentials and secrets."],
     [
       "Disk (>20GB)",
-      checks.disk && checks.disk.ok ? checks.disk.freeGB >= 20 : false,
+      { ok: checks.disk && checks.disk.ok ? checks.disk.freeGB >= 20 : false, skipped: false, detail: checks.disk && checks.disk.ok ? `${checks.disk.freeGB} GB free` : "Could not read disk space" },
+      "Free space for containers, results, and caches.",
     ],
   ];
-  for (const [name, ok] of rows) {
+  for (const [name, check, help] of rows) {
     const li = document.createElement("li");
+    const left = document.createElement("div");
+    left.className = "check-left";
     const n = document.createElement("span");
+    n.className = "check-name";
     n.textContent = name;
+    const hint = document.createElement("span");
+    hint.className = "check-help";
+    hint.textContent = help;
+    left.append(n, hint);
+
     const v = document.createElement("span");
-    v.textContent = ok ? "OK" : "Check";
-    v.className = ok ? "ok" : "bad";
-    li.append(n, v);
+    const skipped = check && check.skipped;
+    const ok = check && (check.ok || skipped);
+    if (skipped) {
+      v.textContent = "N/A";
+      v.className = "na";
+      v.title = check.detail || "";
+    } else if (ok) {
+      v.textContent = "✓ OK";
+      v.className = "ok";
+      if (check.detail) v.title = check.detail;
+    } else {
+      v.textContent = "Needs attention";
+      v.className = "bad";
+      if (check && check.detail) v.title = check.detail;
+    }
+    li.append(left, v);
     list.appendChild(li);
   }
   if (!silent) {
@@ -394,7 +473,15 @@ function renderLicenseItem(lic) {
   item.appendChild(desc);
 
   const detail = document.createElement("p");
-  detail.className = "meta";
+  detail.className = "meta lic-detail";
+  if (lic.installed) {
+    const when = lic.installed_at
+      ? new Date(lic.installed_at).toLocaleString()
+      : "unknown date";
+    const where = lic.path || lic.filename;
+    const size = lic.size ? `${lic.size} bytes` : "";
+    detail.textContent = `Saved ${when}${where ? ` · ${where}` : ""}${size ? ` · ${size}` : ""}`;
+  }
   item.appendChild(detail);
 
   let textarea = null;
@@ -462,6 +549,9 @@ async function saveLicense(id, content, detailEl) {
 }
 
 async function removeLicense(id, detailEl) {
+  if (!window.confirm("Remove this license? Pipelines that need it will fail until you install it again.")) {
+    return;
+  }
   detailEl.textContent = "Removing…";
   const res = await nir.licenses.remove(id);
   if (res && res.ok === false) {

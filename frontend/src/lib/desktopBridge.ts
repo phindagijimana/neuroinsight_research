@@ -1,4 +1,4 @@
-/** Minimal desktop (Electron) bridge exposed via preload as `window.nir`. */
+/** Desktop (Electron) bridge exposed via preload as `window.nir`. */
 
 export interface PickInputResult {
   ok: boolean;
@@ -8,9 +8,32 @@ export interface PickInputResult {
   error?: string;
 }
 
+export interface BackendStatus {
+  running?: boolean;
+  healthy?: boolean;
+  pid?: number | null;
+  port?: number;
+  url?: string;
+  container?: string;
+}
+
+export interface NirBackendStatusResponse {
+  backend?: BackendStatus;
+  celery?: { running?: boolean };
+}
+
 export interface NirDesktopBridge {
   pickInputPath?: () => Promise<PickInputResult>;
   openDataDialog?: () => Promise<void>;
+  backend?: {
+    status: () => Promise<NirBackendStatusResponse>;
+  };
+  ui?: {
+    control: () => Promise<{ ok?: boolean }>;
+  };
+  onOpenVolume?: (
+    cb: (payload: { name: string; data: ArrayBuffer | Uint8Array }) => void
+  ) => () => void;
 }
 
 declare global {
@@ -26,4 +49,17 @@ export function isDesktopApp(): boolean {
 export async function pickLocalInputPath(): Promise<PickInputResult | null> {
   if (!isDesktopApp()) return null;
   return window.nir!.pickInputPath!();
+}
+
+export async function getDesktopBackendStatus(): Promise<NirBackendStatusResponse | null> {
+  if (!window.nir?.backend?.status) return null;
+  try {
+    return await window.nir.backend.status();
+  } catch {
+    return null;
+  }
+}
+
+export function openControlCenter(): void {
+  window.nir?.ui?.control?.();
 }

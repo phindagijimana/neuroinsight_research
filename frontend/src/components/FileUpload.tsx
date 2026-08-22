@@ -13,7 +13,7 @@
  *    -> TransferProgress -> PipelineSelector -> Submit
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, FolderOpen, ArrowLeft, ArrowRight } from 'lucide-react';
 import { DirectorySelector } from './DirectorySelector';
 import { SingleFileUpload } from './SingleFileUpload';
@@ -25,6 +25,13 @@ import { TransferProgress } from './TransferProgress';
 import { apiService } from '../services/api';
 import type { Pipeline, DataSourceType, PlatformConnection, PlatformFile } from '../types';
 import { useToast } from '../contexts/NotificationContext';
+import { isDesktopApp } from '../lib/desktopBridge';
+import {
+  type ExecutionInputProfile,
+  isBidsInput,
+  isSingleNiftiInput,
+  parseBidsSubjectPath,
+} from '../lib/inputFormat';
 
 type UploadMode = 'directory' | 'single';
 type Step = 'source' | 'browse' | 'backend' | 'transfer' | 'pipeline';
@@ -34,7 +41,7 @@ interface FileUploadProps {
   onBack?: () => void;
 }
 
-interface SelectedExecution {
+interface SelectedExecution extends ExecutionInputProfile {
   type: 'plugin' | 'workflow';
   id: string;
   name: string;
@@ -92,6 +99,22 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
   };
 
   const currentStep = getCurrentStep();
+
+  const bidsWorkflow = isBidsInput(selectedExecution);
+  const niftiInput = isSingleNiftiInput(selectedExecution);
+  const filesystemBrowseMode =
+    dataSource === 'hpc' ? 'hpc' : dataSource === 'remote' ? 'remote' : 'local';
+
+  // Match input mode to pipeline/workflow expectations.
+  useEffect(() => {
+    if (!selectedExecution) return;
+    if (bidsWorkflow) {
+      setMode('directory');
+      setUploadedFilePath(null);
+    } else if (niftiInput || selectedExecution.type === 'plugin') {
+      setMode('single');
+    }
+  }, [selectedExecution?.id, selectedExecution?.type, bidsWorkflow, niftiInput]);
 
   // ---- Platform flow handlers ----
 
@@ -232,6 +255,46 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
 
     try {
       const wfP: Record<string, string> = {};
+
+      // BIDS App workflows: dataset root + subject (sessions discovered inside the subject folder).
+      if (bidsWorkflow && selectedExecution?.type === 'workflow' && selectedExecution.id) {
+        const parsed = parseBidsSubjectPath(uploadedFilePath);
+        let bidsDir = uploadedFilePath;
+        let subjectId: string | undefined;
+
+        if (parsed) {
+          bidsDir = parsed.bidsDir;
+          subjectId = parsed.subjectId;
+        } else {
+          const info = await apiService.browseDirectory(uploadedFilePath, filesystemBrowseMode);
+          const subjects = (info.directories || [])
+            .map((d: { name: string }) => d.name)
+            .filter((n: string) => n.startsWith('sub-'))
+            .map((n: string) => n.replace(/^sub-/, ''));
+          if (subjects.length === 1) {
+            subjectId = subjects[0];
+          } else if (subjects.length > 1) {
+            setError(
+              'Multiple subjects in this dataset — select a sub-XXX folder for one subject, or use BIDS batch mode.'
+            );
+            return;
+          } else {
+            setError('No sub-* folders found. Choose a BIDS dataset root or a sub-XXX folder.');
+            return;
+          }
+        }
+
+        const params = { ...resourceParams(customResources), subject_id: subjectId, ...wfP };
+        const result = await apiService.submitWorkflowJob(
+          selectedExecution.id,
+          [bidsDir],
+          params,
+          customResources || undefined
+        );
+        onJobsSubmitted([result.job_id]);
+        return;
+      }
+
       if (selectedExecution?.type === 'plugin' && selectedExecution.id) {
         const result = await apiService.submitPluginJob(selectedExecution.id, [uploadedFilePath], resourceParams(customResources), customResources || undefined);
         onJobsSubmitted([result.job_id]);
@@ -420,23 +483,86 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
   }
 
   // ===========================================================================
-  // FILESYSTEM FLOW (Local / Remote / HPC) -- original layout
+  // FILESYSTEM FLOW (Local / Remote / HPC)
   // ===========================================================================
+  const fsStep = !selectedPipeline ? 2 : 3;
+  const fsSteps = ['Compute', 'Pipeline', 'Data'];
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Process MRI Data</h2>
-          <p className="mt-1 text-sm text-gray-600">Select execution backend, pipeline, and input data</p>
+          <h2 className="text-xl font-bold tracking-tight text-gray-900">New job</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            Choose where to run, pick a pipeline, then select your data
+          </p>
         </div>
-        {onBack && (
-          <button onClick={onBack} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+        {onBack && !isDesktopApp() && (
+          <button
+            onClick={onBack}
+            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
             &larr; Back
           </button>
         )}
       </div>
 
-      <div className="space-y-4">
+      {/* Step indicator */}
+      <ol className="flex items-center gap-2 sm:gap-4" aria-label="Job submission steps">
+        {fsSteps.map((label, i) => {
+          const stepNum = i + 1;
+          const done = stepNum < fsStep;
+          const active = stepNum === fsStep;
+          return (
+            <li key={label} className="flex min-w-0 flex-1 items-center gap-2">
+              <span
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                  done
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : active
+                      ? 'bg-navy-600 text-white'
+                      : 'bg-gray-100 text-gray-400'
+                }`}
+              >
+                {done ? '✓' : stepNum}
+              </span>
+              <span
+                className={`truncate text-xs font-semibold sm:text-sm ${
+                  active ? 'text-navy-700' : done ? 'text-gray-700' : 'text-gray-400'
+                }`}
+              >
+                {label}
+              </span>
+              {i < fsSteps.length - 1 && (
+                <span className="hidden h-px flex-1 bg-gray-200 sm:block" aria-hidden />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+
+      {selectedExecution && (bidsWorkflow || niftiInput || selectedExecution.inputFormatDescription) && (
+        <div className="rounded-xl border border-navy-100 bg-navy-50/60 px-4 py-3 text-sm text-navy-900">
+          <p className="font-semibold">
+            Input: {selectedExecution.inputFormatName || (bidsWorkflow ? 'BIDS' : 'Single file')}
+          </p>
+          <p className="mt-1 text-navy-800/85 text-xs leading-relaxed">
+            {bidsWorkflow ? (
+              <>
+                BIDS App mode — point at a dataset with <code className="text-[11px]">sub-*</code> folders.
+                Sessions (<code className="text-[11px]">ses-*</code>) are discovered inside each subject.
+                Use <strong>Batch</strong> for many subjects, or <strong>Single</strong> for one{' '}
+                <code className="text-[11px]">sub-XXX</code> folder or a single-subject dataset.
+              </>
+            ) : (
+              selectedExecution.inputFormatDescription ||
+              'Select one NIfTI file or subject folder.'
+            )}
+          </p>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-gray-200/90 bg-white p-4 shadow-sm sm:p-6">
         {/* Row 1: Unified Backend (with platform tabs) + Resource Configuration */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
           <BackendSelector {...backendProps} />
@@ -455,23 +581,35 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
           {selectedPipeline && (
             <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 space-y-4 flex flex-col h-full">
               <div>
-                <h3 className="text-xs font-semibold tracking-wide text-gray-500 mb-3">Input Mode</h3>
+                <h3 className="text-xs font-semibold tracking-wide text-gray-500 mb-3">Data input</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <button onClick={() => setMode('single')}
                     className={`p-3 rounded-lg border text-left transition-all ${mode === 'single' ? 'border-navy-600/40 bg-white shadow-sm ring-1 ring-navy-600/15' : 'border-gray-200/80 bg-white hover:border-gray-300'}`}>
                     <div className="flex items-center mb-1">
                       <Upload className={`h-4 w-4 mr-1.5 ${mode === 'single' ? 'text-navy-600' : 'text-gray-400'}`} />
-                      <span className="text-sm font-medium text-gray-900">Single</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {bidsWorkflow ? 'One subject' : 'Single NIfTI'}
+                      </span>
                     </div>
-                    <p className="text-xs text-gray-600 text-left">One subject folder or file</p>
+                    <p className="text-xs text-gray-600 text-left">
+                      {bidsWorkflow
+                        ? 'One sub-XXX folder or file'
+                        : 'One scan or subject folder'}
+                    </p>
                   </button>
                   <button onClick={() => setMode('directory')}
                     className={`p-3 rounded-md border transition-all ${mode === 'directory' ? 'border-navy-600 bg-navy-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
                     <div className="flex items-center mb-1">
                       <FolderOpen className={`h-4 w-4 mr-1.5 ${mode === 'directory' ? 'text-navy-600' : 'text-gray-400'}`} />
-                      <span className="text-sm font-medium text-gray-900">Batch</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {bidsWorkflow ? 'BIDS batch' : 'Batch'}
+                      </span>
                     </div>
-                    <p className="text-xs text-gray-600 text-left">Folder with multiple subjects</p>
+                    <p className="text-xs text-gray-600 text-left">
+                      {bidsWorkflow
+                        ? 'Dataset root — one job per subject'
+                        : 'Many NIfTI files at once'}
+                    </p>
                   </button>
                 </div>
               </div>
@@ -486,6 +624,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
                     sshConnected={dataSource === 'local' ? true : sshConnected}
                     onSubmit={handleBatchSubmit}
                     onBidsSubmit={handleBidsBatchSubmit}
+                    bidsAppMode={bidsWorkflow}
                   />
                 ) : (
                   <>
@@ -494,6 +633,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
                       sshConnected={dataSource === 'local' ? true : sshConnected}
                       onFileUploaded={(path) => { setUploadedFilePath(path); setError(null); }}
                       executionContext={selectedExecution ? { type: selectedExecution.type, id: selectedExecution.id } : null}
+                      inputFormatName={selectedExecution?.inputFormatName}
+                      bidsAppMode={bidsWorkflow}
                     />
                     {uploadedFilePath && (
                       <div className="mt-3">
