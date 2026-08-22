@@ -1,75 +1,58 @@
-# NeuroInsight Research -- User Guide
+# NeuroInsight — User Guide
 
-Complete guide for deploying and using the NeuroInsight Research platform for neuroimaging analysis.
+Reference guide for deploying and using NeuroInsight. **New desktop users:** start with **[INSTALL.md](INSTALL.md)** (short, step-by-step). Use this guide for advanced setup, connectors, and HPC.
+
+## Contents
+
+- [Desktop install (quick pointer)](#desktop-install-quick-pointer)
+- [Docker installation](#docker-installation)
+- [macOS notes](#macos-notes)
+- [Local vs remote deployment](#local-vs-remote-deployment)
+- [Deployment from source](#deployment)
+- [Terminology](#terminology)
+- [Compute and data sources](#compute-and-data-sources)
+- [Plugins and workflows](#plugins-and-workflows)
+- [Connecting to a remote server](#connecting-to-a-remote-server)
+- [Connecting to Pennsieve](#connecting-to-pennsieve)
+- [Connecting to HPC (SLURM)](#connecting-to-hpc-slurm-cluster)
+- [Connecting to XNAT](#connecting-to-xnat)
+- [Support](#support)
 
 ## Prerequisites
 
-- Docker and Docker Compose (for local or containerized deployment)
-- Python 3.10+ (for development setup)
-- Node.js 18+ (for frontend development)
-- 16GB+ RAM (32GB recommended for processing)
+**Desktop app:** Docker Desktop (running), ~20 GB disk, 8 GB+ RAM — see [INSTALL.md](INSTALL.md).
+
+**From source / development:**
+
+- Docker and Docker Compose
+- Python 3.10+
+- Node.js 18+
+- 16 GB+ RAM (32 GB recommended for local processing)
 - SSH key-based authentication (for remote/HPC connections)
 
-## NIR Desktop installer (optional)
+## Desktop install (quick pointer)
 
-The **macOS** build is signed and notarized, so it opens normally. On **Windows** (not yet signed) — and in some download scenarios — the OS may block or warn on first launch because the file came from the internet. Use the steps for your platform **with the real path and filename** of your download (names vary by version and architecture).
+Full install steps, checksum verification, and first launch are in **[INSTALL.md](INSTALL.md)**.
 
-### Windows (PowerShell)
+| Platform | Installer (example) |
+|---|---|
+| macOS (Apple Silicon) | `NeuroInsight-<version>-arm64.dmg` |
+| Windows | `NeuroInsight-Setup-<version>.exe` |
+| Linux | `NeuroInsight-<version>.AppImage` or `nir-desktop-app_<version>_amd64.deb` |
 
-Downloads are often **blocked** until you clear the *mark of the web*. Use the **full path to the installer**, including the **`.exe`** extension.
+**macOS:** drag **`NeuroInsight.app`** to **`/Applications`** before first launch. Current builds are signed and notarized — no Gatekeeper workaround needed.
 
-```powershell
-Unblock-File -LiteralPath "$env:USERPROFILE\Downloads\nir-desktop-0.1.0-win-x64.exe"
-```
+**Windows:** if SmartScreen appears, verify the SHA-256 checksum from the release, then **More info → Run anyway**. You can also right-click the `.exe` → **Properties** → **Unblock**.
 
-Replace the file name with whatever appears in your `Downloads` folder. To list matching files:
+**Linux:** `chmod +x NeuroInsight-*.AppImage` then run, or `sudo dpkg -i nir-desktop-app_*_amd64.deb`.
 
-```powershell
-Get-ChildItem "$env:USERPROFILE\Downloads" | Where-Object { $_.Name -like "*nir*" }
-```
-
-To unblock **everything** under a folder (for example after unzipping an archive):
-
-```powershell
-Get-ChildItem -LiteralPath "C:\Path\To\Folder" -Recurse -File | Unblock-File
-```
-
-You can also **right‑click** the file in File Explorer → **Properties** → check **Unblock** (if shown) → **OK**.
-
-**Note:** `Unblock-File` addresses download blocking. If **SmartScreen** still warns about an unsigned app, use **More info** → **Run anyway** if your policy allows, or rely on a signed build from your organization.
-
-### macOS (Terminal)
-
-The current macOS build is signed and notarized, so it opens normally — no workaround needed. Only if you're on an older/unsigned build or hit a Gatekeeper quarantine error, clear the **quarantine** attribute after copying **NeuroInsight.app** into `/Applications`:
+**Legacy / unsigned builds only:** if Gatekeeper or quarantine blocks an old build, after copying to Applications:
 
 ```bash
-xattr -cr "/Applications/NeuroInsight Research.app"
+xattr -cr "/Applications/NeuroInsight.app"
 ```
 
-If the app name or path differs, adjust the path. For a **`.dmg` or `.app` still in Downloads**, you can remove the quarantine attribute on that file first (example names):
-
-```bash
-xattr -d com.apple.quarantine ~/Downloads/nir-desktop-0.1.0-mac-x64.dmg
-```
-
-Then open the disk image or drag the app to **Applications**, and run `xattr -cr` on the installed `.app` if needed.
-
-**Note:** The current release is distributed with Apple notarization and Developer ID signing, so it opens without a right‑click workaround. Only older pilot/unsigned builds may still need **right‑click → Open** the first time.
-
-### Linux
-
-Linux does not use Windows `Unblock-File` or macOS `xattr` quarantine in the same way.
-
-- **AppImage:** make it executable, then run:
-
-```bash
-chmod +x ~/Downloads/nir-desktop-*-linux-*.AppImage
-~/Downloads/nir-desktop-*-linux-*.AppImage
-```
-
-- **`.deb`:** install with your package manager, e.g. `sudo apt install ./nir-desktop-*.deb` (exact command depends on distribution).
-
-Verify **checksums** against `desktop-release-sha256.txt` (or your release notes) when provided.
+The app was formerly named "NeuroInsight Research"; current releases use **`NeuroInsight.app`**.
 
 ### Web UI without the desktop shell
 
@@ -127,7 +110,7 @@ wsl --install -d Ubuntu
 
 ## macOS Notes
 
-> **Recommendation:** Use **Linux** as the primary production host platform for NeuroInsight Research.
+> **Recommendation:** Use **Linux** as the primary production host platform for NeuroInsight.
 > macOS is supported, but it is best used as an orchestration host (submitting jobs to remote servers or HPC) rather than for heavy local processing.
 
 ### Production Readiness by Host OS

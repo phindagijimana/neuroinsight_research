@@ -1,6 +1,6 @@
-# NeuroInsight Research
+# NeuroInsight
 
-An open-source platform for running neuroimaging tools from a web interface. Select your data, pick a plugin or workflow, choose where to process, and click Submit -- no terminal commands or container expertise required.
+An open-source platform for running neuroimaging tools from a web interface. Select your data, pick a plugin or workflow, choose where to process, and click Submit — no terminal commands or container expertise required.
 
 A **plugin** wraps a single neuroimaging tool (e.g., FreeSurfer, fMRIPrep) so it can run in a container with one click. A **workflow** chains multiple plugins into a single job with automatic data passing between steps (e.g., fMRIPrep then XCP-D). Both are defined as YAML files -- drop a new one in `plugins/` or `workflows/` to extend the platform.
 
@@ -10,62 +10,16 @@ Most users want the **desktop app** — a one-click installer for macOS, Windows
 or Linux. The only prerequisite is **Docker Desktop** (running). On first launch
 the app downloads its engine image (~1.8 GB) once, then everything runs locally.
 
-Full step-by-step guide: **[docs/INSTALL.md](docs/INSTALL.md)**. Quick version:
+**Install guide:** **[docs/INSTALL.md](docs/INSTALL.md)** — download from
+[Releases](https://github.com/phindagijimana/neuroinsight_research/releases),
+verify the checksum, drag **`NeuroInsight.app`** to **`/Applications`** (macOS),
+start Docker, and launch.
 
-### 1. Download
+**Stuck?** [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — Docker detection,
+SmartScreen, App Translocation, and engine startup.
 
-From the [**Releases**](https://github.com/phindagijimana/neuroinsight_research/releases) page, grab the file for your OS **plus its checksum file**:
-
-| OS | Installer | Checksum file |
-|---|---|---|
-| macOS (Apple Silicon) | `NeuroInsight-<ver>-arm64.dmg` | `desktop-release-sha256-macos.txt` |
-| Windows | `NeuroInsight.Setup.<ver>.exe` | `desktop-release-sha256-windows.txt` |
-| Linux | `NeuroInsight-<ver>.AppImage` or `…_amd64.deb` | `desktop-release-sha256-linux.txt` |
-
-### 2. Verify the checksum (then allow it to run)
-
-The **macOS** build is code-signed (Developer ID) and **notarized**, so it opens
-normally. **Windows** is not yet signed (you'll clear a one-time SmartScreen
-prompt), and Linux installers aren't signed by convention. Either way, verifying
-the SHA-256 checksum confirms the file is the **authentic, untampered release**.
-
-**Easiest:** download all the release files into one folder and run the helper
-for your OS — it verifies the checksums and installs:
-`install-nir-macos.sh` · `install-nir-linux.sh` · `install-nir-windows.ps1`.
-
-**Manual check:**
-
-```bash
-# macOS / Linux
-shasum -a 256 NeuroInsight-*.dmg        # or .AppImage / .deb
-#   compare the hash to the line in desktop-release-sha256-macos.txt (or -linux.txt)
-```
-```powershell
-# Windows (PowerShell)
-Get-FileHash .\NeuroInsight.Setup.*.exe -Algorithm SHA256
-#   compare to the line in desktop-release-sha256-windows.txt
-```
-
-### 3. First-launch notes
-
-- **macOS** — **opens normally.** The app is signed with a Developer ID and
-  notarized by Apple, so there's no Gatekeeper workaround to do.
-- **Windows** — if SmartScreen blocks it ("Windows protected your PC"), click
-  **More info → Run anyway**. *(Expected for an unsigned installer — verify the
-  checksum above, then Run anyway.)* You can also right-click the `.exe` →
-  Properties → **Unblock**.
-- **Linux** — `chmod +x NeuroInsight-*.AppImage` then run it, or `sudo dpkg -i nir-desktop-app_*_amd64.deb`.
-
-### 4. Launch & use
-
-1. Make sure **Docker Desktop is running**, then open NeuroInsight (first launch pulls the engine image once).
-2. **Settings → Licenses** — upload FreeSurfer / MELD license files if your pipelines need them (uploaded once; used automatically).
-3. **Jobs** — pick a data source, a plugin or workflow, choose **Local / Remote / HPC**, set resources, and **Submit**.
-4. **Results / Viewer** — monitor progress and open outputs in the built-in NIfTI viewer.
-
-> macOS builds are signed and notarized (no first-run warning). Windows signing
-> is planned; until then the checksum is your authenticity guarantee. See
-> [docs/SIGNING_AND_TRUST.md](docs/SIGNING_AND_TRUST.md).
+**Advanced:** remote servers, HPC/SLURM, Pennsieve, and XNAT — see
+[docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
 ---
 
@@ -94,20 +48,17 @@ If you only submit jobs to a remote server or HPC, the app itself is lightweight
 
 ## Quick Start
 
+See **[QUICK_START.md](QUICK_START.md)** for a minimal command reference, or run:
+
 ```bash
 git clone https://github.com/phindagijimana/neuroinsight_research.git
 cd neuroinsight_research
 ./research install        # install deps, start infra, init DB
 ./research license        # set up FreeSurfer / MELD license files
 ./research start          # launch the app
-./research stop           # stop app + infra containers (keep data volumes)
-./research stop app       # stop app services only (keep infra running)
-./research stop --all     # stop everything and remove infra data volumes
 ```
 
-Open **http://localhost:3000** -- that's it.
-
-`./research install` creates a Python venv, installs Node/Python dependencies, generates secure passwords, and starts PostgreSQL/Redis/MinIO via Docker. `./research license` walks you through placing the required license files interactively. `./research start` builds the frontend and launches the backend.
+Open **http://localhost:3000**.
 
 ## How to Use
 
@@ -227,23 +178,25 @@ trust (code signing / notarization), see [docs/SIGNING_AND_TRUST.md](docs/SIGNIN
 
 ## Documentation
 
-- [User Guide](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/USER_GUIDE.md) -- Complete setup, connections, SSH key guide, and usage instructions
-- [Troubleshooting](https://github.com/phindagijimana/neuroinsight_research/blob/main/docs/TROUBLESHOOTING.md) -- Common issues and solutions
-- [Processor Image Mirror](docker/processors/README.md) -- Required tested images and mirror script for `phindagijimana321/*`
-- [Pennsieve Registration Bundle](pennsieve/REGISTER.md) -- 14 processors + 7 workflows translation and registration runbook
-- [Pennsieve Go/No-Go Checklist](pennsieve/PLATFORM_REGISTRATION_CHECKLIST.md) -- strict phased checks for platform registration
+- [Install (desktop)](docs/INSTALL.md) — download, verify, first launch (start here for end users)
+- [User Guide](docs/USER_GUIDE.md) — advanced connectors, HPC/SLURM, Pennsieve, XNAT, and source deployment
+- [Quick Start (developers)](QUICK_START.md) — run from source with `./research`
+- [Troubleshooting](docs/TROUBLESHOOTING.md) — common issues and solutions
+- [Processor Image Mirror](docker/processors/README.md) — required tested images and mirror script for `phindagijimana321/*`
+- [Pennsieve Registration Bundle](pennsieve/REGISTER.md) — 14 processors + 7 workflows translation and registration runbook
+- [Pennsieve Go/No-Go Checklist](pennsieve/PLATFORM_REGISTRATION_CHECKLIST.md) — strict phased checks for platform registration
 
 ## Citing This Software
 
-If you use NeuroInsight Research in your work, please cite:
+If you use NeuroInsight in your work, please cite:
 
 ```bibtex
 @software{neuroinsight_research,
   author       = {Phindagijimana},
-  title        = {NeuroInsight Research: Neuroimaging Processing Platform},
+  title        = {NeuroInsight: Neuroimaging Processing Platform},
   year         = {2026},
   url          = {https://github.com/phindagijimana/neuroinsight_research},
-  version      = {1.0.0}
+  version      = {0.1.15}
 }
 ```
 

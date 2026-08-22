@@ -1,6 +1,18 @@
 # Troubleshooting Guide
 
-Common issues and solutions for NeuroInsight Research.
+Common issues and solutions for NeuroInsight.
+
+## Desktop app (macOS / Windows / Linux)
+
+| Problem | Solution |
+|---------|----------|
+| **"Docker is not running"** but Docker Desktop is up (macOS) | Upgrade to **v0.1.15+** (fixes stripped GUI `PATH`). Interim: launch from Terminal: `"/Applications/NeuroInsight.app/Contents/MacOS/NeuroInsight"`. |
+| App behaves oddly after opening from DMG | **Drag `NeuroInsight.app` to `/Applications`** and launch from there (avoids App Translocation). |
+| Engine won't start | Docker Desktop must be **running**; then **Settings → Engine → Start engine**. |
+| macOS Gatekeeper / quarantine (old unsigned builds) | Current releases are signed and notarized — upgrade. Legacy workaround: `xattr -cr "/Applications/NeuroInsight.app"`. |
+| Windows SmartScreen blocks installer | **More info → Run anyway** after verifying the SHA-256 checksum from the release. |
+
+See also [INSTALL.md](INSTALL.md) for first-time setup.
 
 ## Connection Issues
 

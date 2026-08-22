@@ -1,6 +1,6 @@
 # HPC Pipeline Submission Guide
 
-How to submit neuroimaging pipelines on HPC through the NeuroInsight Research UI.
+How to submit neuroimaging pipelines on HPC through the NeuroInsight UI.
 
 ---
 

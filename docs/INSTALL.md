@@ -54,7 +54,8 @@ shasum -a 256 -c desktop-release-sha256-macos.txt    # or -linux.txt
 
 ## 3. Install & launch
 
-- **macOS:** open the `.dmg`, drag **NeuroInsight** to Applications, launch it.
+- **macOS:** open the `.dmg`, **drag `NeuroInsight.app` to `/Applications`**, then
+  launch from Applications (not from the mounted disk image).
 - **Windows:** run the `.exe` installer, then launch from the Start menu.
 - **Linux:** `chmod +x NeuroInsight-*.AppImage && ./NeuroInsight-*.AppImage`, or
   `sudo dpkg -i NeuroInsight-*.deb`.
@@ -84,13 +85,18 @@ background. You can also check via **Help → Check for Updates…**.
 
 ## Troubleshooting
 
-- **"Docker is required" / engine won't start** — make sure Docker Desktop is
-  installed **and running**, then reopen NeuroInsight (or **Settings → Engine →
-  Start engine**).
+- **"Docker is required" / "Docker is not running" (macOS)** — confirm Docker
+  Desktop is **running** (whale icon in the menu bar). On **v0.1.14 and older**,
+  a stripped GUI `PATH` could make preflight fail even when Docker is up; upgrade
+  to **v0.1.15+** or launch once from Terminal:
+  `"/Applications/NeuroInsight.app/Contents/MacOS/NeuroInsight"`. Then reopen
+  normally or use **Settings → Engine → Start engine**.
 - **First launch is slow** — it's downloading the ~1.8 GB engine image; this only
   happens once.
 - **Something's wrong** — open **Settings**, expand **Advanced → Diagnostics**, and
   **Export bundle**; attach it when reporting an issue.
+
+More issues: [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ## Security & privacy
 

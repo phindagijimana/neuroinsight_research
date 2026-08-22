@@ -7,6 +7,11 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+### Fixed
+- **macOS Dock icon looked oversized** — `app.dock.setIcon()` was overriding the
+  padded `icon.icns` with full-bleed `icon.png` on every launch. Packaged apps
+  now use the bundle `.icns`; dev mode loads the padded `.icns` explicitly.
+
 ## [0.1.15] - 2026-08-20
 
 ### Fixed

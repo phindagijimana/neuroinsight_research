@@ -1,4 +1,7 @@
-# Quick Start
+# Quick Start — Developers (run from source)
+
+> **Desktop users:** install the app from [docs/INSTALL.md](docs/INSTALL.md) instead —
+> you do not need this guide.
 
 ## Prerequisites
 

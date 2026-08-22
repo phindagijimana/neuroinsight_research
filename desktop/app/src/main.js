@@ -13,7 +13,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { app, BrowserWindow, Menu, ipcMain, shell, dialog, crashReporter } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, shell, dialog, crashReporter, nativeImage } = require("electron");
 
 // macOS/Linux GUI apps (launched from Finder/Dock/DMG) inherit a stripped PATH
 // (/usr/bin:/bin:/usr/sbin:/sbin) that omits /usr/local/bin, /opt/homebrew/bin,
@@ -852,11 +852,13 @@ function installCrashHandlers() {
 // App lifecycle
 // --------------------------------------------------------------------------
 app.whenReady().then(async () => {
-  // Show the NeuroInsight "NI" icon in the macOS dock in dev too (packaged
-  // builds get it from the .icns via electron-builder).
-  if (process.platform === "darwin" && app.dock) {
+  // macOS Dock: packaged apps use icon.icns from the bundle (824px body on Apple's
+  // grid). Do NOT override with icon.png — that asset is full-bleed for Linux.
+  // In dev, match production by loading the padded .icns explicitly.
+  if (process.platform === "darwin" && app.dock && !app.isPackaged) {
     try {
-      app.dock.setIcon(require("path").join(__dirname, "..", "assets", "icon.png"));
+      const icns = path.join(__dirname, "..", "assets", "icon.icns");
+      if (fs.existsSync(icns)) app.dock.setIcon(nativeImage.createFromPath(icns));
     } catch (_e) {
       /* best effort */
     }
