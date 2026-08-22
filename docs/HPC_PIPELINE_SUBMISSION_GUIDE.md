@@ -1,69 +1,15 @@
 # HPC Pipeline Submission Guide
 
-How to submit neuroimaging pipelines on HPC through the NeuroInsight UI.
+Pipeline-specific **input layouts** for submitting jobs on HPC through the NeuroInsight UI.
+
+**Before this guide:**
+
+- Connect HPC/SLURM in the UI — [USER_GUIDE.md § Connecting to HPC](USER_GUIDE.md#connecting-to-hpc-slurm-cluster) (SSH keys, tunnels, SLURM settings, monitoring).
+- Tool licenses — [TOOL_LICENSES.md](TOOL_LICENSES.md).
 
 ---
 
-## Prerequisites
-
-### 1. SSH Tunnel from Your Local Machine to the NIR Server
-
-The NIR app runs on an AWS server. You need an SSH tunnel to access the web UI and to relay HPC connections.
-
-```bash
-ssh -i /path/to/your-key.pem \
-    -L 3000:localhost:3000 \
-    -L 8000:localhost:8000 \
-    -L 2222:your-hpc-login-node.edu:22 \
-    ubuntu@<NIR-SERVER-IP>
-```
-
-- `-L 3000:localhost:3000` — tunnels the frontend UI
-- `-L 2222:your-hpc-login-node.edu:22` — tunnels SSH to HPC through port 2222
-
-> **Note:** Replace `your-hpc-login-node.edu` with your actual HPC login node hostname (e.g., `hpc.university.edu`).
-
-### 2. SSH Key for HPC Authentication
-
-Your SSH key for the HPC must be loaded into your SSH agent:
-
-```bash
-ssh-add ~/.ssh/id_rsa        # or your HPC key
-ssh-add -l                    # verify it's loaded
-```
-
-The passphrase must be entered once when loading the key. After that, the agent handles authentication.
-
-### 3. License Files
-
-Place these in the NIR project root (`/home/ubuntu/src/NeuroInsight_Research_Tool/`):
-
-- `license.txt` — FreeSurfer license (free from https://surfer.nmr.mgh.harvard.edu/registration.html)
-- `meld_license.txt` — MELD Graph license (if using cortical lesion detection)
-
-These are automatically uploaded to HPC job directories during submission.
-
----
-
-## Step 1: Connect to HPC in the UI
-
-1. Open **http://localhost:3000** in your browser
-2. Click **Jobs** in the navigation bar
-3. Under **Data Source**, select **HPC**
-4. Under **Compute Source**, select **HPC**
-5. Fill in the SSH connection fields:
-   - **Hostname**: `localhost` (because of the SSH tunnel)
-   - **Username**: your HPC username (e.g., `jsmith`)
-   - **Port**: `2222` (the tunneled port)
-   - **Work Directory**: `~/neuroinsight` (where job directories are created on HPC)
-6. Click **Connect** — you should see "Connected to [hostname]"
-7. Click **Activate SLURM Backend** (or it auto-activates after connection)
-
-> **Important:** After a browser refresh, you do NOT need to reconnect — the SSH connection persists on the backend. However, if the backend server restarts, you must reconnect.
-
----
-
-## Step 2: Select a Pipeline or Workflow
+## Step 1: Select a Pipeline or Workflow
 
 In the right panel, choose between **Plugins** (single tools) or **Workflows** (chained pipelines).
 
@@ -82,7 +28,7 @@ Select the desired workflow from the dropdown (workflow id: `multimodal_epilepsy
 
 ---
 
-## Step 3: Provide Input Data
+## Step 2: Provide Input Data
 
 Input data must already be on the HPC filesystem. Use the **Browse** button to navigate the HPC file system and select your input.
 
@@ -211,7 +157,7 @@ your_input_dir/
 
 1. **SSH to the HPC login node** (or another session where your lab NFS mounts are visible). BDSP/BIND paths such as `/mnt/nfs/Gugger_Lab/...` are only valid there—not on your laptop by default.
 2. **Optional — build one staging folder** from separate BIDS EEG + BIND MRI trees: from a checkout of this repo on the cluster, run `eeg/scripts/stage_bdsp_bind_multimodal.py` (see the script docstring). Write the output under something like `…/Documents/NeuroInsight_Research/multimodal_<id>/`.
-3. **Connect NIR to HPC** — complete **Step 1** in this guide (SSH tunnel to the NIR server, Jobs page **Data Source: HPC**, **Compute: HPC**, fill SSH fields, **Activate SLURM Backend**).
+3. **Connect NIR to HPC** — follow [USER_GUIDE.md § Connecting to HPC](USER_GUIDE.md#connecting-to-hpc-slurm-cluster) (Jobs → **Data Source: HPC**, **Compute: HPC**, **Activate SLURM Backend**).
 4. **Submit** the workflow from the UI (steps below) so SLURM runs on the cluster.
 
 **Required layout — one folder** (EEG and T1 must not be split across unrelated parents):
@@ -227,11 +173,11 @@ your_run_on_hpc/
 **Optional** (same folder or subfolders, depending on your study):
 
 - `models/` with BEM / source space / `src.fif` etc. (see `eeg/docker/README.md`); if absent, plugins may fall back to sphere BEM with a logged warning.
-- FreeSurfer **license**: place `license.txt` in the NIR server project root as for other workflows, or pass `fs_license` if your deployment supports it.
+- FreeSurfer **license:** see [TOOL_LICENSES.md](TOOL_LICENSES.md).
 
-**How to submit (after HPC SSH + UI connection in Step 1):**
+**How to submit (after HPC is connected in the UI):**
 
-1. Confirm **SLURM Backend** is active (you already completed **Step 1: Connect to HPC in the UI**).
+1. Confirm **SLURM Backend** is active.
 2. **Workflows** → **Multimodal Epilepsy Biomarker**.
 3. **Batch** mode → **Browse** on the HPC side to `your_run_on_hpc` (the directory that contains **both** `eeg/raw/` and `T1w.nii.gz`).
 4. **Use This Directory**, then **Submit Directory as Input** (same pattern as BIDS workflows).
@@ -292,7 +238,7 @@ your_folder/
 4. Click **Submit Job**
 
 **Notes:**
-- Requires both `license.txt` (FreeSurfer) and `meld_license.txt` (MELD)
+- Requires FreeSurfer and MELD licenses — [TOOL_LICENSES.md](TOOL_LICENSES.md)
 - T1w file is auto-detected by `T1w` or `T1` in the filename
 - FLAIR file is auto-detected by `FLAIR` or `flair` in the filename
 - Including FLAIR significantly improves lesion detection accuracy
@@ -301,45 +247,11 @@ your_folder/
 
 ---
 
-## Step 4: Monitor Jobs
+## Monitor jobs
 
-### SLURM Queue Monitor
-The **SLURM Queue** panel (on the Jobs page) shows real-time SLURM job status, including:
-- SLURM Job ID
-- Job name
-- State (RUNNING, PENDING, COMPLETED, FAILED)
-- Wall time elapsed
-- Partition and node assignment
+SLURM queue panel, job list, and log locations: [USER_GUIDE.md § Connecting to HPC — Step 5](USER_GUIDE.md#step-5-monitor-jobs).
 
-This refreshes every 10 seconds.
-
-### Job List
-The **Overview of All Processing Jobs** section shows all submitted jobs with:
-- Pipeline name and type (Plugin/Workflow)
-- Current status and phase
-- Compute backend (HPC SLURM / Local Docker)
-- Input path and submission time
-- Progress bar
-
-Click on a completed job to view results in the Dashboard.
-
-### Checking Job Logs on HPC
-Job files are stored at:
-```
-~/neuroinsight/neuroinsight/jobs/<job-id>/
-  ├── inputs/          # Symlinks to input data
-  ├── outputs/         # Pipeline outputs
-  ├── logs/            # SLURM stdout/stderr logs
-  │   ├── slurm-<id>.out
-  │   └── slurm-<id>.err
-  └── scripts/         # Generated sbatch script and licenses
-      ├── run.sh
-      ├── pipeline_cmd.sh
-      ├── license.txt
-      └── meld_license.txt
-```
-
-You can SSH into the HPC and check logs directly:
+Quick log check on the cluster:
 ```bash
 tail -f ~/neuroinsight/neuroinsight/jobs/<job-id>/logs/slurm-*.out
 ```

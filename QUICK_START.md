@@ -7,54 +7,33 @@
 
 - Python 3.9+, Node.js 18+, Docker (Compose v2), 8GB+ RAM
 
-## Setup and Launch
+## Setup, run, and common commands
 
 ```bash
-./research install        # Install deps, start infra, init DB
-./research license        # Set up FreeSurfer / MELD license files
-./research start          # Launch the app
-./research stop           # Stop app + infra containers (keep data volumes)
-./research stop app       # Stop app services only (keep infra running)
-./research stop --all     # Stop everything and remove infra data volumes
+./research install        # deps + infra + DB (first time)
+./research license        # FreeSurfer / MELD — see docs/TOOL_LICENSES.md
+./research start          # launch → http://localhost:3000
+./research stop           # stop app + infra (keep data)
+./research stop app       # stop app only
+./research stop --all     # stop and remove infra data
+./research status         # service health
+./research logs all       # tail logs
+./research health         # backend /health
+./research restart
 ```
 
-Open **http://localhost:3000**.
-
-## Usage
-
-1. Go to **Jobs** tab
-2. Select a pipeline and upload input files
-3. Configure resources (CPU, RAM, GPU)
-4. Submit and monitor progress on the **Dashboard**
-5. View results in the **Viewer**
-
-## Commands
+## Infrastructure only
 
 ```bash
-./research install        # First-time setup (deps + infra + DB)
-./research license        # Set up pipeline license files
-./research start          # Start the application
-./research stop           # Stop app + infra, keep DB/object data
-./research stop app       # Stop app only, keep infra running
-./research stop --all     # Stop app + infra and remove infra data
-./research status         # Check all services
-./research logs all       # Tail all logs
-./research health         # Backend health endpoint
-./research restart        # Restart everything
-```
-
-## Infrastructure
-
-```bash
-./research infra up       # Start PostgreSQL, Redis, MinIO
-./research infra status   # Check health
-./research infra down     # Stop containers
-./research infra reset    # Stop + delete all data
+./research infra up       # PostgreSQL, Redis, MinIO
+./research infra status
+./research infra down
+./research infra reset    # stop + delete data
 ```
 
 ## Development mode
 
 ```bash
-./research-dev start      # Hot-reload backend + HMR frontend
-./research-dev logs all   # Tail all logs
+./research-dev start      # hot-reload backend + HMR frontend
+./research-dev logs all
 ```

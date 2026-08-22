@@ -14,11 +14,8 @@ keeps the desktop/frontend `package.json` in sync.
 
 ## One-time prerequisites
 
-- [ ] **Code-signing — currently SKIPPED (optional).** Releases ship **unsigned**;
-      the workflow warns (doesn't block). Users do a one-time "open anyway" on
-      first launch (see [INSTALL.md](INSTALL.md)). To remove the warnings later,
-      add signing secrets (see [SIGNING_AND_TRUST.md](SIGNING_AND_TRUST.md)) and
-      builds sign + notarize automatically.
+- [ ] **macOS signing secrets** in GitHub Actions (see [SIGNING_AND_TRUST.md](SIGNING_AND_TRUST.md)) — macOS releases are signed/notarized when `CSC_*` and `APPLE_*` secrets are set.
+- [ ] **Windows signing** (optional) — add `WIN_CSC_*` secrets; otherwise Windows ships unsigned with checksums.
 - [ ] **GHCR package is public.** After the first image push, set
       `nir-allinone` to Public: GitHub → your profile → **Packages** →
       `nir-allinone` → **Package settings** → **Change visibility → Public**.
@@ -27,53 +24,43 @@ keeps the desktop/frontend `package.json` in sync.
 
 ## Per-release steps
 
-1. **Bump the version** (must be greater than the last tag; latest desktop tag
-   was `v0.1.8`, so this release is `0.1.9`):
+1. **Bump the version** (must be greater than the last tag):
    ```bash
-   python3 scripts/bump_version.py 0.1.9
-   git commit -am "chore: release v0.1.9"
+   python3 scripts/bump_version.py 0.1.16
+   git commit -am "chore: release v0.1.16"
    git push origin main
    ```
 
 2. **Publish the engine image FIRST** (so it exists when the app looks for it):
    ```bash
-   git tag nir-v0.1.9 && git push origin nir-v0.1.9
+   git tag nir-v0.1.16 && git push origin nir-v0.1.16
    ```
    Wait for the *All-in-One Image (GHCR)* workflow to finish (multi-arch
-   amd64+arm64). It tags `:v0.1.9` and `:latest`.
+   amd64+arm64). It tags `:v0.1.16` and `:latest`.
 
 3. **Confirm the image is pullable without auth** (simulates an end user) — from
    a machine that is **not** logged in to GHCR:
    ```bash
-   docker pull ghcr.io/phindagijimana/nir-allinone:v0.1.9
+   docker pull ghcr.io/phindagijimana/nir-allinone:v0.1.16
    ```
    If this fails with auth/denied, the package isn't public yet (see prereqs).
 
 4. **Build + publish the desktop installers:**
    ```bash
-   git tag desktop-v0.1.9 && git push origin desktop-v0.1.9
+   git tag desktop-v0.1.16 && git push origin desktop-v0.1.16
    ```
    The *Desktop Release (Multi-Platform)* workflow builds macOS/Windows/Linux
-   installers, generates `SHA256SUMS.txt`, and attaches everything to the GitHub
-   Release. With no signing secrets it **warns and ships unsigned** (current
-   setup); add secrets later to sign + notarize.
+   installers, generates checksum files, and attaches everything to the GitHub
+   Release. macOS is signed/notarized when Apple secrets are configured.
 
 5. **Verify the release:**
-   - [ ] GitHub Release has `.dmg`, `.exe`, `.AppImage`/`.deb`, and `SHA256SUMS.txt`.
-   - [ ] (If signed) macOS: `spctl -a -vvv -t install <app>` reports *Notarized
-         Developer ID*. (If unsigned, expect the one-time right-click → Open.)
-   - [ ] Fresh-machine test: on a clean Mac/Win/Linux with only Docker Desktop,
-         install → first launch downloads the engine (~1.8 GB) → lands in the
-         Workspace.
-   - [ ] `docs/INSTALL.md` links resolve and the version matches.
+   - [ ] GitHub Release has `.dmg`, `.exe`, `.AppImage`/`.deb`, and checksum files.
+   - [ ] macOS: `spctl -a -vvv -t install <dmg>` reports *Notarized Developer ID*.
+   - [ ] Fresh-machine test: install → first launch downloads the engine (~1.8 GB).
+   - [ ] `docs/INSTALL.md` links resolve.
 
-## Workflow notes (sanity-check)
+## Workflow notes
 
-- `allinone_image.yml` — correct: multi-arch build of `docker/allinone/Dockerfile`,
-  GHCR login via the built-in `GITHUB_TOKEN` (`packages: write`), tags derived
-  from the `nir-v*` tag (`v<x.y.z>` + `latest`). No change needed; the only
-  external action is making the package **public** (above).
-- `desktop_release_multi.yml` — builds all three platforms, enforces signing on a
-  published tag, runs checksum/trust verification, and attaches artifacts.
-- Tag order matters: **`nir-v*` before `desktop-v*`** so the engine image exists
-  when the new desktop version ships.
+- `allinone_image.yml` — multi-arch GHCR image from `nir-v*` tags.
+- `desktop_release_multi.yml` — multi-platform installers + checksum/trust verification.
+- Tag order: **`nir-v*` before `desktop-v*`** so the engine image exists when the desktop ships.

@@ -1,32 +1,27 @@
 # Signing, Notarization & Trust
 
-> **Current status: signing is SKIPPED.** Releases ship **unsigned**; integrity
-> comes from `SHA256SUMS.txt` + the baked-in `app-integrity.json`. Users do a
-> one-time "open anyway" on first launch (see [INSTALL.md](INSTALL.md)). This
-> document is the runbook for **enabling** signing later — when secrets are
-> present, builds sign + notarize automatically and the warnings disappear.
+> **Current status (v0.1.11+):** **macOS** builds are **signed and notarized**
+> (Developer ID). **Windows** installers are still **unsigned** (SmartScreen +
+> checksum verification — see [INSTALL.md](INSTALL.md)). **Linux** uses published
+> SHA-256 checksums only. Integrity is also checked via `app-integrity.json`
+> baked into each build.
 
-Unsigned builds trigger macOS Gatekeeper ("NeuroInsight can't be opened because
-Apple cannot check it for malicious software") and Windows SmartScreen ("Windows
-protected your PC"). That's acceptable for a pilot but not ideal for broad public
-distribution — so the section below is how to add signing when you're ready.
+This document is the maintainer runbook for signing secrets, CI behavior, and
+user-facing verification. End-user install steps: [INSTALL.md](INSTALL.md).
 
-The release workflow (`.github/workflows/desktop_release_multi.yml`) **warns** (it
-does not block) when signing secrets are absent, so unsigned releases publish.
-Add the secrets below to switch to signed + notarized automatically.
+The release workflow (`.github/workflows/desktop_release_multi.yml`) signs and
+notarizes macOS when Apple secrets are present; Windows signs when `WIN_CSC_*`
+secrets are set. Without secrets, that platform ships unsigned with checksums.
 
-| Platform | Required for a public release? | Mechanism |
-|----------|-------------------------------|-----------|
-| macOS    | Yes — sign **and** notarize   | Developer ID Application cert + Apple notary |
-| Windows  | Yes — Authenticode sign       | OV or (preferred) EV code-signing cert |
-| Linux    | No                            | AppImage/.deb verified via published SHA-256 checksums |
+| Platform | Public release | Mechanism |
+|----------|----------------|-----------|
+| macOS    | Signed + notarized | Developer ID Application cert + Apple notary |
+| Windows  | Unsigned today; sign when cert available | Authenticode (OV/EV) |
+| Linux    | Checksum only | `desktop-release-sha256-*.txt` on each release |
 
 ---
 
-## Interim trust before signing — checksums
-
-Until code-signing certificates are in place, **checksums are the integrity
-mechanism**. They're produced automatically on every build (no separate step):
+## Checksums (all platforms)
 
 - **`SHA256SUMS.txt`** is written next to the installers by the
   `afterAllArtifactBuild` hook (`build/after_all_artifact_build.js`) and
@@ -127,14 +122,6 @@ artifact's **code signature** before applying — so once signing is in place,
 updates are protected too. This is another reason signing is non-optional for
 public distribution.
 
-## Releasing (summary)
+## Releasing
 
-```bash
-python3 scripts/bump_version.py 0.2.0
-git commit -am "chore: release v0.2.0"
-git tag nir-v0.2.0     && git push origin nir-v0.2.0      # GHCR all-in-one image v0.2.0
-git tag desktop-v0.2.0 && git push origin desktop-v0.2.0  # signed installers -> GitHub Release
-```
-
-If signing secrets are missing, the `desktop-v*` build **fails fast** with a
-clear error rather than publishing an unsigned installer.
+See [RELEASING.md](RELEASING.md) for the full tag order and verification checklist.

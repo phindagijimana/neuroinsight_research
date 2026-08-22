@@ -9,7 +9,7 @@ This directory contains packaging/release utilities for NIR Desktop.
 - `SUPPORT_SOP.md` - support SOP + incident workflow (severity, SLAs, escalation, rollback)
 - `LICENSING_OPERATIONS.md` - billing/licensing operational playbook (issue/renew/revoke)
 - `pilot_smoke_test.sh` - quick pre-pilot validation script
-- `SIGNING_AND_TRUST.md` - Phase 6 signing/notarization setup and trust checks
+- `SIGNING_AND_TRUST.md` - pointer to [docs/SIGNING_AND_TRUST.md](../../docs/SIGNING_AND_TRUST.md)
 - `PHASE7_RELIABILITY_GATE.md` - Phase 7 go/conditional/no-go gate definition
 - `pilot_reliability_report.template.json` - reliability evidence template
 - `evaluate_pilot_gate.js` - automated gate evaluator for pilot evidence

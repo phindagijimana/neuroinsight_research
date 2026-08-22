@@ -15,8 +15,7 @@ engine image (~1.8 GB) once.
 | Windows | `NeuroInsight-Setup-0.1.10.exe` |
 | Linux | `NeuroInsight-0.1.10.AppImage` / `.deb` |
 
-> **Unsigned builds:** first open → macOS **right-click → Open**; Windows
-> **More info → Run anyway**. Verify with `desktop-release-sha256-<platform>.txt`.
+Verify downloads: [INSTALL.md](INSTALL.md).
 
 ## Highlights
 **Fixed**

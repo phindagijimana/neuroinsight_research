@@ -1,3 +1,7 @@
+> **Historical planning doc.** The desktop app described here has shipped — for
+> current install and architecture, see [docs/INSTALL.md](docs/INSTALL.md),
+> [desktop/README.md](desktop/README.md), and [desktop/app/README.md](desktop/app/README.md).
+
 # NIR Desktop Client App
 
 This document defines the proposed desktop-client model for NeuroInsight Research (NIR), including architecture, security controls, licensing, and commercialization guidance.

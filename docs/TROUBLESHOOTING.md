@@ -12,7 +12,7 @@ Common issues and solutions for NeuroInsight.
 | macOS Gatekeeper / quarantine (old unsigned builds) | Current releases are signed and notarized — upgrade. Legacy workaround: `xattr -cr "/Applications/NeuroInsight.app"`. |
 | Windows SmartScreen blocks installer | **More info → Run anyway** after verifying the SHA-256 checksum from the release. |
 
-See also [INSTALL.md](INSTALL.md) for first-time setup.
+See [INSTALL.md](INSTALL.md) for first-time setup.
 
 ## Connection Issues
 

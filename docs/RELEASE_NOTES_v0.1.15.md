@@ -14,7 +14,7 @@ engine image (~1.8 GB) once.
 | Windows | `NeuroInsight-Setup-0.1.15.exe` |
 | Linux | `NeuroInsight-0.1.15.AppImage` / `.deb` |
 
-Verify downloads with `desktop-release-sha256-<platform>.txt` on the GitHub Release.
+Verify downloads: [INSTALL.md](INSTALL.md).
 
 ## Highlights
 **Fixed**

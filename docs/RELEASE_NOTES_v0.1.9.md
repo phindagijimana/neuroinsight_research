@@ -18,18 +18,7 @@ Download the installer for your platform below, then see the
 Docker Engine on Linux), ~20 GB free disk, and 8 GB+ RAM. On first launch the app
 downloads its engine image (~1.8 GB) once.
 
-> **These builds are not code-signed.** They're safe — verify with the
-> `desktop-release-sha256-<platform>.txt` checksum file (below) — but your OS
-> shows a one-time prompt on first open:
-> - **macOS:** right-click the app → **Open → Open** (once).
-> - **Windows:** SmartScreen → **More info → Run anyway**.
-> - **Linux:** no prompt.
-
-### Verify your download
-```bash
-# macOS / Linux — use the checksum file matching your installer
-shasum -a 256 -c desktop-release-sha256-macos.txt   # or -linux.txt
-```
+> **Historical note:** v0.1.9 was unsigned. Verify downloads per [INSTALL.md](INSTALL.md).
 
 ## Highlights
 

@@ -4,11 +4,10 @@ Reference guide for deploying and using NeuroInsight. **New desktop users:** sta
 
 ## Contents
 
-- [Desktop install (quick pointer)](#desktop-install-quick-pointer)
-- [Docker installation](#docker-installation)
+- [Docker (source / Linux servers)](#docker-source--linux-servers)
 - [macOS notes](#macos-notes)
 - [Local vs remote deployment](#local-vs-remote-deployment)
-- [Deployment from source](#deployment)
+- [Deployment from source](#deployment-from-source)
 - [Terminology](#terminology)
 - [Compute and data sources](#compute-and-data-sources)
 - [Plugins and workflows](#plugins-and-workflows)
@@ -30,81 +29,28 @@ Reference guide for deploying and using NeuroInsight. **New desktop users:** sta
 - 16 GB+ RAM (32 GB recommended for local processing)
 - SSH key-based authentication (for remote/HPC connections)
 
-## Desktop install (quick pointer)
+## Desktop app
 
-Full install steps, checksum verification, and first launch are in **[INSTALL.md](INSTALL.md)**.
+Install, verify, and first launch: **[INSTALL.md](INSTALL.md)**. Problems:
+**[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**.
 
-| Platform | Installer (example) |
-|---|---|
-| macOS (Apple Silicon) | `NeuroInsight-<version>-arm64.dmg` |
-| Windows | `NeuroInsight-Setup-<version>.exe` |
-| Linux | `NeuroInsight-<version>.AppImage` or `nir-desktop-app_<version>_amd64.deb` |
+To run the web UI without the desktop installer, use [Deployment from source](#deployment-from-source) below.
 
-**macOS:** drag **`NeuroInsight.app`** to **`/Applications`** before first launch. Current builds are signed and notarized — no Gatekeeper workaround needed.
+## Docker (source / Linux servers)
 
-**Windows:** if SmartScreen appears, verify the SHA-256 checksum from the release, then **More info → Run anyway**. You can also right-click the `.exe` → **Properties** → **Unblock**.
+**Desktop users:** install **Docker Desktop** — see [INSTALL.md](INSTALL.md) §1.
 
-**Linux:** `chmod +x NeuroInsight-*.AppImage` then run, or `sudo dpkg -i nir-desktop-app_*_amd64.deb`.
-
-**Legacy / unsigned builds only:** if Gatekeeper or quarantine blocks an old build, after copying to Applications:
-
-```bash
-xattr -cr "/Applications/NeuroInsight.app"
-```
-
-The app was formerly named "NeuroInsight Research"; current releases use **`NeuroInsight.app`**.
-
-### Web UI without the desktop shell
-
-The same NeuroInsight **web interface** is available by running the stack from the repository (for example `./research start`) and opening the backend URL in a browser. That path does not require installing the desktop `.exe`/`.app`/AppImage.
-
-## Docker Installation
-
-Docker is required for local processing and for containerized deployment. Choose the method for your platform.
-
-### Linux (Ubuntu/Debian)
+For **Linux servers** or source deployments without Docker Desktop:
 
 ```bash
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
-
-sudo systemctl start docker
-sudo systemctl enable docker
-
-sudo usermod -aG docker $USER
-```
-
-Log out and back in after the `usermod` command, then verify:
-
-```bash
-docker --version
+sudo usermod -aG docker $USER   # then log out and back in
 docker compose version
-docker run hello-world
 ```
 
-### macOS
-
-1. Install Docker Desktop from https://www.docker.com/products/docker-desktop/
-2. Open Docker Desktop and verify it is running
-3. Open Terminal and verify:
-
-```bash
-docker --version
-docker compose version
-docker run hello-world
-```
-
-### Windows (WSL2)
-
-1. Install Docker Desktop from https://www.docker.com/products/docker-desktop/
-2. In Docker Desktop Settings, go to **Resources > WSL Integration** and enable your Ubuntu distribution
-3. Open an Ubuntu terminal and verify `docker ps` works
-
-If Docker Desktop is not installed yet, also enable WSL2:
-
-```powershell
-wsl --install -d Ubuntu
-```
+On **Windows (WSL2)** for source installs: enable WSL integration in Docker Desktop
+Settings → Resources → WSL Integration.
 
 ---
 
@@ -213,46 +159,24 @@ Regardless of deployment, the SSH key must be on the machine running NeuroInsigh
 
 ---
 
-## Deployment
+## Deployment from source
 
-### Using Docker Compose (recommended)
+**CLI (recommended):** see **[QUICK_START.md](../QUICK_START.md)** for `./research install`, `start`, and `stop`.
+
+**Tool licenses:** [TOOL_LICENSES.md](TOOL_LICENSES.md).
+
+### Docker Compose (alternative)
 
 ```bash
 git clone https://github.com/phindagijimana/neuroinsight_research.git
 cd neuroinsight_research
-
-cp .env.example .env
-# Edit .env to set passwords (POSTGRES_PASSWORD, SECRET_KEY, etc.)
-
+cp .env.example .env   # set POSTGRES_PASSWORD, SECRET_KEY, etc.
 docker compose up -d
 ```
 
-Access the UI at `http://localhost:3000` (or the port configured in `.env`).
-
-### CLI Setup (recommended)
-
-```bash
-git clone https://github.com/phindagijimana/neuroinsight_research.git
-cd neuroinsight_research
-./research install        # Install deps, start infra, init DB
-./research license        # Set up FreeSurfer / MELD license files
-./research start          # Launch the app (production)
-./research stop           # Stop app + infra containers (keep data volumes)
-./research stop app       # Stop app services only (keep infra running)
-./research stop --all     # Stop everything and remove infra data volumes
-```
-
-For development mode with hot-reload:
-
-```bash
-./research-dev start      # Backend auto-reload + Vite HMR frontend
-```
-
-The frontend dev server runs at `http://localhost:3000` and proxies API requests to the backend on port `3051`.
+Open `http://localhost:3000`. For dev hot-reload: `./research-dev start` (see QUICK_START).
 
 ### Configuration
-
-Key environment variables (set in `.env` or passed to Docker):
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
@@ -795,4 +719,4 @@ Check **"Skip SSL verification"** when connecting via a tunnel -- the XNAT certi
 
 ---
 
-MIT License. Individual neuroimaging tools (FreeSurfer, fMRIPrep, etc.) have their own licenses.
+MIT License. Tool-specific licenses: [TOOL_LICENSES.md](TOOL_LICENSES.md).

@@ -18,25 +18,7 @@ engine image (~1.8 GB) once.
 | Windows | `NeuroInsight-Setup-0.1.11.exe` |
 | Linux | `NeuroInsight-0.1.11.AppImage` / `.deb` |
 
-> **Unsigned builds:** first open → macOS **right-click → Open** (on macOS 15
-> Sequoia: **System Settings → Privacy & Security → Open Anyway**); Windows
-> **More info → Run anyway**.
-
-## Verify your download (integrity for unsigned builds)
-The build is unsigned, so verify the checksum after downloading. Compare against
-`desktop-release-sha256-<platform>.txt` attached to this release:
-
-```bash
-# macOS
-shasum -a 256 NeuroInsight-0.1.11-arm64.dmg
-# Linux
-sha256sum NeuroInsight-0.1.11.AppImage
-```
-```powershell
-# Windows (PowerShell)
-Get-FileHash .\NeuroInsight-Setup-0.1.11.exe -Algorithm SHA256
-```
-The printed hash must match the line for your file in the checksum file.
+Verify downloads: [INSTALL.md](INSTALL.md) (checksum files on the GitHub Release).
 
 ## Highlights
 **Fixed**

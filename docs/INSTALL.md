@@ -4,6 +4,8 @@ NeuroInsight is a desktop app for macOS, Windows, and Linux. It runs its
 processing engine locally in a container, so **your data never leaves your
 machine**.
 
+Doc index: [README.md](README.md).
+
 ## System requirements
 
 | | Minimum |
