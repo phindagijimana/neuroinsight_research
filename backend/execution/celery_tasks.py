@@ -440,7 +440,7 @@ def run_docker_job(self, job_id: str, spec_dict: dict) -> dict:
     from docker.errors import ImageNotFound
 
     data_dir = Path(spec_dict.get("data_dir", "./data")).resolve()
-    output_dir = data_dir / "outputs" / job_id
+    output_dir = Path(spec_dict.get("output_dir") or (data_dir / "outputs" / job_id))
 
     # Create output directory structure
     for sub in ("native", "bundle/volumes", "bundle/metrics", "bundle/qc", "logs", "_inputs"):
@@ -926,7 +926,7 @@ def execute_workflow_job_impl(celery_task, job_id: str, spec_dict: dict) -> dict
     in a local thread without a broker (e.g. Celery unavailable).
     """
     data_dir = Path(spec_dict.get("data_dir", "./data")).resolve()
-    output_dir = data_dir / "outputs" / job_id
+    output_dir = Path(spec_dict.get("output_dir") or (data_dir / "outputs" / job_id))
 
     for sub in ("native", "bundle/volumes", "bundle/metrics", "bundle/qc", "logs", "_inputs"):
         (output_dir / sub).mkdir(parents=True, exist_ok=True)

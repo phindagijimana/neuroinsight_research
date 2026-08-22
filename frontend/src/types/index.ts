@@ -196,6 +196,15 @@ export interface Job {
   /** UI-friendly display name (workflow-aware), provided by backend when available */
   display_name?: string;
 
+  /** Human-readable subject/session label, e.g. sub-001 · ses-1 */
+  subject_label?: string | null;
+
+  /** Short input filename or path summary */
+  input_label?: string | null;
+
+  /** Human-readable output folder basename, e.g. sub-001_fs_76625681 */
+  output_folder?: string | null;
+
   /** Pipeline version at time of execution */
   pipeline_version?: string;
 

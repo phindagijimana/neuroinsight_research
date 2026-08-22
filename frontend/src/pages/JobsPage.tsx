@@ -25,6 +25,13 @@ import WorkspacePageHeader from '../components/WorkspacePageHeader';
 import type { ViewerTab } from '../utils/viewerQuery';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { useToast, useConfirm } from '../contexts/NotificationContext';
+import {
+  formatDisplayPath,
+  formatJobInput,
+  formatJobOutput,
+  resolveJobOutputPath,
+} from '../lib/jobPaths';
+import { deriveJobSubjectLabel, jobMatchesFilter } from '../lib/jobLabels';
 
 const SAMPLE_VIEWER_TABS: ViewerTab[] = ['eeg', 'imaging', 'eeg-brain'];
 
@@ -42,6 +49,12 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [deletingJobs, setDeletingJobs] = useState<Set<string>>(new Set());
+  const [pathContext, setPathContext] = useState<{
+    dataDir: string;
+    hostDataDir: string | null;
+    homeDir: string | null;
+  }>({ dataDir: './data', hostDataDir: null, homeDir: null });
+  const [jobFilter, setJobFilter] = useState('');
   const [stats, setStats] = useState({
     total: 0,
     completed: 0,
@@ -120,6 +133,18 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
   // Initial load
   useEffect(() => {
     fetchJobs();
+    apiService
+      .getBrowseRoot()
+      .then(({ data_dir, host_data_dir, local_root }) => {
+        setPathContext({
+          dataDir: data_dir,
+          hostDataDir: host_data_dir ?? null,
+          homeDir: local_root ?? null,
+        });
+      })
+      .catch(() => {
+        /* browse root is optional — paths still show without ~ shortening */
+      });
   }, []);
 
   // Start/stop progress polling based on active jobs
@@ -212,6 +237,11 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
       return bs - as;
     });
   }, [jobs]);
+
+  const visibleJobs = useMemo(() => {
+    if (!jobFilter.trim()) return sortedJobs;
+    return sortedJobs.filter((job) => jobMatchesFilter(job, jobFilter));
+  }, [sortedJobs, jobFilter]);
 
   // Sample jobs are EEG demos — only surface them when the EEG feature is on.
   const hasSampleJobs = useMemo(
@@ -326,14 +356,28 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
         {/* Jobs List */}
         <div className="rounded-2xl border border-gray-200/90 bg-white shadow-sm">
           <div className="border-b border-gray-100 px-4 py-4 sm:px-6">
-            <h2 className="text-lg font-semibold tracking-tight text-gray-900">Recent jobs</h2>
-            <p className="mt-0.5 text-sm text-gray-500">
-              {lastRefreshTime ? (
-                <>Updated {formatDate(lastRefreshTime.toISOString())} · open completed jobs in Results</>
-              ) : (
-                'Open completed jobs in Results'
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight text-gray-900">Recent jobs</h2>
+                <p className="mt-0.5 text-sm text-gray-500">
+                  {lastRefreshTime ? (
+                    <>Updated {formatDate(lastRefreshTime.toISOString())} · search by subject or pipeline</>
+                  ) : (
+                    'Search by subject, pipeline, or job ID'
+                  )}
+                </p>
+              </div>
+              {jobs.length > 0 && (
+                <input
+                  type="search"
+                  value={jobFilter}
+                  onChange={(e) => setJobFilter(e.target.value)}
+                  placeholder="Filter e.g. sub-001"
+                  aria-label="Filter jobs"
+                  className="w-full sm:w-56 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                />
               )}
-            </p>
+            </div>
           </div>
 
           {jobsLoading ? (
@@ -343,9 +387,18 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
               <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-600">No jobs yet — submit a job to see it here.</p>
             </div>
+          ) : visibleJobs.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+              <p className="text-gray-600">No jobs match &ldquo;{jobFilter}&rdquo;.</p>
+            </div>
           ) : (
             <div className="max-h-[min(32rem,calc(100vh-14rem))] divide-y divide-gray-100 overflow-y-auto">
-              {sortedJobs.map((job) => (
+              {visibleJobs.map((job) => {
+                const subjectLabel = job.is_sample_job
+                  ? 'Sample EEG demo'
+                  : deriveJobSubjectLabel(job);
+                const pipelineLabel = job.display_name || job.pipeline_name;
+                return (
                 <div
                   key={job.id}
                   className="px-4 sm:px-6 py-3.5 hover:bg-slate-50/80 transition cursor-pointer"
@@ -356,10 +409,15 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                       <div className="flex items-center gap-3 mb-2">
                         {getStatusIcon(job.status)}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-sm font-medium text-gray-900 truncate min-w-0">
-                              {job.display_name || job.pipeline_name}
+                          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                            <span className="text-sm font-semibold text-gray-900 truncate min-w-0">
+                              {subjectLabel || pipelineLabel}
                             </span>
+                            {subjectLabel && (
+                              <span className="text-xs text-gray-500 truncate max-w-full">
+                                {pipelineLabel}
+                              </span>
+                            )}
                             {job.is_sample_job && (
                               <span className="shrink-0 text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
                                 Sample
@@ -384,12 +442,35 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                               ) : null;
                             })()}
                           </div>
-                          <div className="mt-1 text-xs text-gray-500 truncate">
-                            {job.is_sample_job ? (
-                              <span>Bundled sample data</span>
-                            ) : (
-                              <>Input: {job.input_files[0] || 'N/A'}</>
-                            )}
+                          <div className="mt-1.5 space-y-0.5 text-xs text-gray-500">
+                            {(() => {
+                              const pathOpts = {
+                                containerDataDir: pathContext.dataDir,
+                                hostDataDir: pathContext.hostDataDir,
+                                homeDir: pathContext.homeDir,
+                              };
+                              const inputRaw = formatJobInput(job);
+                              let inputDisplay = inputRaw;
+                              if (!job.is_sample_job && job.input_files.length === 1) {
+                                inputDisplay = formatDisplayPath(inputRaw, pathContext.homeDir);
+                              } else if (!job.is_sample_job && job.input_files.length > 1) {
+                                inputDisplay = `${formatDisplayPath(job.input_files[0], pathContext.homeDir)} (+${job.input_files.length - 1} more)`;
+                              }
+                              const outputRaw = resolveJobOutputPath(job, pathOpts);
+                              const outputDisplay = formatJobOutput(job, pathOpts);
+                              return (
+                                <>
+                                  <p className="font-mono break-all leading-relaxed" title={inputRaw}>
+                                    <span className="font-sans font-medium text-gray-600">Input: </span>
+                                    {inputDisplay}
+                                  </p>
+                                  <p className="font-mono break-all leading-relaxed" title={outputRaw}>
+                                    <span className="font-sans font-medium text-gray-600">Output: </span>
+                                    {outputDisplay}
+                                  </p>
+                                </>
+                              );
+                            })()}
                           </div>
                           <div className="text-xs text-gray-400 mt-1">
                             Submitted: {formatDate(job.submitted_at)}
@@ -454,7 +535,8 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </div>

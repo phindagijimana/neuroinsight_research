@@ -6,6 +6,7 @@
 import React from 'react';
 import type { Job } from '../types';
 import CheckCircle from './icons/CheckCircle';
+import { deriveJobSubjectLabel } from '../lib/jobLabels';
 
 interface JobSelectorProps {
   jobs: Job[];
@@ -43,11 +44,19 @@ export const JobSelector: React.FC<JobSelectorProps> = ({
         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 focus:border-navy-600 bg-white text-gray-900"
       >
         <option value="">-- Select a completed job --</option>
-        {completedJobs.map((job) => (
+        {completedJobs.map((job) => {
+          const subject = deriveJobSubjectLabel(job);
+          const pipeline = job.display_name || job.pipeline_name;
+          const when = new Date(job.completed_at || job.submitted_at).toLocaleDateString();
+          const label = subject
+            ? `${subject} — ${pipeline} (${when})`
+            : `${pipeline} (${when}) · ${job.id.slice(0, 8)}`;
+          return (
           <option key={job.id} value={job.id}>
-            {job.id} - {job.display_name || job.pipeline_name} [{job.execution_mode === 'plugin' ? 'Plugin' : 'Workflow'}] ({new Date(job.completed_at || job.submitted_at).toLocaleDateString()})
+            {label}
           </option>
-        ))}
+          );
+        })}
       </select>
       {selectedJobId && (
         <div className="flex items-center gap-2 text-sm text-green-600">

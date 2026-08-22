@@ -564,7 +564,11 @@ export const apiService = {
   },
 
   /** Default local browse root (host home in desktop container mode, else ./data). */
-  async getBrowseRoot(): Promise<{ local_root: string; data_dir: string }> {
+  async getBrowseRoot(): Promise<{
+    local_root: string;
+    data_dir: string;
+    host_data_dir?: string | null;
+  }> {
     const response = await api.get('/api/browse/root');
     return response.data;
   },

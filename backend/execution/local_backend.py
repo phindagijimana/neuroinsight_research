@@ -98,8 +98,20 @@ class LocalDockerBackend(ExecutionBackend):
         if job_id is None:
             job_id = str(uuid.uuid4())
 
-        # Create output directory
-        output_dir = self.data_dir / "outputs" / job_id
+        # Use spec.output_dir when provided (human-readable folder names).
+        if spec.output_dir:
+            output_dir = Path(spec.output_dir)
+        else:
+            from backend.core.job_labels import build_job_output_dir
+
+            output_dir = build_job_output_dir(
+                self.data_dir,
+                job_id,
+                parameters=spec.parameters or {},
+                input_files=spec.input_files or [],
+                plugin_id=spec.plugin_id or "",
+                pipeline_name=spec.pipeline_name or "",
+            )
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Build spec dict for serialization
@@ -709,7 +721,22 @@ class LocalDockerBackend(ExecutionBackend):
                     logger.debug("Could not remove container during cleanup for %s: %s", job_id[:8], e)
 
         # Remove output directory
-        output_dir = self.data_dir / "outputs" / job_id
+        output_dir = None
+        if job_info and job_info.get("output_dir"):
+            output_dir = Path(job_info["output_dir"])
+        if output_dir is None or not output_dir.exists():
+            try:
+                from backend.core.database import get_db_context
+                from backend.models.job import Job
+
+                with get_db_context() as db:
+                    row = db.query(Job).filter_by(id=job_id).first()
+                    if row and row.output_dir:
+                        output_dir = Path(row.output_dir)
+            except Exception:
+                pass
+        if output_dir is None:
+            output_dir = self.data_dir / "outputs" / job_id
         if output_dir.exists():
             try:
                 shutil.rmtree(str(output_dir))

@@ -21,6 +21,7 @@ import { LoadingState, Spinner } from '../components/LoadingState';
 import WorkspacePageHeader from '../components/WorkspacePageHeader';
 import Button from '../components/Button';
 import StatusBadge from '../components/StatusBadge';
+import { deriveJobSubjectLabel } from '../lib/jobLabels';
 
 const VIEWER_TABS: ViewerTab[] = ['eeg', 'imaging', 'eeg-brain'];
 
@@ -203,9 +204,22 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                    {selectedJob.display_name || selectedJob.pipeline_name}
-                  </h2>
+                  {(() => {
+                    const subject = selectedJob.is_sample_job
+                      ? null
+                      : deriveJobSubjectLabel(selectedJob);
+                    const pipeline = selectedJob.display_name || selectedJob.pipeline_name;
+                    return (
+                      <>
+                        <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                          {subject || pipeline}
+                        </h2>
+                        {subject && (
+                          <p className="text-base text-gray-600 mb-1">{pipeline}</p>
+                        )}
+                      </>
+                    );
+                  })()}
                   <p className="text-gray-600">
                     Job ID: {selectedJob.id} &middot;{' '}
                     {selectedJob.execution_mode === 'workflow' ? 'Workflow' : 'Plugin'} Execution

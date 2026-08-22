@@ -807,6 +807,31 @@ def _enforce_disk_guard_for_submission(plugin_ids: List[str], submission_label: 
         )
 
 
+def _resolve_job_output_dir(
+    job_id: str,
+    *,
+    input_files: List[str],
+    parameters: Optional[dict] = None,
+    plugin_id: str = "",
+    pipeline_name: str = "",
+    workflow_steps: Optional[List[str]] = None,
+) -> str:
+    """Human-readable output path, e.g. data/outputs/sub-001_fs_76625681/."""
+    from backend.core.job_labels import build_job_output_dir
+
+    return str(
+        build_job_output_dir(
+            settings.data_dir,
+            job_id,
+            parameters=parameters or {},
+            input_files=input_files,
+            plugin_id=plugin_id,
+            pipeline_name=pipeline_name,
+            workflow_steps=workflow_steps,
+        )
+    )
+
+
 @app.post("/api/plugins/{plugin_id}/submit")
 def submit_plugin_job(plugin_id: str, request: PluginJobSubmitRequest, db: Session = Depends(get_db)):
     """Submit a job that runs a single plugin."""
@@ -823,12 +848,19 @@ def submit_plugin_job(plugin_id: str, request: PluginJobSubmitRequest, db: Sessi
     resources = _resolve_job_resources(plugin, request.custom_resources)
 
     job_id = str(uuid.uuid4())
-    output_dir = str(Path(settings.data_dir) / "outputs" / job_id)
 
     params = _normalize_submission_parameters_for_plugins([plugin_id], dict(request.parameters))
     if request.custom_resources and request.custom_resources.get("threads"):
         params["threads"] = int(request.custom_resources["threads"])
     params["_plugin_id"] = plugin_id
+
+    output_dir = _resolve_job_output_dir(
+        job_id,
+        input_files=request.input_files,
+        parameters=params,
+        plugin_id=plugin_id,
+        pipeline_name=plugin.name,
+    )
 
     spec = JobSpec(
         pipeline_name=plugin.name,
@@ -938,12 +970,19 @@ def submit_workflow_job(workflow_id: str, request: WorkflowJobSubmitRequest, db:
     resources = _resolve_job_resources(None, request.custom_resources, base_resources=workflow_res)
 
     job_id = str(uuid.uuid4())
-    output_dir = str(Path(settings.data_dir) / "outputs" / job_id)
 
     # Store workflow steps in parameters for the Celery task
     params = _normalize_submission_parameters_for_plugins(step_plugin_ids, dict(request.parameters))
     params["_workflow_steps"] = [step.uses for step in workflow.steps]
     params["_workflow_id"] = workflow_id
+
+    output_dir = _resolve_job_output_dir(
+        job_id,
+        input_files=request.input_files,
+        parameters=params,
+        pipeline_name=workflow.name,
+        workflow_steps=step_plugin_ids,
+    )
 
     spec = JobSpec(
         pipeline_name=workflow.name,
@@ -1072,7 +1111,6 @@ def submit_workflow_batch(workflow_id: str, request: WorkflowBatchSubmitRequest,
     for sid in subject_ids:
         try:
             job_id = str(uuid.uuid4())
-            output_dir = str(batch_root / job_id / "outputs")
 
             params = dict(normalized_base_params)
             params["subject_id"] = sid
@@ -1080,6 +1118,14 @@ def submit_workflow_batch(workflow_id: str, request: WorkflowBatchSubmitRequest,
             params["_workflow_steps"] = step_plugin_ids
             params["_workflow_id"] = workflow_id
             params["_batch_id"] = batch_id
+
+            output_dir = _resolve_job_output_dir(
+                job_id,
+                input_files=[bids_dir],
+                parameters=params,
+                pipeline_name=workflow.name,
+                workflow_steps=step_plugin_ids,
+            )
 
             spec = JobSpec(
                 pipeline_name=workflow.name,
@@ -1166,7 +1212,13 @@ def submit_job(request: JobSubmitRequest, db: Session = Depends(get_db)):
     )
 
     job_id = str(uuid.uuid4())
-    output_dir = str(Path(settings.data_dir) / "outputs" / job_id)
+
+    output_dir = _resolve_job_output_dir(
+        job_id,
+        input_files=input_files,
+        parameters=merged_params,
+        pipeline_name=pipeline_name,
+    )
 
     spec = JobSpec(
         pipeline_name=pipeline_name,
@@ -1228,7 +1280,12 @@ def submit_batch_job(request: BatchSubmitRequest, db: Session = Depends(get_db))
 
     for input_file in input_files:
         job_id = str(uuid.uuid4())
-        output_dir = str(batch_root / job_id / "outputs")
+        output_dir = _resolve_job_output_dir(
+            job_id,
+            input_files=[input_file],
+            parameters={},
+            pipeline_name=request.pipeline_name,
+        )
 
         resources = ResourceSpec(
             memory_gb=pipeline.resources.memory_gb,
@@ -2008,6 +2065,8 @@ def _humanize_identifier(value: str) -> str:
 
 def _build_job_display_fields(job: "Job") -> dict:
     """Build UI-friendly workflow/plugin labels for consistent page naming."""
+    from backend.core.job_labels import build_job_label_fields
+
     payload_name = (job.pipeline_name or "").strip()
     params = job.parameters if isinstance(job.parameters, dict) else {}
     execution_mode = job.execution_mode
@@ -2020,6 +2079,7 @@ def _build_job_display_fields(job: "Job") -> dict:
             "display_name": payload_name,
             "workflow_plugin_count": 0,
             "workflow_id": "",
+            **build_job_label_fields(job),
         }
 
     workflow_name = ""
@@ -2040,6 +2100,7 @@ def _build_job_display_fields(job: "Job") -> dict:
         "display_name": base,
         "workflow_plugin_count": workflow_plugin_count,
         "workflow_id": workflow_id,
+        **build_job_label_fields(job),
     }
 
 
@@ -2472,8 +2533,13 @@ def browse_root():
     """Return the default local browse root for the in-app file tree."""
     data_dir = os.getenv("DATA_DIR", "/data")
     host_home = os.getenv("NIR_HOST_HOME")
+    host_data_dir = os.getenv("NIR_HOST_DATA_DIR")
     local_root = host_home if host_home else data_dir
-    return {"local_root": local_root, "data_dir": data_dir}
+    return {
+        "local_root": local_root,
+        "data_dir": data_dir,
+        "host_data_dir": host_data_dir or None,
+    }
 
 
 # ---------------------------------------------------------------------------
