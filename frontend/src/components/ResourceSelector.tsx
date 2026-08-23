@@ -59,6 +59,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
   /* -- State --------------------------------------------------------------- */
   const [systemRes, setSystemRes] = useState<SystemResources | null>(null);
   const [activeProfile, setActiveProfile] = useState<string>('default');
+  const [expanded, setExpanded] = useState(false);
   const [useCustom, setUseCustom] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [resources, setResources] = useState<ResourceConfig>({
@@ -170,50 +171,56 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
   const overMem = resources.memory_gb > limits.maxMemGb;
   const gpuNeededButMissing = resources.gpu && !limits.gpuAvail;
 
+  const resourceSummary = [
+    profileLabel(activeProfile),
+    `${resources.cpus} CPU`,
+    `${resources.memory_gb} GB`,
+    resources.gpu ? 'GPU' : null,
+  ].filter(Boolean).join(' · ');
+
   /* ----------------------------------------------------------------------- */
   /*  RENDER                                                                 */
   /* ----------------------------------------------------------------------- */
   return (
-    <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 h-full flex flex-col gap-4 shadow-sm">
-      {/* Header + customize toggle */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-          <Settings2 className="h-4 w-4 text-navy-600" />
-          Resource Configuration
-        </h3>
-        <label className="flex items-center gap-2 text-xs">
-          <input
-            type="checkbox"
-            checked={useCustom}
-            onChange={(e) => {
-              setUseCustom(e.target.checked);
-              if (!e.target.checked) resetToProfile(activeProfile);
-            }}
-            className="rounded border-gray-300 text-navy-600 focus:ring-navy-600"
-          />
-          <span className="text-gray-600">Customize</span>
-        </label>
-      </div>
-
-      {/* System capacity bar */}
-      {isRemoteCompute ? (
-        <div className="flex gap-3 text-[10px] text-gray-400 border-b border-gray-100 pb-2">
-          <span>{backendType === 'hpc' ? 'HPC cluster' : 'Remote server'} &mdash; resources allocated per job</span>
-          <span className="text-emerald-500">GPU available</span>
-        </div>
-      ) : systemRes ? (
-        <div className="flex gap-3 text-[10px] text-gray-400 border-b border-gray-100 pb-2">
-          <span>Host: {systemRes.cpu.total_logical} CPUs</span>
-          <span>{systemRes.memory.total_gb} GB RAM</span>
-          {systemRes.gpu.available ? (
-            <span className="text-emerald-500">
-              GPU {systemRes.gpu.devices?.[0]?.name ?? 'available'}
-            </span>
-          ) : (
-            <span>No GPU</span>
+    <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Settings2 className="h-4 w-4 shrink-0 text-navy-600" />
+          <span className="text-sm font-semibold text-gray-900 shrink-0">Resources</span>
+          {!expanded && (
+            <span className="truncate text-xs text-gray-500">{resourceSummary}</span>
           )}
         </div>
-      ) : null}
+        <button
+          type="button"
+          onClick={() => setExpanded((open) => !open)}
+          className="shrink-0 text-xs font-medium text-navy-600 hover:text-navy-800"
+        >
+          {expanded ? 'Done' : 'Customize'}
+        </button>
+      </div>
+
+      {gpuNeededButMissing && !isRemoteCompute && (
+        <p className="mt-2 text-[11px] text-navy-600 flex items-center gap-1">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          GPU requested but none detected on this host.
+        </p>
+      )}
+
+      {expanded && (
+        <div className="mt-3 flex flex-col gap-4 border-t border-gray-200/80 pt-3">
+          <label className="flex items-center gap-2 text-xs self-end">
+            <input
+              type="checkbox"
+              checked={useCustom}
+              onChange={(e) => {
+                setUseCustom(e.target.checked);
+                if (!e.target.checked) resetToProfile(activeProfile);
+              }}
+              className="rounded border-gray-300 text-navy-600 focus:ring-navy-600"
+            />
+            <span className="text-gray-600">Manual overrides</span>
+          </label>
 
       {/* -- Profile selector (only if multiple profiles) ---------------- */}
       {profileNames.length > 1 && (
@@ -252,9 +259,6 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
           {para?.supports_threading && (
             <Row icon={<Layers />} label="Threads" value={`${resources.threads}`} />
           )}
-          <p className="text-[10px] text-gray-400 pt-1">
-            Using {profileLabel(activeProfile)} profile. Check "Customize" to adjust.
-          </p>
         </div>
       ) : (
         /* -- Editable mode -------------------------------------------- */
@@ -431,6 +435,8 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
               ? 'CPU count exceeds host capacity. Job performance may degrade.'
               : 'Memory exceeds host capacity. Job may be killed by the OS.'}
           </p>
+        </div>
+      )}
         </div>
       )}
     </div>

@@ -207,7 +207,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
 
       {/* Dataset List */}
       {!loading && view === 'datasets' && (
-        <div className="space-y-1 max-h-72 overflow-y-auto">
+        <div className="space-y-1 nir-scroll-list">
           {datasets.length === 0 && (
             <p className="text-sm text-gray-500 py-4 text-center">No datasets found</p>
           )}
@@ -256,7 +256,7 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
             </span>
           </div>
 
-          <div className="space-y-0.5 max-h-72 overflow-y-auto border border-gray-100 rounded-md p-1">
+          <div className="space-y-0.5 nir-scroll-list border border-gray-100 rounded-md p-1">
             {items.length === 0 && (
               <p className="text-sm text-gray-500 py-4 text-center">No items found</p>
             )}

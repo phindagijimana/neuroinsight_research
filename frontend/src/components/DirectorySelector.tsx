@@ -253,9 +253,6 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
         <label className="block text-xs font-semibold text-gray-700">
           Batch Input Directory <span className="text-red-500">*</span>
         </label>
-        <p className="text-[11px] text-gray-500">
-          Folder with multiple subjects or NIfTI files
-        </p>
         <div className="flex gap-2">
           <input
             type="text"
@@ -288,12 +285,14 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
       {browserOpen && (
         <div className="border border-navy-600/30 rounded-lg overflow-hidden bg-white shadow-sm">
           {/* Browser header */}
-          <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
+          <div
+            className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200"
+            title="Click a folder to select it as input"
+          >
             <FolderOpen className="h-3.5 w-3.5 text-navy-600" />
             <span className="text-xs font-semibold text-gray-700">
               {mode === 'local' && isDesktopApp() ? 'Local' : mode === 'local' ? 'Server' : mode === 'remote' ? 'Remote' : 'HPC'} File Browser
             </span>
-            <span className="text-[10px] text-gray-400 ml-auto">Click a folder to select it as input</span>
           </div>
 
           {/* Toolbar */}
@@ -319,7 +318,7 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
           </div>
 
           {/* Entries */}
-          <div className="max-h-52 overflow-y-auto">
+          <div className="nir-scroll-list">
             {browserLoading && (
               <div className="flex items-center justify-center py-8">
                 <Spinner size="sm" className="text-navy-600 mr-2" />
@@ -435,7 +434,7 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
               {selectedSubjects.size === bidsSubjects.length ? 'Deselect All' : 'Select All'}
             </button>
           </div>
-          <div className="max-h-40 overflow-y-auto space-y-0.5 bg-white rounded p-2 border border-gray-100">
+          <div className="nir-scroll-list space-y-0.5 bg-white rounded p-2 border border-gray-100">
             {bidsSubjects.map((sid) => (
               <label
                 key={sid}
@@ -470,18 +469,13 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
               Found {directoryInfo.nifti_files.length} NIfTI file{directoryInfo.nifti_files.length !== 1 ? 's' : ''}
             </span>
           </div>
-          <div className="max-h-32 overflow-y-auto space-y-0.5 bg-white rounded p-2">
-            {directoryInfo.nifti_files.slice(0, 10).map((file, idx) => (
+          <div className="nir-scroll-list space-y-0.5 bg-white rounded p-2">
+            {directoryInfo.nifti_files.map((file, idx) => (
               <div key={idx} className="text-[11px] text-gray-700 flex items-center py-0.5">
                 <FileText className="h-3 w-3 mr-1.5 text-green-500 flex-shrink-0" />
                 <span className="truncate">{file}</span>
               </div>
             ))}
-            {directoryInfo.nifti_files.length > 10 && (
-              <p className="text-[11px] text-gray-500 italic pt-1 border-t">
-                ... and {directoryInfo.nifti_files.length - 10} more
-              </p>
-            )}
           </div>
           <div className="mt-2 text-[10px] text-gray-600">
             <p><strong>Input:</strong> {inputDir}</p>

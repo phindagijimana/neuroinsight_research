@@ -258,9 +258,6 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
         <label className="block text-xs font-semibold text-gray-700">
           Subject Path <span className="text-red-500">*</span>
         </label>
-        <p className="text-[11px] text-gray-500">
-          Browse to a subject folder, NIfTI file, or pick from previous results
-        </p>
         <form onSubmit={handleManualSubmit} className="flex gap-2">
           <input
             type="text"
@@ -309,14 +306,9 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
             <span className="text-xs font-semibold text-navy-600">
               Previous Job Results
             </span>
-            <span className="text-[10px] text-gray-400 ml-auto">
-              {executionContext
-                ? 'Showing compatible outputs for selected pipeline'
-                : 'Select a pipeline first for filtered results'}
-            </span>
           </div>
 
-          <div className="max-h-52 overflow-y-auto">
+          <div className="nir-scroll-list">
             {prevLoading && (
               <div className="flex items-center justify-center py-8">
                 <Spinner size="sm" className="text-navy-600 mr-2" />
@@ -395,10 +387,12 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
       {browserOpen && (
         <div className="border border-navy-600/30 rounded-lg overflow-hidden bg-white shadow-sm">
           {/* Header */}
-          <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
+          <div
+            className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200"
+            title="Click a file to select it, or use the current folder"
+          >
             <FolderOpen className="h-3.5 w-3.5 text-navy-600" />
             <span className="text-xs font-semibold text-gray-700">{modeLabel} File Browser</span>
-            <span className="text-[10px] text-gray-400 ml-auto">Click a file to select it, or use a folder</span>
           </div>
 
           {/* Toolbar */}
@@ -424,7 +418,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
           </div>
 
           {/* Entries */}
-          <div className="max-h-52 overflow-y-auto">
+          <div className="nir-scroll-list">
             {loading && (
               <div className="flex items-center justify-center py-8">
                 <Spinner size="sm" className="text-navy-600 mr-2" />

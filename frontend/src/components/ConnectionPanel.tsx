@@ -39,6 +39,8 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connectedInfo, setConnectedInfo] = useState<string>('');
+  const [uploadReady, setUploadReady] = useState<boolean | null>(null);
+  const [agentTarget, setAgentTarget] = useState<string | null>(null);
 
   // SSH fields
   const [host, setHost] = useState('');
@@ -61,10 +63,15 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
     if (platform === 'local') {
       setConnected(true);
       setChecking(false);
+      setUploadReady(null);
+      setAgentTarget(null);
       onConnectionChange(true);
       onPlatformStatusChange?.({ connected: true, uploadReady: true });
       return;
     }
+
+    setUploadReady(null);
+    setAgentTarget(null);
 
     setChecking(true);
     try {
@@ -85,13 +92,18 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
         if (platform === 'pennsieve' && status.connected) {
           try {
             const agent = await apiService.getPennsieveAgentStatus();
+            const ready = !!agent.ready_for_upload;
+            setUploadReady(ready);
+            setAgentTarget(agent.agent_target ?? null);
             onPlatformStatusChange?.({
               connected: true,
-              uploadReady: !!agent.ready_for_upload,
+              uploadReady: ready,
               uploadError: agent.error || null,
               agentTarget: agent.agent_target,
             });
           } catch (agentErr: any) {
+            setUploadReady(false);
+            setAgentTarget(null);
             onPlatformStatusChange?.({
               connected: true,
               uploadReady: false,
@@ -99,6 +111,7 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
             });
           }
         } else {
+          setUploadReady(status.connected);
           onPlatformStatusChange?.({ connected: status.connected, uploadReady: status.connected });
         }
         if (status.connected) {
@@ -149,13 +162,18 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
           onConnectionChange(true);
           try {
             const agent = await apiService.getPennsieveAgentStatus();
+            const ready = !!agent.ready_for_upload;
+            setUploadReady(ready);
+            setAgentTarget(agent.agent_target ?? null);
             onPlatformStatusChange?.({
               connected: true,
-              uploadReady: !!agent.ready_for_upload,
+              uploadReady: ready,
               uploadError: agent.error || null,
               agentTarget: agent.agent_target,
             });
           } catch (agentErr: any) {
+            setUploadReady(false);
+            setAgentTarget(null);
             onPlatformStatusChange?.({
               connected: true,
               uploadReady: false,
@@ -198,6 +216,8 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
     } catch { /* ignore */ }
     setConnected(false);
     setConnectedInfo('');
+    setUploadReady(null);
+    setAgentTarget(null);
     onConnectionChange(false);
     onPlatformStatusChange?.({ connected: false, uploadReady: false });
   };
@@ -206,21 +226,35 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
 
   if (checking) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500">
+      <div className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] text-gray-500">
         <Spinner size="sm" />
-        Checking {platformLabel} connection...
+        Checking {platformLabel}…
       </div>
     );
   }
 
   if (connected) {
     return (
-      <div className="flex items-center justify-between px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-xs">
-        <div className="flex items-center gap-1.5 text-green-700">
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          <span>Connected{connectedInfo ? `: ${connectedInfo}` : ''}</span>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-xs">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-green-700">
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate font-medium">
+            {connectedInfo || platformLabel}
+          </span>
+          {platform === 'pennsieve' && uploadReady != null && (
+            <span
+              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                uploadReady
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-amber-100 text-amber-800'
+              }`}
+              title={agentTarget ? `Agent target: ${agentTarget}` : undefined}
+            >
+              Agent {uploadReady ? 'ready' : 'off'}
+            </span>
+          )}
         </div>
-        <button onClick={handleDisconnect} className="text-green-600 hover:text-red-600 font-medium transition">
+        <button onClick={handleDisconnect} className="shrink-0 text-green-600 hover:text-red-600 font-medium transition">
           Disconnect
         </button>
       </div>

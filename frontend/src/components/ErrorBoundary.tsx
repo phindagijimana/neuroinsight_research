@@ -41,7 +41,7 @@ class ErrorBoundary extends Component<Props, State> {
               reloading the page or resetting the current view.
             </p>
             {this.state.error && (
-              <pre className="text-left text-xs bg-gray-50 border border-gray-200 rounded p-3 mb-4 overflow-auto max-h-32 text-gray-700">
+              <pre className="text-left text-xs bg-gray-50 border border-gray-200 rounded p-3 mb-4 overflow-auto nir-scroll-list text-gray-700">
                 {this.state.error.message}
               </pre>
             )}

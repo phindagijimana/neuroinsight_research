@@ -14,7 +14,7 @@
  */
 
 import React, { useState } from 'react';
-import { Upload, FolderOpen, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Upload, FolderOpen, ArrowLeft } from 'lucide-react';
 import { DirectorySelector } from './DirectorySelector';
 import { SingleFileUpload } from './SingleFileUpload';
 import { PipelineSelector } from './PipelineSelector';
@@ -97,6 +97,22 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
   };
 
   const currentStep = getCurrentStep();
+
+  const platformLabel = dataSource === 'pennsieve' ? 'Pennsieve' : 'XNAT';
+  const platformStatusLine = (() => {
+    switch (currentStep) {
+      case 'browse':
+        return `${platformLabel} · select files to download`;
+      case 'backend':
+        return `${platformLabel} · ${platformFiles.length} file${platformFiles.length !== 1 ? 's' : ''} · choose compute target`;
+      case 'transfer':
+        return `${platformLabel} · downloading…`;
+      case 'pipeline':
+        return `${platformLabel} · ${platformFiles.length} file${platformFiles.length !== 1 ? 's' : ''} · choose pipeline`;
+      default:
+        return `${platformLabel} · connected`;
+    }
+  })();
 
   const bidsWorkflow = isBidsInput(selectedExecution);
   const filesystemBrowseMode =
@@ -368,12 +384,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Process MRI Data</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Browse data on {dataSource === 'pennsieve' ? 'Pennsieve' : 'XNAT'}, download, and process
-            </p>
-          </div>
+          <h2 className="text-2xl font-bold text-gray-900">Process MRI Data</h2>
           {onBack && (
             <button onClick={onBack} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
               &larr; Back
@@ -381,25 +392,14 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
           )}
         </div>
 
-        {/* Step indicators */}
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          {['Connected', 'Browse', 'Backend', 'Transfer', 'Pipeline'].map((label, i) => {
-            const steps: Step[] = ['source', 'browse', 'backend', 'transfer', 'pipeline'];
-            const isActive = steps[i] === currentStep;
-            const isDone = steps.indexOf(currentStep) > i;
-            return (
-              <React.Fragment key={label}>
-                {i > 0 && <ArrowRight className="h-3 w-3 text-gray-300" />}
-                <span className={`px-2 py-1 rounded ${isActive ? 'bg-navy-600 text-white font-medium' : isDone ? 'text-green-700 font-medium' : ''}`}>
-                  {label}
-                </span>
-              </React.Fragment>
-            );
-          })}
-        </div>
+        <p className="text-sm text-gray-500">{platformStatusLine}</p>
 
-        {/* Unified backend selector (stays visible so user can disconnect) */}
-        <BackendSelector {...backendProps} />
+        {/* Backend: data source on early steps, compute-only when files are selected */}
+        <BackendSelector
+          {...backendProps}
+          showPlatformTabs={currentStep === 'browse'}
+          computeOnly={currentStep !== 'browse'}
+        />
 
         {/* Step: Browse */}
         {currentStep === 'browse' && (
@@ -409,19 +409,6 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
         {/* Step: Backend selection for processing */}
         {currentStep === 'backend' && (
           <div className="space-y-3">
-            <div className="bg-navy-50 border border-navy-200 rounded-lg p-3">
-              <p className="text-xs text-navy-700">
-                <strong>{platformFiles.length} file{platformFiles.length !== 1 ? 's' : ''}</strong> selected.
-                Choose where to process, then download:
-              </p>
-            </div>
-            <BackendSelector
-              selectedBackend={selectedBackend}
-              onBackendChange={setSelectedBackend}
-              sshConfig={sshConfig}
-              onSSHConfigChange={setSSHConfig}
-              showPlatformTabs={false}
-            />
             <div className="flex gap-2">
               <button onClick={resetPlatformFlow} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">
                 <ArrowLeft className="h-3.5 w-3.5 inline mr-1" />Back
@@ -474,10 +461,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Process MRI Data</h2>
-          <p className="mt-1 text-sm text-gray-600">Select execution backend, pipeline, and input data</p>
-        </div>
+        <h2 className="text-2xl font-bold text-gray-900">Process MRI Data</h2>
         {onBack && (
           <button
             onClick={onBack}
@@ -489,8 +473,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
       </div>
 
       <div className="space-y-4">
-        {/* Row 1: Unified Backend (with platform tabs) + Resource Configuration */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
+        {/* Row 1: Backend + resources (collapsed by default) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 lg:items-start">
           <BackendSelector {...backendProps} />
 
           {selectedPipeline && (
@@ -502,30 +486,35 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
           )}
         </div>
 
-        {/* Row 2: Input Mode + Pipeline Selector */}
+        {/* Row 2: Pipeline + input */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 lg:items-start">
+          <div className="space-y-3 min-w-0">
+            <PipelineSelector onPipelineSelect={setSelectedPipeline} selectedPipeline={selectedPipeline} onExecutionSelect={setSelectedExecution} />
+          </div>
+
           {selectedPipeline && (
             <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 space-y-4 flex flex-col h-full">
-              <div>
-                <h3 className="text-xs font-semibold tracking-wide text-gray-500 mb-3">Input Mode</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => setMode('single')}
-                    className={`p-3 rounded-lg border text-left transition-all ${mode === 'single' ? 'border-navy-600/40 bg-white shadow-sm ring-1 ring-navy-600/15' : 'border-gray-200/80 bg-white hover:border-gray-300'}`}>
-                    <div className="flex items-center mb-1">
-                      <Upload className={`h-4 w-4 mr-1.5 ${mode === 'single' ? 'text-navy-600' : 'text-gray-400'}`} />
-                      <span className="text-sm font-medium text-gray-900">Single</span>
-                    </div>
-                    <p className="text-xs text-gray-600 text-left">One subject folder or file</p>
-                  </button>
-                  <button onClick={() => setMode('directory')}
-                    className={`p-3 rounded-md border transition-all ${mode === 'directory' ? 'border-navy-600 bg-navy-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                    <div className="flex items-center mb-1">
-                      <FolderOpen className={`h-4 w-4 mr-1.5 ${mode === 'directory' ? 'text-navy-600' : 'text-gray-400'}`} />
-                      <span className="text-sm font-medium text-gray-900">Batch</span>
-                    </div>
-                    <p className="text-xs text-gray-600 text-left">Folder with multiple subjects</p>
-                  </button>
-                </div>
+              <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 self-start">
+                <button
+                  type="button"
+                  onClick={() => setMode('single')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                    mode === 'single' ? 'bg-navy-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Single
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('directory')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                    mode === 'directory' ? 'bg-navy-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  Batch
+                </button>
               </div>
 
               {error && <div className="p-3 bg-red-50 border border-red-200 rounded"><p className="text-xs text-red-700">{error}</p></div>}
@@ -562,10 +551,6 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
               </div>
             </div>
           )}
-
-          <div className="space-y-3 min-w-0">
-            <PipelineSelector onPipelineSelect={setSelectedPipeline} selectedPipeline={selectedPipeline} onExecutionSelect={setSelectedExecution} />
-          </div>
         </div>
       </div>
     </div>

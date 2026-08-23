@@ -112,7 +112,7 @@ const SlurmQueueMonitor: React.FC<SlurmQueueMonitorProps> = ({
           No jobs in SLURM queue
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="nir-scroll-table">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-gray-200">

@@ -135,10 +135,12 @@ const SettingsPage: React.FC = () => {
       {loading ? (
         <LoadingState message="Loading licenses…" className="py-8" />
       ) : (
-          licenses.map((lic) => <LicenseCard key={lic.id} lic={lic} onChange={load} />)
-        )}
+        <div className="nir-scroll-panel space-y-3">
+          {licenses.map((lic) => <LicenseCard key={lic.id} lic={lic} onChange={load} />)}
+        </div>
+      )}
 
-        <p className="text-xs text-gray-400 mt-2">
+      <p className="text-xs text-gray-400 mt-2">
           More licenses appear here automatically as new pipelines require them.
         </p>
     </div>

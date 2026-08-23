@@ -317,7 +317,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           </button>
         )}
       </div>
-      <div className={`min-h-0 flex-1 overflow-y-auto p-1.5 ${embedded ? '' : 'max-h-96'}`}>
+      <div className={`min-h-0 flex-1 overflow-y-auto p-1.5 ${embedded ? '' : 'nir-scroll-panel'}`}>
         {tree.map((item, idx) => (
           <FileTreeItem
             key={`${item.name}-${idx}`}

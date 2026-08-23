@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { Job } from '../types';
 import JobSelector from '../components/JobSelector';
@@ -16,7 +17,6 @@ import RefreshCw from '../components/icons/RefreshCw';
 import Eye from '../components/icons/Eye';
 import Download from '../components/icons/Download';
 import type { ViewerTab } from '../utils/viewerQuery';
-import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { LoadingState, Spinner } from '../components/LoadingState';
 import WorkspacePageHeader from '../components/WorkspacePageHeader';
 import Button from '../components/Button';
@@ -52,7 +52,6 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
   setSelectedJobId,
   setActivePage,
 }) => {
-  const { eegEnabled } = useFeatureFlags();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,7 +59,8 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
   const [provenance, setProvenance] = useState<Provenance | null>(null);
   const [provenanceLoading, setProvenanceLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'stats' | 'files' | 'qc' | 'provenance'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'files' | 'qc'>('stats');
+  const [provenanceOpen, setProvenanceOpen] = useState(false);
   const [pathContext, setPathContext] = useState<{
     dataDir: string;
     hostDataDir: string | null;
@@ -83,16 +83,19 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
 
   useEffect(() => {
     if (selectedJobId) {
-      const job = jobs.find(j => j.id === selectedJobId);
+      const job = jobs.find((j) => j.id === selectedJobId);
       setSelectedJob(job || null);
-      if (job) {
-        fetchProvenance(job.id);
-      }
     } else {
       setSelectedJob(null);
-      setProvenance(null);
     }
+    setProvenance(null);
+    setProvenanceOpen(false);
   }, [selectedJobId, jobs]);
+
+  useEffect(() => {
+    if (!selectedJobId || !provenanceOpen) return;
+    fetchProvenance(selectedJobId);
+  }, [selectedJobId, provenanceOpen]);
 
   const fetchJobs = async () => {
     setLoading(true);
@@ -205,8 +208,8 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
         )}
 
-        {/* Job Selector — only when no job is selected yet */}
-        {!loading && jobs.length > 0 && !selectedJob && completedJobs.length > 0 && (
+        {/* Job Selector — only when nothing selected and header selector is not enough */}
+        {!loading && jobs.length > 0 && !selectedJobId && completedJobs.length > 0 && (
           <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4">
             <JobSelector
               jobs={jobs}
@@ -255,23 +258,19 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                   <p className="mt-2 text-sm text-gray-500">
                     <span className="font-mono text-gray-700">{jobShortId(selectedJob)}</span>
                     {' · '}
-                    {selectedJob.execution_mode === 'workflow' ? 'Workflow' : 'Plugin'}
-                    {' · '}
                     {jobComputeLabel(selectedJob)}
                     {' · '}
                     {getJobDuration(selectedJob)}
                     {' · '}
-                    {new Date(selectedJob.submitted_at).toLocaleString(undefined, {
+                    {new Date(selectedJob.submitted_at).toLocaleDateString(undefined, {
                       month: 'short',
                       day: 'numeric',
                       year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
                     })}
                     {selectedJob.is_sample_job && (
                       <>
                         {' · '}
-                        <span className="font-medium text-emerald-700">Bundled sample</span>
+                        <span className="font-medium text-emerald-700">Sample</span>
                       </>
                     )}
                   </p>
@@ -292,11 +291,6 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                   )}
                 </div>
               </div>
-              {eegEnabled && selectedJob.is_sample_job && selectedJob.status === 'completed' && (
-                <p className="mt-4 text-sm text-emerald-800 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
-                  Open in Viewer picks the right mode for this sample.
-                </p>
-              )}
               {selectedJob.output_dir && (
                 <PathLocationBar
                   compact
@@ -319,12 +313,13 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
               )}
             </div>
 
-            {/* Tab Navigation */}
+            {/* Primary results tabs */}
             {selectedJob.status === 'completed' && (
+              <>
               <div className="rounded-xl border border-gray-200 bg-white">
                 <div className="border-b border-gray-200">
                   <nav className="flex -mb-px overflow-x-auto">
-                    {(['stats', 'files', 'qc', 'provenance'] as const).map((tab) => (
+                    {(['stats', 'files', 'qc'] as const).map((tab) => (
                       <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -337,7 +332,6 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                         {tab === 'stats' && 'Statistics'}
                         {tab === 'files' && 'Output Files'}
                         {tab === 'qc' && 'QC Images'}
-                        {tab === 'provenance' && 'Provenance'}
                       </button>
                     ))}
                   </nav>
@@ -361,70 +355,102 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                   {activeTab === 'qc' && (
                     <QCImageGallery jobId={selectedJob.id} />
                   )}
-
-                  {activeTab === 'provenance' && (
-                    <div className="p-6">
-                      {provenanceLoading ? (
-                        <div className="flex items-center gap-3">
-                          <Spinner size="md" className="text-navy-600" />
-                          <span className="text-gray-600">Loading provenance...</span>
-                        </div>
-                      ) : provenance ? (
-                        <div className="space-y-4">
-                          <div>
-                            <h4 className="text-sm font-semibold text-gray-700 mb-2">Container Image</h4>
-                            <code className="text-sm bg-gray-100 px-3 py-1.5 rounded font-mono">
-                              {provenance.container_image || 'N/A'}
-                            </code>
-                          </div>
-                          {provenance.input_hashes && Object.keys(provenance.input_hashes).length > 0 && (
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-700 mb-2">Input File Hashes (SHA-256)</h4>
-                              <div className="bg-gray-50 rounded p-3 space-y-1">
-                                {Object.entries(provenance.input_hashes).map(([file, hash]) => (
-                                  <div key={file} className="text-xs font-mono">
-                                    <span className="text-gray-600">{file}:</span>{' '}
-                                    <span className="text-gray-900">{hash}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {provenance.parameters && Object.keys(provenance.parameters).length > 0 && (
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-700 mb-2">Parameters</h4>
-                              <pre className="text-xs bg-gray-50 rounded p-3 overflow-x-auto font-mono">
-                                {JSON.stringify(provenance.parameters, null, 2)}
-                              </pre>
-                            </div>
-                          )}
-                          {provenance.reproducibility_command && (
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-700 mb-2">Reproduce Command</h4>
-                              <pre className="text-xs bg-gray-900 text-green-400 rounded p-3 overflow-x-auto font-mono">
-                                {provenance.reproducibility_command}
-                              </pre>
-                            </div>
-                          )}
-                          {provenance.metadata_audit && (
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                                Metadata Audit
-                                {provenance.metadata_audit_path ? ` (${provenance.metadata_audit_path})` : ''}
-                              </h4>
-                              <pre className="text-xs bg-gray-50 rounded p-3 overflow-x-auto font-mono">
-                                {provenance.metadata_audit}
-                              </pre>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-500">No provenance data available for this job.</p>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
+
+              {/* Provenance — collapsed by default, loaded on expand */}
+              <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setProvenanceOpen((open) => !open)}
+                  className="flex w-full items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-gray-50/80 transition"
+                  aria-expanded={provenanceOpen}
+                >
+                  <span className="text-sm font-semibold text-gray-800">
+                    Reproducibility &amp; provenance
+                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${provenanceOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+
+                {provenanceOpen && (
+                  <div className="border-t border-gray-100 px-5 py-4 space-y-4">
+                    {provenanceLoading ? (
+                      <div className="flex items-center gap-3 py-2">
+                        <Spinner size="md" className="text-navy-600" />
+                        <span className="text-sm text-gray-600">Loading provenance…</span>
+                      </div>
+                    ) : provenance ? (
+                      <>
+                        <div>
+                          <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1.5">
+                            Container image
+                          </h4>
+                          <code className="block text-sm bg-gray-100 px-3 py-1.5 rounded font-mono break-all">
+                            {provenance.container_image || 'N/A'}
+                          </code>
+                        </div>
+
+                        {provenance.reproducibility_command && (
+                          <div>
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1.5">
+                              Reproduce command
+                            </h4>
+                            <pre className="text-xs bg-gray-900 text-green-400 rounded p-3 overflow-x-auto font-mono nir-scroll-list">
+                              {provenance.reproducibility_command}
+                            </pre>
+                          </div>
+                        )}
+
+                        {provenance.input_hashes && Object.keys(provenance.input_hashes).length > 0 && (
+                          <details className="group rounded-lg border border-gray-200 bg-gray-50/50">
+                            <summary className="cursor-pointer list-none px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg [&::-webkit-details-marker]:hidden">
+                              Input file hashes ({Object.keys(provenance.input_hashes).length})
+                            </summary>
+                            <div className="border-t border-gray-200 px-3 py-2 space-y-1 nir-scroll-list">
+                              {Object.entries(provenance.input_hashes).map(([file, hash]) => (
+                                <div key={file} className="text-xs font-mono break-all">
+                                  <span className="text-gray-600">{file}:</span>{' '}
+                                  <span className="text-gray-900">{hash}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+
+                        {provenance.parameters && Object.keys(provenance.parameters).length > 0 && (
+                          <details className="group rounded-lg border border-gray-200 bg-gray-50/50">
+                            <summary className="cursor-pointer list-none px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg [&::-webkit-details-marker]:hidden">
+                              Parameters
+                            </summary>
+                            <pre className="border-t border-gray-200 px-3 py-2 text-xs overflow-x-auto font-mono nir-scroll-list">
+                              {JSON.stringify(provenance.parameters, null, 2)}
+                            </pre>
+                          </details>
+                        )}
+
+                        {provenance.metadata_audit && (
+                          <details className="group rounded-lg border border-gray-200 bg-gray-50/50">
+                            <summary className="cursor-pointer list-none px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg [&::-webkit-details-marker]:hidden">
+                              Metadata audit
+                              {provenance.metadata_audit_path
+                                ? ` (${provenance.metadata_audit_path})`
+                                : ''}
+                            </summary>
+                            <pre className="border-t border-gray-200 px-3 py-2 text-xs overflow-x-auto font-mono nir-scroll-list">
+                              {provenance.metadata_audit}
+                            </pre>
+                          </details>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-500 py-1">No provenance data available for this job.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              </>
             )}
 
             {/* Running / pending / failed (show backend error_message when failed) */}
@@ -450,7 +476,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-red-900">This job failed</p>
                     {selectedJob.error_message ? (
-                      <pre className="text-xs text-red-900 whitespace-pre-wrap break-words font-mono bg-white/60 rounded p-3 border border-red-200 max-h-64 overflow-y-auto">
+                      <pre className="text-xs text-red-900 whitespace-pre-wrap break-words font-mono bg-white/60 rounded p-3 border border-red-200 nir-scroll-list">
                         {selectedJob.error_message}
                       </pre>
                     ) : (

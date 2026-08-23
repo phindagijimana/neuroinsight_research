@@ -15,7 +15,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Monitor, Server, AlertCircle, Wifi,
-  Settings2, Cloud, Database, Globe, CheckCircle2, KeyRound,
+  Settings2, Cloud, Database, Globe, CheckCircle2, KeyRound, ChevronDown,
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { DataSourceType, PlatformConnection } from '../types';
@@ -43,6 +43,8 @@ interface BackendSelectorProps {
   /** Fired when SSH connect/disconnect state changes (remote / HPC). */
   onSSHConnectionChange?: (connected: boolean) => void;
   showPlatformTabs?: boolean;
+  /** Compute row + SSH only (platform transfer step). */
+  computeOnly?: boolean;
 }
 
 interface HPCConfig {
@@ -73,12 +75,14 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
   onPlatformDisconnect,
   onSSHConnectionChange,
   showPlatformTabs = true,
+  computeOnly = false,
 }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connected' | 'error'>('disconnected');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [sshExpanded, setSshExpanded] = useState(false);
 
   const [host, setHost] = useState(sshConfig?.host || '');
   const [username, setUsername] = useState(sshConfig?.username || '');
@@ -181,6 +185,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
       const data = await resp.json();
       if (data.connected) {
         setSSHConnected(true);
+        setSshExpanded(true);
         if (selectedBackend === 'remote_hpc') fetchPartitions();
         if (computeNeedsSSH) {
           switchToRemote(true);
@@ -310,7 +315,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
     <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 h-full flex flex-col shadow-sm">
 
       {/* Row 1: Data Source -- all 5 options */}
-      {showPlatformTabs && (
+      {showPlatformTabs && !computeOnly && (
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1.5">
             <h3 className="text-xs font-semibold text-gray-500 tracking-wider">Data Source</h3>
@@ -368,19 +373,45 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
 
       {/* SSH Configuration -- shown when either data source or compute needs SSH */}
       {needsSSH && (
-        <div className="border-t border-gray-200 pt-3 mt-1 flex-1 overflow-y-auto">
-          {connectionStatus === 'connected' && (
-            <div className="flex items-center justify-between mb-3 px-2 py-1.5 bg-green-50 border border-green-200 rounded text-xs">
-              <div className="flex items-center gap-1.5 text-green-700">
-                <Wifi className="h-3.5 w-3.5" />
-                <span>Connected to <strong>{host}</strong></span>
+        <div className="border-t border-gray-200 pt-3 mt-1">
+          {connectionStatus === 'connected' ? (
+            <div className="flex items-center justify-between gap-2 px-2 py-1.5 bg-green-50 border border-green-200 rounded text-xs">
+              <div className="flex items-center gap-1.5 text-green-700 min-w-0">
+                <Wifi className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Connected to <strong>{host}</strong></span>
               </div>
-              <button onClick={disconnect} className="text-green-600 hover:text-red-600 font-medium transition">
-                Disconnect
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSshExpanded((open) => !open)}
+                  className="text-green-700 hover:text-navy-700 font-medium transition flex items-center gap-0.5"
+                >
+                  {sshExpanded ? 'Hide' : 'Settings'}
+                  <ChevronDown className={`h-3 w-3 transition-transform ${sshExpanded ? 'rotate-180' : ''}`} />
+                </button>
+                <button onClick={disconnect} className="text-green-600 hover:text-red-600 font-medium transition">
+                  Disconnect
+                </button>
+              </div>
             </div>
-          )}
+          ) : !sshExpanded ? (
+            <button
+              type="button"
+              onClick={() => setSshExpanded(true)}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition"
+            >
+              <span className="flex items-center gap-1.5">
+                <Server className="h-3.5 w-3.5 text-navy-600" />
+                Connect SSH to browse or run jobs remotely
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+            </button>
+          ) : null}
 
+          {sshExpanded && (
+        <div className="mt-3 flex-1 overflow-y-auto nir-scroll-list">
+          {connectionStatus !== 'connected' && (
+            <>
           <div className="mb-3">
             <h4 className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
               <Server className="h-3.5 w-3.5" />
@@ -388,7 +419,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
             </h4>
           </div>
 
-          {selectedBackend === 'remote_hpc' && connectionStatus !== 'connected' && (
+          {selectedBackend === 'remote_hpc' && (
             <p className="mb-3 text-xs text-gray-500">
               On a private network? Connect VPN first.{' '}
               <a href={USER_GUIDE_URL} target="_blank" rel="noreferrer" className="text-navy-600 hover:underline">
@@ -396,16 +427,19 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
               </a>
             </p>
           )}
+            </>
+          )}
 
           <div className="space-y-3">
+            {connectionStatus !== 'connected' && (
+              <>
             {sshHosts.length > 0 && (
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Saved host (from ~/.ssh/config)</label>
                 <select
                   defaultValue=""
-                  disabled={connectionStatus === 'connected'}
                   onChange={(e) => applySshAlias(e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white focus:ring-1 focus:ring-green-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white focus:ring-1 focus:ring-green-500 focus:border-transparent"
                 >
                   <option value="">— pick a saved host or enter manually —</option>
                   {sshHosts.map((h) => (
@@ -420,8 +454,8 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
               <label className="block text-xs font-medium text-gray-600 mb-1">Hostname *</label>
               <input
                 type="text" value={host} onChange={(e) => setHost(e.target.value)}
-                placeholder="hpc.university.edu" disabled={connectionStatus === 'connected'}
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
+                placeholder="hpc.university.edu"
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 focus:border-transparent"
               />
             </div>
 
@@ -430,21 +464,20 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
                 <label className="block text-xs font-medium text-gray-600 mb-1">Username *</label>
                 <input
                   type="text" value={username} onChange={(e) => setUsername(e.target.value)}
-                  placeholder="your_username" disabled={connectionStatus === 'connected'}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
+                  placeholder="your_username"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 focus:border-transparent"
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Port</label>
                 <input
                   type="number" value={port} onChange={(e) => setPort(parseInt(e.target.value) || 22)}
-                  placeholder="22" disabled={connectionStatus === 'connected'}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
+                  placeholder="22"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-green-500 focus:border-transparent"
                 />
               </div>
             </div>
 
-            {connectionStatus !== 'connected' && (
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Password <span className="text-gray-400 font-normal">— only if your cluster uses password/Duo</span>
@@ -459,9 +492,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
                   <p className="text-xs text-gray-500 mt-1">A Duo push may appear on your phone — approve it to finish connecting.</p>
                 )}
               </div>
-            )}
 
-            {connectionStatus !== 'connected' && (
               <div className="flex items-center gap-2">
                 <button
                   onClick={testConnection}
@@ -477,6 +508,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
                   </div>
                 )}
               </div>
+              </>
             )}
 
             {connectionStatus === 'connected' && (
@@ -566,21 +598,22 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
               </>
             )}
           </div>
+          {connectionStatus !== 'connected' && (
+            <button
+              type="button"
+              onClick={() => setSshExpanded(false)}
+              className="mt-3 text-xs text-gray-500 hover:text-gray-700"
+            >
+              Cancel
+            </button>
+          )}
         </div>
-      )}
-
-      {/* Local backend info */}
-      {!isPlatformSelected && selectedBackend === 'local' && !dataSourceNeedsSSH && (
-        <div className="border-t border-gray-200 pt-3 mt-1">
-          <div className="flex items-center gap-1.5 text-xs text-gray-600">
-            <Monitor className="h-3.5 w-3.5" />
-            <span>Jobs run on this machine using Docker containers. No HPC scheduling.</span>
-          </div>
+          )}
         </div>
       )}
 
       {/* Platform auth forms (Pennsieve / XNAT) */}
-      {isPlatformSelected && !isPlatformConnected && (
+      {!computeOnly && isPlatformSelected && !isPlatformConnected && (
         <div className="border-t border-gray-200 pt-3 mt-1 space-y-3">
           <h4 className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
             <KeyRound className="h-3.5 w-3.5" />

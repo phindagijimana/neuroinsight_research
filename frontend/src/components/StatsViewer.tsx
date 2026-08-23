@@ -366,7 +366,7 @@ export const StatsViewer: React.FC<StatsViewerProps> = ({ jobId, pipelineName })
                       )}
 
                       {/* Data table */}
-                      <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+                      <div className="overflow-x-auto nir-scroll-panel">
                         <table className="w-full text-sm">
                           <thead className="sticky top-0 bg-gray-50 z-10">
                             <tr>
@@ -461,7 +461,7 @@ export const StatsViewer: React.FC<StatsViewerProps> = ({ jobId, pipelineName })
           )}
 
           {section.table && section.table.length > 0 && (
-            <div className="p-4 overflow-x-auto max-h-80 overflow-y-auto">
+            <div className="p-4 overflow-x-auto nir-scroll-panel">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-white">
                   <tr className="border-b border-gray-200">

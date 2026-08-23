@@ -261,19 +261,21 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
     : null;
   const pipelineLabel = job ? jobPipelineLabel(job) : '';
 
-  const viewerSubtitle =
-    viewerTab === 'eeg'
-      ? 'Time-series preview from job outputs.'
-      : viewerTab === 'eeg-brain'
-        ? 'Combined EEG and brain imaging.'
-        : 'Multi-planar NIfTI / MGZ viewer with overlays.';
+  const jobMetaLine = job
+    ? [
+        subjectLabel ? pipelineLabel : null,
+        jobShortId(job),
+        localVolume ? localVolume.name : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
 
   return (
     <div className="flex min-h-full flex-col bg-gray-50">
       <div className="mx-auto flex w-full max-w-[1800px] flex-1 flex-col px-4 py-6 sm:px-6 lg:px-8">
         <WorkspacePageHeader
           title="Viewer"
-          subtitle={viewerSubtitle}
           actions={
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               {!loading && completedJobs.length > 0 && (
@@ -316,38 +318,15 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
           </div>
         )}
 
-        {!loading && !selectedJobId && completedJobs.length > 0 && (
-          <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4">
-            <JobSelector
-              jobs={jobs}
-              selectedJobId={selectedJobId}
-              onJobSelect={setSelectedJobId}
-              label="Select a completed job"
-            />
-          </div>
-        )}
-
         {job && (
-          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mb-4 flex flex-col gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <p className="truncate text-base font-semibold text-gray-900">
+              <p className="truncate text-sm font-semibold text-gray-900">
                 {subjectLabel || pipelineLabel}
               </p>
-              <p className="mt-0.5 text-sm text-gray-500">
-                {subjectLabel && (
-                  <>
-                    <span>{pipelineLabel}</span>
-                    <span className="mx-1.5 text-gray-300">·</span>
-                  </>
-                )}
-                <span className="font-mono text-gray-600">{jobShortId(job)}</span>
-                {localVolume && (
-                  <>
-                    <span className="mx-1.5 text-gray-300">·</span>
-                    <span className="text-navy-600">Local file: {localVolume.name}</span>
-                  </>
-                )}
-              </p>
+              {jobMetaLine && (
+                <p className="mt-0.5 truncate text-xs text-gray-500">{jobMetaLine}</p>
+              )}
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               <StatusBadge status={job.status} />
@@ -409,14 +388,14 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
               <div className="flex h-full min-h-[420px] flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50/80 p-12 text-center">
                 <Brain className="mx-auto mb-4 h-16 w-16 text-gray-300" />
                 <h3 className="mb-2 text-lg font-semibold text-gray-900">
-                  {completedJobs.length === 0 ? 'No completed jobs yet' : 'Choose a volume to view'}
+                  {completedJobs.length === 0 ? 'No completed jobs yet' : 'Choose a volume'}
                 </h3>
                 <p className="mx-auto max-w-md text-sm text-gray-600">
                   {completedJobs.length === 0
                     ? 'Run a job first, then open its outputs here.'
                     : drawerOpen
-                      ? 'Select a NIfTI or MGZ file from the list on the left.'
-                      : 'Open the file list on the left, then pick a volume.'}
+                      ? 'Pick a NIfTI or MGZ file from the list on the left.'
+                      : 'Open the file list, then pick a volume.'}
                 </p>
                 {completedJobs.length > 0 && selectedJobId && !drawerOpen && (
                   <Button className="mt-4" onClick={toggleDrawer}>
@@ -431,7 +410,7 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
                 <Brain className="mx-auto mb-4 h-16 w-16 text-gray-300" />
                 <h3 className="mb-2 text-lg font-semibold text-gray-900">Add a brain volume</h3>
                 <p className="mb-4 text-sm text-gray-600">
-                  Pick a NIfTI / MGZ volume from the file list on the left.
+                  Pick a brain volume from the file list on the left.
                 </p>
                 <EegViewerPanel jobId={selectedJobId} eegRelativePath={eegFileRelPath} compact />
               </div>

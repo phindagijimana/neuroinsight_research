@@ -74,8 +74,6 @@ function TransferPage() {
   const [rightUploadReady, setRightUploadReady] = useState(true);
   const [leftUploadError, setLeftUploadError] = useState<string | null>(null);
   const [rightUploadError, setRightUploadError] = useState<string | null>(null);
-  const [leftAgentTarget, setLeftAgentTarget] = useState<string | null>(null);
-  const [rightAgentTarget, setRightAgentTarget] = useState<string | null>(null);
 
   // Transfer state
   const [activeTransfers, setActiveTransfers] = useState<ActiveTransfer[]>([]);
@@ -159,7 +157,6 @@ function TransferPage() {
     if (leftPlatform !== 'pennsieve') {
       setLeftUploadReady(true);
       setLeftUploadError(null);
-      setLeftAgentTarget(null);
     }
   }, [leftPlatform]);
 
@@ -167,7 +164,6 @@ function TransferPage() {
     if (rightPlatform !== 'pennsieve') {
       setRightUploadReady(true);
       setRightUploadError(null);
-      setRightAgentTarget(null);
     }
   }, [rightPlatform]);
 
@@ -308,12 +304,7 @@ function TransferPage() {
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col" style={{ height: 'calc(100vh - 140px)' }}>
       {/* Title */}
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Data Transfer</h1>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Browse and transfer data between any two platforms
-          </p>
-        </div>
+        <h1 className="text-xl font-bold text-gray-900">Data Transfer</h1>
         <button
           onClick={() => setShowHistory(!showHistory)}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600"
@@ -360,22 +351,8 @@ function TransferPage() {
               onPlatformStatusChange={(status) => {
                 setLeftUploadReady(status.uploadReady ?? status.connected);
                 setLeftUploadError(status.uploadError ?? null);
-                setLeftAgentTarget(status.agentTarget ?? null);
               }}
             />
-            {leftPlatform === 'pennsieve' && leftConnected && (
-              <div
-                className={`mt-1 px-2 py-1 rounded text-[11px] border ${
-                  leftUploadReady
-                    ? 'bg-green-50 border-green-200 text-green-700'
-                    : 'bg-amber-50 border-amber-200 text-amber-700'
-                }`}
-              >
-                {leftUploadReady
-                  ? `Pennsieve Agent: Ready${leftAgentTarget ? ` (${leftAgentTarget})` : ''}`
-                  : `Pennsieve Agent: Not Ready${leftAgentTarget ? ` (${leftAgentTarget})` : ''}`}
-              </div>
-            )}
           </div>
           <div className="flex-1 min-h-0">
             {leftConnected ? (
@@ -485,22 +462,8 @@ function TransferPage() {
               onPlatformStatusChange={(status) => {
                 setRightUploadReady(status.uploadReady ?? status.connected);
                 setRightUploadError(status.uploadError ?? null);
-                setRightAgentTarget(status.agentTarget ?? null);
               }}
             />
-            {rightPlatform === 'pennsieve' && rightConnected && (
-              <div
-                className={`mt-1 px-2 py-1 rounded text-[11px] border ${
-                  rightUploadReady
-                    ? 'bg-green-50 border-green-200 text-green-700'
-                    : 'bg-amber-50 border-amber-200 text-amber-700'
-                }`}
-              >
-                {rightUploadReady
-                  ? `Pennsieve Agent: Ready${rightAgentTarget ? ` (${rightAgentTarget})` : ''}`
-                  : `Pennsieve Agent: Not Ready${rightAgentTarget ? ` (${rightAgentTarget})` : ''}`}
-              </div>
-            )}
           </div>
           <div className="flex-1 min-h-0">
             {rightConnected ? (
@@ -526,6 +489,7 @@ function TransferPage() {
       {activeTransfers.length > 0 && (
         <div className="mt-3 space-y-2">
           <h3 className="text-xs font-semibold text-gray-600 tracking-wider">Active Transfers</h3>
+          <div className="nir-scroll-list space-y-2">
           {activeTransfers.map(t => (
             <div key={t.id} className="flex items-center gap-3">
               <span className="text-[10px] text-gray-500 whitespace-nowrap">
@@ -541,12 +505,13 @@ function TransferPage() {
               </div>
             </div>
           ))}
+          </div>
         </div>
       )}
 
       {/* Transfer history */}
       {showHistory && recentTransfers.length > 0 && (
-        <div className="mt-3 bg-white rounded-lg border border-gray-200 p-3 max-h-40 overflow-y-auto">
+        <div className="mt-3 bg-white rounded-lg border border-gray-200 p-3 nir-scroll-list">
           <h3 className="text-xs font-semibold text-gray-600 tracking-wider mb-2">Recent Transfers</h3>
           <div className="divide-y divide-gray-50">
             {recentTransfers.slice(0, 20).map((t: any) => (
