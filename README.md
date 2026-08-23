@@ -18,6 +18,30 @@ start Docker, and launch.
 **Stuck?** [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — Docker detection,
 SmartScreen, App Translocation, and engine startup.
 
+### Updating
+
+NeuroInsight has two parts: the **desktop app** (Electron shell) and the **engine**
+(Docker container with the workspace UI). Both should match the same version.
+
+**Check for updates (macOS):** click the NeuroInsight window, then use the **menu
+bar at the top of the screen** → **Help → Check for Updates…** (Help is not inside
+the app window). The app also checks silently on startup; if you are already on the
+latest version, no dialog appears.
+
+**In-app flow:** confirm download → **Restart Now** (usually **~30 sec – 2 min** to
+relaunch; longer if a new engine image must download).
+
+**Manual install:** use the **`.dmg`** from
+[Releases](https://github.com/phindagijimana/neuroinsight_research/releases) and drag
+**NeuroInsight.app** to **`/Applications`**. Do **not** use the `-arm64-mac.zip` for
+manual install — that file is for auto-update only.
+
+**After updating the desktop app**, refresh the workspace UI:
+**NeuroInsight → Settings** → **Stop engine** → **Start engine** → **Open Workspace**.
+
+Full guide: **[docs/DESKTOP_UPDATES.md](docs/DESKTOP_UPDATES.md)** (timing, engine
+refresh, troubleshooting).
+
 **Advanced:** remote servers, HPC/SLURM, Pennsieve, and XNAT — see
 [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
@@ -95,6 +119,7 @@ trust (code signing / notarization), see [docs/SIGNING_AND_TRUST.md](docs/SIGNIN
 See **[docs/README.md](docs/README.md)** for the full index. Quick links:
 
 - [Install (desktop)](docs/INSTALL.md) — start here for end users
+- [Desktop updates](docs/DESKTOP_UPDATES.md) — Help menu, auto-update, engine refresh
 - [User Guide](docs/USER_GUIDE.md) — HPC/SLURM, Pennsieve, XNAT, source deployment
 - [Tool licenses](docs/TOOL_LICENSES.md) — FreeSurfer / MELD setup
 - [Quick Start (developers)](QUICK_START.md) — `./research` from source
