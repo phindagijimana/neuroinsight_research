@@ -7,6 +7,19 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-08-23
+
+### Changed
+- **Classic workspace UI** — horizontal top navigation and Jobs page layout restored;
+  compact pipeline dropdowns and less verbose submission copy.
+- **Compact panels** — resources and SSH collapsed by default on Jobs; provenance
+  accordion on Results; compact job rows and conditional SLURM/stats strips.
+- **Scrollable lists** — shared `nir-scroll-*` utilities for file browsers, job
+  lists, transfer history, and long provenance blocks.
+
+### Added
+- **Desktop update docs** — `docs/DESKTOP_UPDATES.md` and README updating section.
+
 ## [0.1.20] - 2026-08-23
 
 ### Fixed
