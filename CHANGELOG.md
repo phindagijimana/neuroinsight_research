@@ -7,6 +7,37 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-08-23
+
+### Added
+- **Desktop workspace shell** — sidebar navigation (Jobs, Results, Viewer, Transfer,
+  Docs), engine status chip, and shared page headers; desktop opens on Jobs by default.
+- **Subject-first job labels** and **human-readable output folders** (e.g.
+  `sub-001_fs_76625681`); UUID remains the system key. API fields: `subject_label`,
+  `input_label`, `output_folder`.
+- **Jobs search/filter** and **input/output path bars** with Copy plus open in Finder
+  (desktop) or Transfer (HPC, remote, XNAT, Pennsieve).
+- **Results page polish** — subject-first picker, Statistics-first tabs, compact
+  output path bar, short job IDs in metadata.
+- **Viewer file drawer** — collapsible left panel for job outputs; compact Niivue
+  toolbar with Adjust panel for window/level and slice controls.
+- **Pipeline catalog** (Docs) — selectable plugins by default, toggle for internal
+  utilities, compact license chips, clickable references.
+- **Searchable pipeline picker** and BIDS/NIfTI-aware submission hints on Jobs.
+
+### Changed
+- Jobs, Results, Viewer, and Docs layouts aligned for professional desktop daily use.
+- Job selectors use subject labels and 8-character IDs instead of full UUIDs.
+- Transfer deep-links when opening remote/HPC/platform paths from job rows.
+- Control Center and desktop renderer styling/preflight polish.
+
+### Fixed
+- Host output path resolution for local Docker jobs (`host_data_dir` mapping to
+  `~/.nir/data/outputs/…`).
+- Auto-refresh for recent jobs that may reconcile after false failures (long runs).
+- Viewer and Docs no longer surface internal utility plugins by default.
+- Multi-file job inputs use the first real file path for reveal/open actions.
+
 ## [0.1.18] - 2026-08-22
 
 ### Added
