@@ -52,7 +52,7 @@ export default function EngineStatusChip() {
     <button
       type="button"
       onClick={openCenter}
-      className="flex w-full items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-slate-100 transition-colors border-none text-left"
+      className="flex w-full items-center gap-2 rounded-lg bg-slate-50 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-slate-100 transition-colors border-none text-left"
       data-testid="nir-engine-status"
       title="Open Control Center"
     >

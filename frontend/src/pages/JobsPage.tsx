@@ -21,22 +21,10 @@ import SlurmQueueMonitor from '../components/SlurmQueueMonitor';
 import StatusBadge from '../components/StatusBadge';
 import Button from '../components/Button';
 import { LoadingState, Spinner } from '../components/LoadingState';
-import WorkspacePageHeader from '../components/WorkspacePageHeader';
-import PathLocationBar from '../components/PathLocationBar';
 import type { ViewerTab } from '../utils/viewerQuery';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { useToast, useConfirm } from '../contexts/NotificationContext';
-import {
-  formatDisplayPath,
-  formatJobInput,
-  formatJobOutput,
-  resolveJobOutputPath,
-} from '../lib/jobPaths';
-import {
-  deriveJobSubjectLabel,
-  jobMatchesFilter,
-  jobNeedsStatusWatch,
-} from '../lib/jobLabels';
+import { jobNeedsStatusWatch } from '../lib/jobLabels';
 
 const SAMPLE_VIEWER_TABS: ViewerTab[] = ['eeg', 'imaging', 'eeg-brain'];
 
@@ -54,12 +42,6 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [deletingJobs, setDeletingJobs] = useState<Set<string>>(new Set());
-  const [pathContext, setPathContext] = useState<{
-    dataDir: string;
-    hostDataDir: string | null;
-    homeDir: string | null;
-  }>({ dataDir: './data', hostDataDir: null, homeDir: null });
-  const [jobFilter, setJobFilter] = useState('');
   const [stats, setStats] = useState({
     total: 0,
     completed: 0,
@@ -138,18 +120,6 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
   // Initial load
   useEffect(() => {
     fetchJobs();
-    apiService
-      .getBrowseRoot()
-      .then(({ data_dir, host_data_dir, local_root }) => {
-        setPathContext({
-          dataDir: data_dir,
-          hostDataDir: host_data_dir ?? null,
-          homeDir: local_root ?? null,
-        });
-      })
-      .catch(() => {
-        /* browse root is optional — paths still show without ~ shortening */
-      });
   }, []);
 
   const jobsNeedingWatch = useMemo(
@@ -161,8 +131,6 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
     () => jobs.some((j) => j.status === 'pending' || j.status === 'running'),
     [jobs]
   );
-
-  const watchingRecentFailures = jobsNeedingWatch && !hasActiveJobs;
 
   // Start/stop polling — full refresh also runs for recent failures (false-fail recovery).
   useEffect(() => {
@@ -251,11 +219,6 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
     });
   }, [jobs]);
 
-  const visibleJobs = useMemo(() => {
-    if (!jobFilter.trim()) return sortedJobs;
-    return sortedJobs.filter((job) => jobMatchesFilter(job, jobFilter));
-  }, [sortedJobs, jobFilter]);
-
   // Sample jobs are EEG demos — only surface them when the EEG feature is on.
   const hasSampleJobs = useMemo(
     () => eegEnabled && jobs.some((j) => j.is_sample_job),
@@ -311,26 +274,15 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
   };
 
   return (
-    <div className="bg-gradient-to-b from-slate-50/90 to-white min-h-full">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 md:py-8">
-        <WorkspacePageHeader
-          title="Jobs"
-          subtitle="Submit pipelines on local data, HPC, or cloud — then track progress here."
-          actions={
-            <Button variant="secondary" onClick={() => fetchJobs(true)} disabled={isRefreshing}>
-              {isRefreshing ? 'Refreshing…' : 'Refresh'}
-            </Button>
-          }
-        />
-
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12 xl:gap-8">
-          {/* Submit — sticky on wide screens */}
-          <div className="xl:col-span-5 xl:sticky xl:top-6 xl:self-start">
-            <FileUpload onJobsSubmitted={handleJobsSubmitted} />
-          </div>
-
-          {/* Monitor */}
-          <div className="space-y-6 xl:col-span-7">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50/90 to-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-8">
+        {/* Submit jobs — single surface above metrics */}
+        <div className="relative z-10 mb-6 md:mb-8">
+          <FileUpload
+            onJobsSubmitted={handleJobsSubmitted}
+            onBack={() => setActivePage('home')}
+          />
+        </div>
 
         {/* Statistics — one quiet strip */}
         {stats.total > 0 && (
@@ -368,38 +320,20 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
 
         {/* Jobs List */}
         <div className="rounded-2xl border border-gray-200/90 bg-white shadow-sm">
-          <div className="border-b border-gray-100 px-4 py-4 sm:px-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight text-gray-900">Recent jobs</h2>
-                <p className="mt-0.5 text-sm text-gray-500">
-                  {lastRefreshTime ? (
-                    <>
-                      Updated {formatDate(lastRefreshTime.toISOString())}
-                      {watchingRecentFailures ? (
-                        <> · auto-refreshing recent jobs (status may update)</>
-                      ) : (
-                        <> · search by subject or pipeline</>
-                      )}
-                    </>
-                  ) : watchingRecentFailures ? (
-                    'Auto-refreshing — status may update after long runs'
-                  ) : (
-                    'Search by subject, pipeline, or job ID'
-                  )}
-                </p>
-              </div>
-              {jobs.length > 0 && (
-                <input
-                  type="search"
-                  value={jobFilter}
-                  onChange={(e) => setJobFilter(e.target.value)}
-                  placeholder="Filter e.g. sub-001"
-                  aria-label="Filter jobs"
-                  className="w-full sm:w-56 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-                />
-              )}
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 tracking-tight">Jobs</h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {lastRefreshTime ? (
+                  <>Updated {formatDate(lastRefreshTime.toISOString())} · completed jobs open in Results</>
+                ) : (
+                  'Completed jobs open in Results'
+                )}
+              </p>
             </div>
+            <Button onClick={() => fetchJobs(true)} disabled={isRefreshing} className="shrink-0">
+              {isRefreshing ? 'Refreshing…' : 'Refresh'}
+            </Button>
           </div>
 
           {jobsLoading ? (
@@ -409,18 +343,9 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
               <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-600">No jobs yet — submit a job to see it here.</p>
             </div>
-          ) : visibleJobs.length === 0 ? (
-            <div className="px-6 py-12 text-center">
-              <p className="text-gray-600">No jobs match &ldquo;{jobFilter}&rdquo;.</p>
-            </div>
           ) : (
-            <div className="max-h-[min(32rem,calc(100vh-14rem))] divide-y divide-gray-100 overflow-y-auto">
-              {visibleJobs.map((job) => {
-                const subjectLabel = job.is_sample_job
-                  ? 'Sample EEG demo'
-                  : deriveJobSubjectLabel(job);
-                const pipelineLabel = job.display_name || job.pipeline_name;
-                return (
+            <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+              {sortedJobs.map((job) => (
                 <div
                   key={job.id}
                   className="px-4 sm:px-6 py-3.5 hover:bg-slate-50/80 transition cursor-pointer"
@@ -431,15 +356,10 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                       <div className="flex items-center gap-3 mb-2">
                         {getStatusIcon(job.status)}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                            <span className="text-sm font-semibold text-gray-900 truncate min-w-0">
-                              {subjectLabel || pipelineLabel}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium text-gray-900 truncate min-w-0">
+                              {job.display_name || job.pipeline_name}
                             </span>
-                            {subjectLabel && (
-                              <span className="text-xs text-gray-500 truncate max-w-full">
-                                {pipelineLabel}
-                              </span>
-                            )}
                             {job.is_sample_job && (
                               <span className="shrink-0 text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
                                 Sample
@@ -464,50 +384,12 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                               ) : null;
                             })()}
                           </div>
-                          <div className="mt-1.5 space-y-0.5 text-xs text-gray-500">
-                            {(() => {
-                              const pathOpts = {
-                                containerDataDir: pathContext.dataDir,
-                                hostDataDir: pathContext.hostDataDir,
-                                homeDir: pathContext.homeDir,
-                              };
-                              const inputHostPath =
-                                job.is_sample_job || job.input_files.length === 0
-                                  ? ''
-                                  : job.input_files[0];
-                              let inputDisplay = formatJobInput(job);
-                              if (!job.is_sample_job && job.input_files.length === 1) {
-                                inputDisplay = formatDisplayPath(inputHostPath, pathContext.homeDir);
-                              } else if (!job.is_sample_job && job.input_files.length > 1) {
-                                inputDisplay = `${formatDisplayPath(job.input_files[0], pathContext.homeDir)} (+${job.input_files.length - 1} more)`;
-                              }
-                              const outputRaw = resolveJobOutputPath(job, pathOpts);
-                              const outputDisplay = formatJobOutput(job, pathOpts);
-                              return (
-                                <>
-                                  <PathLocationBar
-                                    compact
-                                    label="Input"
-                                    pathKind="input"
-                                    job={job}
-                                    homeDir={pathContext.homeDir}
-                                    hostPath={inputHostPath}
-                                    displayPath={inputDisplay}
-                                    onNavigateToTransfer={() => setActivePage('transfer')}
-                                  />
-                                  <PathLocationBar
-                                    compact
-                                    label="Output"
-                                    pathKind="output"
-                                    job={job}
-                                    homeDir={pathContext.homeDir}
-                                    hostPath={outputRaw}
-                                    displayPath={outputDisplay}
-                                    onNavigateToTransfer={() => setActivePage('transfer')}
-                                  />
-                                </>
-                              );
-                            })()}
+                          <div className="mt-1 text-xs text-gray-500 truncate">
+                            {job.is_sample_job ? (
+                              <span>Bundled sample data</span>
+                            ) : (
+                              <>Input: {job.input_files[0] || 'N/A'}</>
+                            )}
                           </div>
                           <div className="text-xs text-gray-400 mt-1">
                             Submitted: {formatDate(job.submitted_at)}
@@ -572,12 +454,9 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                     </div>
                   </div>
                 </div>
-              );
-              })}
+              ))}
             </div>
           )}
-        </div>
-          </div>
         </div>
       </div>
     </div>

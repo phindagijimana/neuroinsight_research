@@ -80,8 +80,8 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
   browseMode = 'local',
   executionContext,
   sshConnected = true,
-  inputFormatName,
-  bidsAppMode = false,
+  inputFormatName: _inputFormatName,
+  bidsAppMode: _bidsAppMode = false,
 }) => {
   const defaultPath = browseMode === 'local' ? './data' : '~';
 
@@ -256,18 +256,10 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
       {/* Path input */}
       <div className="space-y-1.5">
         <label className="block text-xs font-semibold text-gray-700">
-          {bidsAppMode ? 'BIDS subject or file' : 'Subject path'}{' '}
-          <span className="text-red-500">*</span>
+          Subject Path <span className="text-red-500">*</span>
         </label>
         <p className="text-[11px] text-gray-500">
-          {bidsAppMode ? (
-            <>
-              Browse to a <strong>sub-XXX</strong> folder, BIDS dataset root (single subject), or a{' '}
-              {inputFormatName?.toLowerCase().includes('nifti') ? 'NIfTI file' : 'scan file'}
-            </>
-          ) : (
-            'Browse to a subject folder, NIfTI file, or pick from previous results'
-          )}
+          Browse to a subject folder, NIfTI file, or pick from previous results
         </p>
         <form onSubmit={handleManualSubmit} className="flex gap-2">
           <input

@@ -193,7 +193,7 @@
  */
 
 import { useState, useEffect, lazy, Suspense, type DragEvent } from 'react';
-import AppShell from './components/AppShell';
+import Navigation from './components/Navigation';
 import LoadingState from './components/LoadingState';
 import { isDesktopApp } from './lib/desktopBridge';
 import {
@@ -293,62 +293,62 @@ function App() {
   }, []);
 
   return (
-    <AppShell activePage={activePage} onNavigate={navigateTo}>
-      <div
-        className="relative min-h-full"
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        {isDragging && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-600/70 pointer-events-none">
-            <div className="rounded-2xl border-2 border-dashed border-navy-600 bg-white px-10 py-8 text-center shadow-2xl">
-              <p className="mb-1 text-2xl font-bold text-navy-600">Drop to view</p>
-              <p className="text-gray-600">
-                Release a NIfTI (.nii/.nii.gz) or MGZ file to open it in the Viewer
-              </p>
-            </div>
+    <div
+      className="min-h-screen bg-gray-50"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDragging && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-600/70 pointer-events-none">
+          <div className="rounded-2xl border-2 border-dashed border-navy-600 bg-white px-10 py-8 text-center shadow-2xl">
+            <p className="mb-1 text-2xl font-bold text-navy-600">Drop to view</p>
+            <p className="text-gray-600">
+              Release a NIfTI (.nii/.nii.gz) or MGZ file to open it in the Viewer
+            </p>
           </div>
+        </div>
+      )}
+
+      <Navigation activePage={activePage} setActivePage={navigateTo} />
+
+      <Suspense fallback={<LoadingState message="Loading workspace…" className="min-h-[50vh]" />}>
+        {activePage === 'home' && (
+          <HomePage
+            setActivePage={navigateTo}
+            setSelectedJobId={setSelectedJobId}
+            onOpenLocal={openLocalVolume}
+          />
         )}
 
-        <Suspense fallback={<LoadingState message="Loading workspace…" className="min-h-[50vh]" />}>
-          {activePage === 'home' && (
-            <HomePage
-              setActivePage={navigateTo}
-              setSelectedJobId={setSelectedJobId}
-              onOpenLocal={openLocalVolume}
-            />
-          )}
+        {activePage === 'jobs' && (
+          <JobsPage setActivePage={navigateTo} setSelectedJobId={setSelectedJobId} />
+        )}
 
-          {activePage === 'jobs' && (
-            <JobsPage setActivePage={navigateTo} setSelectedJobId={setSelectedJobId} />
-          )}
+        {activePage === 'dashboard' && (
+          <DashboardPage
+            selectedJobId={selectedJobId}
+            setSelectedJobId={setSelectedJobId}
+            setActivePage={navigateTo}
+          />
+        )}
 
-          {activePage === 'dashboard' && (
-            <DashboardPage
-              selectedJobId={selectedJobId}
-              setSelectedJobId={setSelectedJobId}
-              setActivePage={navigateTo}
-            />
-          )}
+        {activePage === 'viewer' && (
+          <ViewerPage
+            selectedJobId={selectedJobId}
+            setSelectedJobId={setSelectedJobId}
+            viewerNavEpoch={viewerNavEpoch}
+            localVolume={localVolume}
+          />
+        )}
 
-          {activePage === 'viewer' && (
-            <ViewerPage
-              selectedJobId={selectedJobId}
-              setSelectedJobId={setSelectedJobId}
-              viewerNavEpoch={viewerNavEpoch}
-              localVolume={localVolume}
-            />
-          )}
+        {activePage === 'transfer' && <TransferPage />}
 
-          {activePage === 'transfer' && <TransferPage />}
+        {activePage === 'docs' && <DocsPage setActivePage={navigateTo} />}
 
-          {activePage === 'docs' && <DocsPage setActivePage={navigateTo} />}
-
-          {activePage === 'settings' && <SettingsPage />}
-        </Suspense>
-      </div>
-    </AppShell>
+        {activePage === 'settings' && <SettingsPage />}
+      </Suspense>
+    </div>
   );
 }
 
