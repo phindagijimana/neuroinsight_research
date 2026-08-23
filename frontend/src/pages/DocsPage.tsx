@@ -23,6 +23,8 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { LoadingState } from '../components/LoadingState';
+import WorkspacePageHeader from '../components/WorkspacePageHeader';
+import Button from '../components/Button';
 
 interface InputFormat {
   format_name?: string;
@@ -169,20 +171,20 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
     <div className="space-y-6">
       {/* Title */}
       <div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <h2 className="text-2xl font-bold text-gray-900">{plugin.name}</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">{plugin.name}</h2>
           <span className="text-sm text-gray-400">v{plugin.version}</span>
-          <span className={`text-xs px-2.5 py-0.5 rounded-full ${domainColor(plugin.domain)}`}>
+          <span className={`rounded-full px-2.5 py-0.5 text-xs ${domainColor(plugin.domain)}`}>
             {domainLabel(plugin.domain)}
           </span>
-          {!plugin.user_selectable && (
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-100 text-navy-700">
-              Utility (hidden)
+          {plugin.user_selectable === false && (
+            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600">
+              Internal utility
             </span>
           )}
         </div>
-        <code className="text-xs text-gray-400 mt-1 block">{plugin.id}</code>
-        <p className="text-gray-600 mt-3 leading-relaxed">{plugin.description}</p>
+        <p className="mt-1 font-mono text-xs text-gray-400">{plugin.id}</p>
+        <p className="mt-3 leading-relaxed text-gray-600">{plugin.description}</p>
       </div>
 
       {/* Container & Resources row */}
@@ -298,9 +300,17 @@ const PluginDetail: React.FC<{ plugin: PluginDoc }> = ({ plugin }) => {
             <Shield className="w-4 h-4" />
             References
           </h3>
-          <ul className="text-sm text-navy-600 space-y-1">
+          <ul className="space-y-1 text-sm text-navy-600">
             {plugin.references.map((ref: string, i: number) => (
-              <li key={i} className="break-all">{ref}</li>
+              <li key={i} className="break-all">
+                {/^https?:\/\//i.test(ref) ? (
+                  <a href={ref} target="_blank" rel="noreferrer" className="hover:underline">
+                    {ref}
+                  </a>
+                ) : (
+                  ref
+                )}
+              </li>
             ))}
           </ul>
         </div>
@@ -468,7 +478,15 @@ const DocsPage: React.FC<DocsPageProps> = () => {
   const [activeTab, setActiveTab] = useState<'plugins' | 'workflows'>('plugins');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showUtilities, setShowUtilities] = useState(false);
   const [licenseStatus, setLicenseStatus] = useState<LicenseStatus | null>(null);
+
+  const selectablePlugins = plugins.filter((p) => p.user_selectable !== false);
+
+  const pickDefaultPluginId = (items: PluginDoc[]) => {
+    const firstSelectable = items.find((p) => p.user_selectable !== false);
+    return firstSelectable?.id ?? items[0]?.id ?? null;
+  };
 
   useEffect(() => {
     async function fetchDocs() {
@@ -482,9 +500,8 @@ const DocsPage: React.FC<DocsPageProps> = () => {
         if (licenseRes) {
           setLicenseStatus(licenseRes);
         }
-        // Auto-select first plugin
         if (data.plugins?.length > 0) {
-          setSelectedId(data.plugins[0].id);
+          setSelectedId(pickDefaultPluginId(data.plugins));
         }
       } catch (err: any) {
         setError('Could not load documentation. Make sure the backend is running.');
@@ -496,12 +513,11 @@ const DocsPage: React.FC<DocsPageProps> = () => {
     fetchDocs();
   }, []);
 
-  // When switching tabs, auto-select first item in new tab
   const handleTabSwitch = (tab: 'plugins' | 'workflows') => {
     setActiveTab(tab);
     setSearchQuery('');
     if (tab === 'plugins' && plugins.length > 0) {
-      setSelectedId(plugins[0].id);
+      setSelectedId(pickDefaultPluginId(plugins));
     } else if (tab === 'workflows' && workflows.length > 0) {
       setSelectedId(workflows[0].id);
     } else {
@@ -509,251 +525,283 @@ const DocsPage: React.FC<DocsPageProps> = () => {
     }
   };
 
+  const matchesSearch = (text: string) => text.toLowerCase().includes(searchQuery.toLowerCase());
+
   const filteredPlugins = plugins.filter(
     (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.domain.toLowerCase().includes(searchQuery.toLowerCase())
+      matchesSearch(p.name) ||
+      matchesSearch(p.id) ||
+      matchesSearch(p.description) ||
+      matchesSearch(p.domain) ||
+      matchesSearch(domainLabel(p.domain)),
   );
+
+  const visiblePlugins = showUtilities
+    ? filteredPlugins
+    : filteredPlugins.filter((p) => p.user_selectable !== false);
 
   const filteredWorkflows = workflows.filter(
     (w) =>
-      w.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      w.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      w.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      w.domain.toLowerCase().includes(searchQuery.toLowerCase())
+      matchesSearch(w.name) ||
+      matchesSearch(w.id) ||
+      matchesSearch(w.description) ||
+      matchesSearch(w.domain) ||
+      matchesSearch(domainLabel(w.domain)),
   );
 
   const selectedPlugin = plugins.find((p) => p.id === selectedId) || null;
   const selectedWorkflow = workflows.find((w) => w.id === selectedId) || null;
 
+  useEffect(() => {
+    if (activeTab !== 'plugins' || showUtilities) return;
+    if (selectedPlugin && selectedPlugin.user_selectable === false) {
+      setSelectedId(pickDefaultPluginId(plugins));
+    }
+  }, [activeTab, showUtilities, selectedPlugin, plugins]);
+
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <LoadingState message="Loading documentation…" />
+      <div className="min-h-full bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <LoadingState message="Loading pipeline catalog…" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-full flex flex-col">
-      {/* Header */}
-      <div className="mb-6 flex-shrink-0">
-        <div className="flex items-center gap-3 mb-1">
-          <FileText className="w-7 h-7 text-navy-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Documentation</h1>
-        </div>
-        <p className="text-gray-500 text-sm ml-10">
-          Browse plugins and workflows. Select one to view its full specification.
-        </p>
-        {!error && (plugins.length > 0 || workflows.length > 0) && (
-          <div className="ml-10 mt-4 max-w-2xl rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-1.5">
-            <div className="text-xs text-gray-600 flex items-center gap-1.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-green-500 flex-shrink-0" aria-hidden />
-              <span>
-                Live:{' '}
-                {plugins.filter((p) => p.user_selectable !== false).length} selectable plugins,{' '}
-                {workflows.length} workflows
-              </span>
+    <div className="flex min-h-full flex-col bg-gray-50">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col px-4 py-6 sm:px-6 lg:px-8">
+        <WorkspacePageHeader
+          title="Pipeline catalog"
+          subtitle="Plugins run a single tool; workflows chain several plugins. Pick one to review inputs, resources, and specs."
+          actions={
+            <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+              {!error && (
+                <div className="flex flex-wrap justify-end gap-1.5">
+                  <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-600">
+                    {selectablePlugins.length} plugins · {workflows.length} workflows
+                  </span>
+                  {licenseStatus?.freesurfer.found && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs text-green-700">
+                      <CheckCircle className="h-3 w-3" />
+                      FreeSurfer
+                    </span>
+                  )}
+                  {licenseStatus?.meld_graph.found && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs text-green-700">
+                      <CheckCircle className="h-3 w-3" />
+                      MELD
+                    </span>
+                  )}
+                </div>
+              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => window.open(USER_GUIDE_URL, '_blank', 'noopener,noreferrer')}
+              >
+                User guide
+              </Button>
             </div>
-            {licenseStatus && (
-              <div className="space-y-0.5 pt-0.5 border-t border-gray-200">
-                <div
-                  className={`text-xs flex items-center gap-1 ${licenseStatus.freesurfer.found ? 'text-green-600' : 'text-navy-600'}`}
-                >
-                  {licenseStatus.freesurfer.found ? (
-                    <>
-                      <CheckCircle className="w-3 h-3 flex-shrink-0" />
-                      FreeSurfer license detected
-                    </>
-                  ) : (
-                    <>
-                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                      <span>
-                        No FreeSurfer license — place{' '}
-                        <code className="bg-gray-100 px-1 rounded text-[10px]">license.txt</code> in project root
-                      </span>
-                    </>
-                  )}
-                </div>
-                <div
-                  className={`text-xs flex items-center gap-1 ${licenseStatus.meld_graph.found ? 'text-green-600' : 'text-navy-600'}`}
-                >
-                  {licenseStatus.meld_graph.found ? (
-                    <>
-                      <CheckCircle className="w-3 h-3 flex-shrink-0" />
-                      MELD Graph license detected
-                    </>
-                  ) : (
-                    <>
-                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                      <span>
-                        No MELD license — place{' '}
-                        <code className="bg-gray-100 px-1 rounded text-[10px]">meld_license.txt</code> in project root
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
+          }
+        />
+
+        {error && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-navy-200 bg-navy-50 p-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-navy-600" />
+            <span className="text-sm text-navy-800">{error}</span>
+          </div>
+        )}
+
+        {licenseStatus && !error && (!licenseStatus.freesurfer.found || !licenseStatus.meld_graph.found) && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {!licenseStatus.freesurfer.found && (
+              <p className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  FreeSurfer license not found — add <code className="rounded bg-white px-1 text-xs">license.txt</code> to the project root.
+                </span>
+              </p>
+            )}
+            {!licenseStatus.meld_graph.found && (
+              <p className={`flex items-start gap-2 ${!licenseStatus.freesurfer.found ? 'mt-2' : ''}`}>
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  MELD license not found — add <code className="rounded bg-white px-1 text-xs">meld_license.txt</code> to the project root.
+                </span>
+              </p>
             )}
           </div>
         )}
-      </div>
 
-      {error && (
-        <div className="bg-navy-50 border border-navy-200 rounded-lg p-3 mb-4 flex items-center gap-2 flex-shrink-0">
-          <AlertTriangle className="w-5 h-5 text-navy-600 flex-shrink-0" />
-          <span className="text-navy-800 text-sm">{error}</span>
-        </div>
-      )}
+        <div className="flex min-h-[calc(100vh-14rem)] flex-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          {/* Catalog sidebar */}
+          <div className="flex w-80 shrink-0 flex-col border-r border-gray-200 xl:w-96">
+            <div className="flex shrink-0 border-b border-gray-200">
+              <button
+                type="button"
+                onClick={() => handleTabSwitch('plugins')}
+                className={`flex flex-1 items-center justify-center gap-1.5 px-4 py-3 text-sm font-medium transition ${
+                  activeTab === 'plugins'
+                    ? 'border-b-2 border-navy-600 bg-navy-50/40 text-navy-700'
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                }`}
+              >
+                <Zap className="h-4 w-4" />
+                Plugins ({showUtilities ? plugins.length : selectablePlugins.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTabSwitch('workflows')}
+                className={`flex flex-1 items-center justify-center gap-1.5 px-4 py-3 text-sm font-medium transition ${
+                  activeTab === 'workflows'
+                    ? 'border-b-2 border-navy-600 bg-navy-50/40 text-navy-700'
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                }`}
+              >
+                <GitBranch className="h-4 w-4" />
+                Workflows ({workflows.length})
+              </button>
+            </div>
 
-      {/* Main layout: sidebar + detail */}
-      <div className="flex gap-6 flex-1 min-h-0">
-        {/* Sidebar */}
-        <div className="w-80 flex-shrink-0 flex flex-col bg-white border border-gray-200 rounded-lg overflow-hidden">
-          {/* Tabs */}
-          <div className="flex border-b border-gray-200 flex-shrink-0">
-            <button
-              onClick={() => handleTabSwitch('plugins')}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition flex items-center justify-center gap-1.5 ${
-                activeTab === 'plugins'
-                  ? 'text-navy-600 border-b-2 border-navy-600 bg-navy-50/50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Zap className="w-4 h-4" />
-              Plugins ({plugins.length})
-            </button>
-            <button
-              onClick={() => handleTabSwitch('workflows')}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition flex items-center justify-center gap-1.5 ${
-                activeTab === 'workflows'
-                  ? 'text-navy-600 border-b-2 border-navy-600 bg-navy-50/50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <GitBranch className="w-4 h-4" />
-              Workflows ({workflows.length})
-            </button>
-          </div>
+            <div className="shrink-0 space-y-2 border-b border-gray-100 p-3">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="search"
+                  placeholder="Search by name or domain…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-sm outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-600"
+                />
+              </div>
+              {activeTab === 'plugins' && plugins.length > selectablePlugins.length && (
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={showUtilities}
+                    onChange={(e) => setShowUtilities(e.target.checked)}
+                    className="rounded text-navy-600 focus:ring-navy-600"
+                  />
+                  Show internal utilities ({plugins.length - selectablePlugins.length})
+                </label>
+              )}
+            </div>
 
-          {/* Search */}
-          <div className="p-3 border-b border-gray-100 flex-shrink-0">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder={`Search ${activeTab}...`}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-navy-600 focus:border-navy-600 outline-none"
-              />
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {activeTab === 'plugins' && (
+                <>
+                  {visiblePlugins.length === 0 && (
+                    <div className="p-4 text-center text-sm text-gray-400">No plugins match your search.</div>
+                  )}
+                  {visiblePlugins.map((plugin) => (
+                    <button
+                      key={plugin.id}
+                      type="button"
+                      onClick={() => setSelectedId(plugin.id)}
+                      className={`w-full border-b border-gray-50 px-4 py-3 text-left transition ${
+                        selectedId === plugin.id
+                          ? 'border-l-[3px] border-l-navy-600 bg-navy-50'
+                          : 'border-l-[3px] border-l-transparent hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className={`text-sm font-medium ${
+                            selectedId === plugin.id ? 'text-navy-700' : 'text-gray-800'
+                          }`}
+                        >
+                          {plugin.name}
+                        </span>
+                        <ChevronRight
+                          className={`h-4 w-4 shrink-0 ${
+                            selectedId === plugin.id ? 'text-navy-600' : 'text-gray-300'
+                          }`}
+                        />
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${domainColor(plugin.domain)}`}>
+                          {domainLabel(plugin.domain)}
+                        </span>
+                        {plugin.user_selectable === false && (
+                          <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">
+                            internal
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {activeTab === 'workflows' && (
+                <>
+                  {filteredWorkflows.length === 0 && (
+                    <div className="p-4 text-center text-sm text-gray-400">No workflows match your search.</div>
+                  )}
+                  {filteredWorkflows.map((workflow) => (
+                    <button
+                      key={workflow.id}
+                      type="button"
+                      onClick={() => setSelectedId(workflow.id)}
+                      className={`w-full border-b border-gray-50 px-4 py-3 text-left transition ${
+                        selectedId === workflow.id
+                          ? 'border-l-[3px] border-l-navy-600 bg-navy-50'
+                          : 'border-l-[3px] border-l-transparent hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className={`text-sm font-medium ${
+                            selectedId === workflow.id ? 'text-navy-700' : 'text-gray-800'
+                          }`}
+                        >
+                          {workflow.name}
+                        </span>
+                        <ChevronRight
+                          className={`h-4 w-4 shrink-0 ${
+                            selectedId === workflow.id ? 'text-navy-600' : 'text-gray-300'
+                          }`}
+                        />
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${domainColor(workflow.domain)}`}>
+                          {domainLabel(workflow.domain)}
+                        </span>
+                        <span className="text-[10px] text-gray-400">
+                          {workflow.steps?.length || 0} steps
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           </div>
 
-          {/* Scrollable list */}
-          <div className="flex-1 overflow-y-auto">
-            {activeTab === 'plugins' && (
-              <>
-                {filteredPlugins.length === 0 && (
-                  <div className="p-4 text-sm text-gray-400 text-center">No plugins match your search.</div>
-                )}
-                {filteredPlugins.map((plugin) => (
-                  <button
-                    key={plugin.id}
-                    onClick={() => setSelectedId(plugin.id)}
-                    className={`w-full text-left px-4 py-3 border-b border-gray-50 transition ${
-                      selectedId === plugin.id
-                        ? 'bg-navy-50 border-l-[3px] border-l-navy-600'
-                        : 'hover:bg-gray-50 border-l-[3px] border-l-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`text-sm font-medium ${selectedId === plugin.id ? 'text-navy-600' : 'text-gray-800'}`}>
-                        {plugin.name}
-                      </span>
-                      <ChevronRight className={`w-4 h-4 flex-shrink-0 ${selectedId === plugin.id ? 'text-navy-600' : 'text-gray-300'}`} />
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${domainColor(plugin.domain)}`}>
-                        {domainLabel(plugin.domain)}
-                      </span>
-                      {!plugin.user_selectable && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-navy-100 text-navy-600">utility</span>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </>
+          {/* Detail */}
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-6">
+            {activeTab === 'plugins' && selectedPlugin && (
+              <PluginDetail key={selectedPlugin.id} plugin={selectedPlugin} />
             )}
-
-            {activeTab === 'workflows' && (
-              <>
-                {filteredWorkflows.length === 0 && (
-                  <div className="p-4 text-sm text-gray-400 text-center">No workflows match your search.</div>
-                )}
-                {filteredWorkflows.map((workflow) => (
-                  <button
-                    key={workflow.id}
-                    onClick={() => setSelectedId(workflow.id)}
-                    className={`w-full text-left px-4 py-3 border-b border-gray-50 transition ${
-                      selectedId === workflow.id
-                        ? 'bg-navy-50 border-l-[3px] border-l-navy-600'
-                        : 'hover:bg-gray-50 border-l-[3px] border-l-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`text-sm font-medium ${selectedId === workflow.id ? 'text-navy-600' : 'text-gray-800'}`}>
-                        {workflow.name}
-                      </span>
-                      <ChevronRight className={`w-4 h-4 flex-shrink-0 ${selectedId === workflow.id ? 'text-navy-600' : 'text-gray-300'}`} />
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${domainColor(workflow.domain)}`}>
-                        {domainLabel(workflow.domain)}
-                      </span>
-                      <span className="text-[10px] text-gray-400">
-                        {workflow.steps?.length || 0} steps
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </>
+            {activeTab === 'workflows' && selectedWorkflow && (
+              <WorkflowDetail key={selectedWorkflow.id} workflow={selectedWorkflow} />
+            )}
+            {!selectedPlugin && activeTab === 'plugins' && (
+              <div className="flex h-full flex-col items-center justify-center text-gray-400">
+                <Zap className="mb-3 h-12 w-12 opacity-30" />
+                <p>Select a plugin to view its specification</p>
+              </div>
+            )}
+            {!selectedWorkflow && activeTab === 'workflows' && (
+              <div className="flex h-full flex-col items-center justify-center text-gray-400">
+                <GitBranch className="mb-3 h-12 w-12 opacity-30" />
+                <p>Select a workflow to view its specification</p>
+              </div>
             )}
           </div>
         </div>
-
-        {/* Detail panel */}
-        <div className="flex-1 bg-white border border-gray-200 rounded-lg overflow-y-auto p-6 min-h-0">
-          {activeTab === 'plugins' && selectedPlugin && (
-            <PluginDetail key={selectedPlugin.id} plugin={selectedPlugin} />
-          )}
-          {activeTab === 'workflows' && selectedWorkflow && (
-            <WorkflowDetail key={selectedWorkflow.id} workflow={selectedWorkflow} />
-          )}
-          {!selectedPlugin && activeTab === 'plugins' && (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400">
-              <Zap className="w-12 h-12 mb-3 opacity-30" />
-              <p className="text-lg">Select a plugin to view its details</p>
-            </div>
-          )}
-          {!selectedWorkflow && activeTab === 'workflows' && (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400">
-              <GitBranch className="w-12 h-12 mb-3 opacity-30" />
-              <p className="text-lg">Select a workflow to view its details</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Quick Reference footer */}
-      <div className="mt-4 flex-shrink-0 bg-gray-50 border border-gray-200 rounded-lg px-5 py-3 text-sm text-gray-600">
-        <span className="font-semibold text-gray-700">Plugin</span> = one tool ·{' '}
-        <span className="font-semibold text-gray-700">Workflow</span> = a sequence of plugins.{' '}
-        <a href={USER_GUIDE_URL} target="_blank" rel="noreferrer" className="text-navy-600 hover:underline">
-          User Guide →
-        </a>
       </div>
     </div>
   );

@@ -50,6 +50,7 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
   const [sliceFrac, setSliceFrac] = useState<[number, number, number]>([0.5, 0.5, 0.5]);
   const [layers, setLayers] = useState<Array<{ index: number; name: string }>>([]);
   const [showHelp, setShowHelp] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Initialize Niivue
   useEffect(() => {
@@ -247,37 +248,35 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Controls */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {/* View Type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              View Type
+    <div className="flex flex-col gap-3">
+      {/* Compact toolbar — primary controls only */}
+      <div className="rounded-xl border border-gray-200 bg-white px-3 py-2.5">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[9rem] flex-1">
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500">
+              Layout
             </label>
             <select
               value={sliceType}
               onChange={(e) => setSliceType(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 focus:border-transparent"
+              className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-navy-600 focus:ring-2 focus:ring-navy-600"
             >
               <option value={3}>Multi-planar (4-up)</option>
               <option value={0}>Axial</option>
               <option value={1}>Coronal</option>
               <option value={2}>Sagittal</option>
-              <option value={4}>3D Render</option>
+              <option value={4}>3D render</option>
             </select>
           </div>
 
-          {/* Colormap */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="min-w-[7rem] flex-1">
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500">
               Colormap
             </label>
             <select
               value={colormap}
               onChange={(e) => setColormap(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 focus:border-transparent"
+              className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-navy-600 focus:ring-2 focus:ring-navy-600"
             >
               <option value="gray">Grayscale</option>
               <option value="jet">Jet</option>
@@ -288,169 +287,173 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
             </select>
           </div>
 
-          {/* Mouse Mode */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Mouse (drag)
+          <div className="min-w-[7rem] flex-1">
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500">
+              Drag
             </label>
             <select
               value={mouseMode}
               onChange={(e) => setMouseMode(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 focus:border-transparent"
+              className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-navy-600 focus:ring-2 focus:ring-navy-600"
             >
-              <option value={1}>Window / Level</option>
+              <option value={1}>Window / level</option>
               <option value={2}>Measure</option>
               <option value={3}>Pan</option>
             </select>
           </div>
 
-          {/* Crosshair Toggle */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Crosshair
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showCrosshair}
-                onChange={(e) => setShowCrosshair(e.target.checked)}
-                className="w-4 h-4 text-navy-600 rounded focus:ring-navy-600"
-              />
-              <span className="text-sm text-gray-700">Show</span>
-            </label>
+          <label className="flex items-center gap-2 pb-1.5 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={showCrosshair}
+              onChange={(e) => setShowCrosshair(e.target.checked)}
+              className="h-4 w-4 rounded text-navy-600 focus:ring-navy-600"
+            />
+            Crosshair
+          </label>
+
+          <div className="flex flex-wrap gap-2 pb-0.5">
+            <button
+              type="button"
+              onClick={handleResetView}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              onClick={handleScreenshot}
+              className="rounded-lg bg-navy-600 px-3 py-1.5 text-sm text-white hover:bg-navy-800"
+            >
+              Screenshot
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowHelp((v) => !v)}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+              title="Keyboard shortcuts"
+            >
+              ?
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              {showAdvanced ? 'Less' : 'Adjust'}
+            </button>
+            {isHippo && segmentationUrl && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSliceType(3);
+                    setOpacity(0.7);
+                  }}
+                  className="rounded-lg bg-green-600 px-3 py-1.5 text-sm text-white hover:bg-green-700"
+                >
+                  Hippocampal 3D
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSliceType(1);
+                    setOpacity(0.65);
+                  }}
+                  className="rounded-lg bg-green-600 px-3 py-1.5 text-sm text-white hover:bg-green-700"
+                >
+                  Coronal
+                </button>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Window / Level (display range) */}
-        {winRange && winMin !== null && winMax !== null && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Window Min: {winMin.toFixed(1)}
-              </label>
-              <input
-                type="range"
-                min={winRange.min}
-                max={winRange.max}
-                step={(winRange.max - winRange.min) / 200 || 1}
-                value={winMin}
-                onChange={(e) => setWinMin(Number(e.target.value))}
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Window Max: {winMax.toFixed(1)}
-              </label>
-              <input
-                type="range"
-                min={winRange.min}
-                max={winRange.max}
-                step={(winRange.max - winRange.min) / 200 || 1}
-                value={winMax}
-                onChange={(e) => setWinMax(Number(e.target.value))}
-                className="w-full"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Slice position (scrubbing) — hidden in pure 3D render */}
-        {sliceType !== 4 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-            {(['Sagittal', 'Coronal', 'Axial'] as const).map((label, axis) => (
-              <div key={label}>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {label} position: {Math.round(sliceFrac[axis] * 100)}%
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.005}
-                  value={sliceFrac[axis]}
-                  onChange={(e) => setSliceAxis(axis, Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Layers */}
-        {layers.length > 0 && (
-          <div className="mt-4">
-            <p className="text-sm font-semibold text-gray-700 mb-2">Layers</p>
-            <div className="space-y-2">
-              {layers.map((l) => (
-                <div key={l.index} className="flex items-center gap-3">
-                  <span className="text-sm text-gray-700 w-40 truncate" title={l.name}>
-                    {l.index === 0 ? '◾' : '▥'} {l.name}
-                  </span>
+        {showAdvanced && (
+          <div className="mt-3 space-y-3 border-t border-gray-100 pt-3">
+            {winRange && winMin !== null && winMax !== null && (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                    Window min: {winMin.toFixed(1)}
+                  </label>
                   <input
                     type="range"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    defaultValue={l.index === 0 ? 1 : opacity}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      setLayerOpacity(l.index, v);
-                      if (l.index > 0) setOpacity(v);
-                    }}
-                    className="flex-1"
+                    min={winRange.min}
+                    max={winRange.max}
+                    step={(winRange.max - winRange.min) / 200 || 1}
+                    value={winMin}
+                    onChange={(e) => setWinMin(Number(e.target.value))}
+                    className="w-full"
                   />
-                  <span className="text-xs text-gray-500 w-10 text-right">opacity</span>
                 </div>
-              ))}
-            </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                    Window max: {winMax.toFixed(1)}
+                  </label>
+                  <input
+                    type="range"
+                    min={winRange.min}
+                    max={winRange.max}
+                    step={(winRange.max - winRange.min) / 200 || 1}
+                    value={winMax}
+                    onChange={(e) => setWinMax(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            )}
+
+            {sliceType !== 4 && (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                {(['Sagittal', 'Coronal', 'Axial'] as const).map((label, axis) => (
+                  <div key={label}>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">
+                      {label}: {Math.round(sliceFrac[axis] * 100)}%
+                    </label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.005}
+                      value={sliceFrac[axis]}
+                      onChange={(e) => setSliceAxis(axis, Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {layers.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-medium text-gray-600">Layers</p>
+                <div className="space-y-2">
+                  {layers.map((l) => (
+                    <div key={l.index} className="flex items-center gap-3">
+                      <span className="w-36 truncate text-sm text-gray-700" title={l.name}>
+                        {l.index === 0 ? '◾' : '▥'} {l.name}
+                      </span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        defaultValue={l.index === 0 ? 1 : opacity}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setLayerOpacity(l.index, v);
+                          if (l.index > 0) setOpacity(v);
+                        }}
+                        className="flex-1"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 mt-4 flex-wrap">
-          <button
-            onClick={handleResetView}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
-          >
-            Reset View
-          </button>
-          <button
-            onClick={handleScreenshot}
-            className="px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-800 transition"
-          >
-            Save Screenshot
-          </button>
-          <button
-            onClick={() => setShowHelp((v) => !v)}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
-            title="Keyboard shortcuts & mouse controls"
-          >
-            ? Shortcuts
-          </button>
-          {isHippo && segmentationUrl && (
-            <>
-              <button
-                onClick={() => {
-                  setSliceType(3);
-                  setOpacity(0.7);
-                }}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-              >
-                Hippocampal 3D
-              </button>
-              <button
-                onClick={() => {
-                  setSliceType(1);
-                  setOpacity(0.65);
-                }}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-              >
-                Coronal View
-              </button>
-            </>
-          )}
-        </div>
       </div>
 
       {/* Canvas */}
@@ -496,8 +499,8 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
         )}
       </div>
 
-      {/* Cursor readout — voxel coords + intensity (ITK-SNAP / Slicer style) */}
-      <div className="bg-gray-900 text-gray-200 rounded-lg px-4 py-2 text-xs font-mono flex flex-wrap gap-x-6 gap-y-1">
+      {/* Cursor readout */}
+      <div className="flex flex-wrap gap-x-6 gap-y-1 rounded-lg bg-gray-900 px-4 py-2 font-mono text-xs text-gray-200">
         <span>
           Voxel:{' '}
           {location?.vox ? `(${location.vox.slice(0, 3).map((v) => Math.round(v)).join(', ')})` : '—'}
@@ -512,21 +515,6 @@ const NiivueViewer: React.FC<NiivueViewerProps> = ({
             ? location.values[0].value.toFixed(2)
             : '—'}
         </span>
-      </div>
-
-      {/* Instructions */}
-      <div className="bg-navy-50 border border-navy-200 rounded-lg p-4">
-        <h4 className="text-sm font-semibold text-navy-900 mb-2">
-          PACS-like Controls
-        </h4>
-        <div className="text-sm text-navy-800 grid grid-cols-2 gap-2">
-          <div>- <strong>Left Click + Drag:</strong> Pan</div>
-          <div>- <strong>Right Click + Drag:</strong> Window/Level</div>
-          <div>- <strong>Mouse Wheel:</strong> Zoom</div>
-          <div>- <strong>Shift + Click:</strong> Crosshair</div>
-          <div>- <strong>Ctrl + Click:</strong> Measure</div>
-          <div>- <strong>Multi-planar:</strong> 4-view PACS layout</div>
-        </div>
       </div>
     </div>
   );

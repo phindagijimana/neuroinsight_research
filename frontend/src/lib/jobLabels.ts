@@ -25,9 +25,47 @@ function basenameLabel(path: string): string {
   return name;
 }
 
+export function jobPipelineLabel(job: Job): string {
+  return job.display_name || job.pipeline_name || 'Unknown pipeline';
+}
+
+export function jobShortId(job: Job): string {
+  return job.id.slice(0, 8);
+}
+
+export function jobComputeLabel(job: Job): string {
+  switch (job.backend_type) {
+    case 'local_docker':
+      return 'Local';
+    case 'slurm':
+      return 'HPC';
+    case 'remote_docker':
+      return 'Remote';
+    default:
+      return job.backend_type || 'Unknown';
+  }
+}
+
+/** Dropdown / picker label — subject first, never the full UUID. */
+export function formatJobPickerLabel(job: Job): string {
+  const subject = job.is_sample_job ? 'Sample EEG demo' : deriveJobSubjectLabel(job);
+  const pipeline = jobPipelineLabel(job);
+  const when = new Date(job.completed_at || job.submitted_at).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  if (subject) return `${subject} — ${pipeline} (${when})`;
+  return `${pipeline} (${when}) · ${jobShortId(job)}`;
+}
+
 /** Client-side fallback when API has not attached subject_label yet. */
 export function deriveJobSubjectLabel(job: Job): string | null {
   if (job.subject_label) return job.subject_label;
+  if (job.input_label) {
+    const fromInput = job.input_label.replace(/\.(nii\.gz|nii|mgz)$/i, '');
+    if (fromInput) return fromInput;
+  }
 
   const params = job.parameters || {};
   let subjectId = String(params.subject_id || '').trim();
@@ -67,6 +105,25 @@ export function deriveJobSubjectLabel(job: Job): string | null {
   }
 
   return null;
+}
+
+/** Keep auto-refreshing jobs that may still be running or get reconciled after a false failure. */
+const STATUS_WATCH_WINDOW_MS = 12 * 60 * 60 * 1000;
+const SUSPICIOUS_FAIL_RUNTIME_SEC = 300;
+
+export function jobNeedsStatusWatch(job: Job, now = Date.now()): boolean {
+  if (job.status === 'pending' || job.status === 'running') return true;
+  if (job.status !== 'failed') return false;
+
+  const submitted = new Date(job.submitted_at).getTime();
+  if (Number.isNaN(submitted) || now - submitted > STATUS_WATCH_WINDOW_MS) return false;
+
+  const runtime = job.runtime_seconds ?? 0;
+  // Fast "failed" on long pipelines (e.g. FreeSurfer) is often a monitoring glitch.
+  if (runtime > 0 && runtime < SUSPICIOUS_FAIL_RUNTIME_SEC) return true;
+
+  // Recent failure — Celery retry or reaper may still update the DB.
+  return true;
 }
 
 export function jobMatchesFilter(job: Job, query: string): boolean {

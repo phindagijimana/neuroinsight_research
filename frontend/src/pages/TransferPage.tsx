@@ -26,6 +26,7 @@ import FileBrowserPane from '../components/FileBrowserPane';
 import ConnectionPanel from '../components/ConnectionPanel';
 import { TransferProgress } from '../components/TransferProgress';
 import type { FileEntry, PlatformType } from '../components/FileBrowserPane';
+import { consumeTransferOpenAt } from '../lib/openJobPath';
 
 interface PlatformTabDef {
   id: PlatformType;
@@ -59,6 +60,8 @@ function TransferPage() {
   // Pane paths (for backend platforms, used as source_path / dest_path)
   const [leftPath, setLeftPath] = useState('~');
   const [rightPath, setRightPath] = useState('~');
+  const [leftInitialPath, setLeftInitialPath] = useState<string | null>(null);
+  const [rightInitialPath, setRightInitialPath] = useState<string | null>(null);
 
   // Selected files in each pane
   const [leftSelected, setLeftSelected] = useState<FileEntry[]>([]);
@@ -133,6 +136,19 @@ function TransferPage() {
       setActiveTransfers(restored);
     }
     loadHistory();
+
+    const openAt = consumeTransferOpenAt();
+    if (openAt) {
+      if (openAt.pane === 'left') {
+        setLeftPlatform(openAt.platform);
+        setLeftPath(openAt.path);
+        setLeftInitialPath(openAt.path);
+      } else {
+        setRightPlatform(openAt.platform);
+        setRightPath(openAt.path);
+        setRightInitialPath(openAt.path);
+      }
+    }
   }, [hydrateActiveTransfers]);
 
   useEffect(() => {
@@ -364,12 +380,13 @@ function TransferPage() {
           <div className="flex-1 min-h-0">
             {leftConnected ? (
               <FileBrowserPane
-                key={`left-${leftPlatform}-${leftConnected}`}
+                key={`left-${leftPlatform}-${leftConnected}-${leftInitialPath || ''}`}
                 platform={leftPlatform}
                 side="source"
                 selectedFiles={leftSelected}
                 onSelectionChange={setLeftSelected}
                 onPathChange={setLeftPath}
+                initialPath={leftInitialPath}
               />
             ) : (
               <div className="h-full flex items-center justify-center bg-white rounded-lg border border-gray-200">
@@ -488,12 +505,13 @@ function TransferPage() {
           <div className="flex-1 min-h-0">
             {rightConnected ? (
               <FileBrowserPane
-                key={`right-${rightPlatform}-${rightConnected}`}
+                key={`right-${rightPlatform}-${rightConnected}-${rightInitialPath || ''}`}
                 platform={rightPlatform}
                 side="destination"
                 selectedFiles={rightSelected}
                 onSelectionChange={setRightSelected}
                 onPathChange={setRightPath}
+                initialPath={rightInitialPath}
               />
             ) : (
               <div className="h-full flex items-center justify-center bg-white rounded-lg border border-gray-200">

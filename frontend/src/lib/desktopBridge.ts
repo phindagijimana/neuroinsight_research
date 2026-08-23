@@ -31,6 +31,9 @@ export interface NirDesktopBridge {
   ui?: {
     control: () => Promise<{ ok?: boolean }>;
   };
+  diagnostics?: {
+    reveal: (filePath: string) => Promise<{ ok?: boolean; error?: string }>;
+  };
   onOpenVolume?: (
     cb: (payload: { name: string; data: ArrayBuffer | Uint8Array }) => void
   ) => () => void;
@@ -62,4 +65,19 @@ export async function getDesktopBackendStatus(): Promise<NirBackendStatusRespons
 
 export function openControlCenter(): void {
   window.nir?.ui?.control?.();
+}
+
+export function canRevealInFinder(): boolean {
+  return typeof window.nir?.diagnostics?.reveal === 'function';
+}
+
+/** Open a file or folder in Finder / Explorer (desktop app only). */
+export async function revealPathInFinder(filePath: string): Promise<boolean> {
+  if (!canRevealInFinder() || !filePath) return false;
+  try {
+    const res = await window.nir!.diagnostics!.reveal(filePath);
+    return res?.ok !== false;
+  } catch {
+    return false;
+  }
 }

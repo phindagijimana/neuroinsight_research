@@ -22,6 +22,7 @@ import StatusBadge from '../components/StatusBadge';
 import Button from '../components/Button';
 import { LoadingState, Spinner } from '../components/LoadingState';
 import WorkspacePageHeader from '../components/WorkspacePageHeader';
+import PathLocationBar from '../components/PathLocationBar';
 import type { ViewerTab } from '../utils/viewerQuery';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { useToast, useConfirm } from '../contexts/NotificationContext';
@@ -31,7 +32,11 @@ import {
   formatJobOutput,
   resolveJobOutputPath,
 } from '../lib/jobPaths';
-import { deriveJobSubjectLabel, jobMatchesFilter } from '../lib/jobLabels';
+import {
+  deriveJobSubjectLabel,
+  jobMatchesFilter,
+  jobNeedsStatusWatch,
+} from '../lib/jobLabels';
 
 const SAMPLE_VIEWER_TABS: ViewerTab[] = ['eeg', 'imaging', 'eeg-brain'];
 
@@ -147,12 +152,20 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
       });
   }, []);
 
-  // Start/stop progress polling based on active jobs
-  useEffect(() => {
-    const hasActiveJobs = jobs.some(
-      (j) => j.status === 'pending' || j.status === 'running'
-    );
+  const jobsNeedingWatch = useMemo(
+    () => jobs.some((j) => jobNeedsStatusWatch(j)),
+    [jobs]
+  );
 
+  const hasActiveJobs = useMemo(
+    () => jobs.some((j) => j.status === 'pending' || j.status === 'running'),
+    [jobs]
+  );
+
+  const watchingRecentFailures = jobsNeedingWatch && !hasActiveJobs;
+
+  // Start/stop polling — full refresh also runs for recent failures (false-fail recovery).
+  useEffect(() => {
     // Progress poll every 15s (SSH-based, can be slow)
     if (hasActiveJobs && !progressTimerRef.current) {
       progressTimerRef.current = setInterval(pollProgress, 15000);
@@ -161,10 +174,10 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
       progressTimerRef.current = null;
     }
 
-    // Slower full refresh (30s) to catch status transitions
-    if (hasActiveJobs && !fullRefreshTimerRef.current) {
+    // Full refresh every 30s while jobs may still change status (running or recently failed).
+    if (jobsNeedingWatch && !fullRefreshTimerRef.current) {
       fullRefreshTimerRef.current = setInterval(() => fetchJobs(true), 30000);
-    } else if (!hasActiveJobs && fullRefreshTimerRef.current) {
+    } else if (!jobsNeedingWatch && fullRefreshTimerRef.current) {
       clearInterval(fullRefreshTimerRef.current);
       fullRefreshTimerRef.current = null;
     }
@@ -175,7 +188,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
       progressTimerRef.current = null;
       fullRefreshTimerRef.current = null;
     };
-  }, [jobs, pollProgress]);
+  }, [jobs, hasActiveJobs, jobsNeedingWatch, pollProgress]);
 
   const handleJobsSubmitted = (jobIds: string[]) => {
     const n = jobIds.length;
@@ -361,7 +374,16 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                 <h2 className="text-lg font-semibold tracking-tight text-gray-900">Recent jobs</h2>
                 <p className="mt-0.5 text-sm text-gray-500">
                   {lastRefreshTime ? (
-                    <>Updated {formatDate(lastRefreshTime.toISOString())} · search by subject or pipeline</>
+                    <>
+                      Updated {formatDate(lastRefreshTime.toISOString())}
+                      {watchingRecentFailures ? (
+                        <> · auto-refreshing recent jobs (status may update)</>
+                      ) : (
+                        <> · search by subject or pipeline</>
+                      )}
+                    </>
+                  ) : watchingRecentFailures ? (
+                    'Auto-refreshing — status may update after long runs'
                   ) : (
                     'Search by subject, pipeline, or job ID'
                   )}
@@ -449,10 +471,13 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                                 hostDataDir: pathContext.hostDataDir,
                                 homeDir: pathContext.homeDir,
                               };
-                              const inputRaw = formatJobInput(job);
-                              let inputDisplay = inputRaw;
+                              const inputHostPath =
+                                job.is_sample_job || job.input_files.length === 0
+                                  ? ''
+                                  : job.input_files[0];
+                              let inputDisplay = formatJobInput(job);
                               if (!job.is_sample_job && job.input_files.length === 1) {
-                                inputDisplay = formatDisplayPath(inputRaw, pathContext.homeDir);
+                                inputDisplay = formatDisplayPath(inputHostPath, pathContext.homeDir);
                               } else if (!job.is_sample_job && job.input_files.length > 1) {
                                 inputDisplay = `${formatDisplayPath(job.input_files[0], pathContext.homeDir)} (+${job.input_files.length - 1} more)`;
                               }
@@ -460,14 +485,26 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                               const outputDisplay = formatJobOutput(job, pathOpts);
                               return (
                                 <>
-                                  <p className="font-mono break-all leading-relaxed" title={inputRaw}>
-                                    <span className="font-sans font-medium text-gray-600">Input: </span>
-                                    {inputDisplay}
-                                  </p>
-                                  <p className="font-mono break-all leading-relaxed" title={outputRaw}>
-                                    <span className="font-sans font-medium text-gray-600">Output: </span>
-                                    {outputDisplay}
-                                  </p>
+                                  <PathLocationBar
+                                    compact
+                                    label="Input"
+                                    pathKind="input"
+                                    job={job}
+                                    homeDir={pathContext.homeDir}
+                                    hostPath={inputHostPath}
+                                    displayPath={inputDisplay}
+                                    onNavigateToTransfer={() => setActivePage('transfer')}
+                                  />
+                                  <PathLocationBar
+                                    compact
+                                    label="Output"
+                                    pathKind="output"
+                                    job={job}
+                                    homeDir={pathContext.homeDir}
+                                    hostPath={outputRaw}
+                                    displayPath={outputDisplay}
+                                    onNavigateToTransfer={() => setActivePage('transfer')}
+                                  />
                                 </>
                               );
                             })()}

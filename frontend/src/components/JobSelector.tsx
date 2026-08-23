@@ -1,68 +1,101 @@
 /**
- * JobSelector Component
- * Dropdown to select a completed job
+ * JobSelector — pick a completed job (subject-first labels, optional search).
  */
-
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import type { Job } from '../types';
-import CheckCircle from './icons/CheckCircle';
-import { deriveJobSubjectLabel } from '../lib/jobLabels';
+import { formatJobPickerLabel, jobMatchesFilter } from '../lib/jobLabels';
 
 interface JobSelectorProps {
   jobs: Job[];
   selectedJobId: string | null;
   onJobSelect: (jobId: string) => void;
   label?: string;
+  /** Inline layout for page headers (no block label). */
+  compact?: boolean;
+  className?: string;
 }
 
 export const JobSelector: React.FC<JobSelectorProps> = ({
   jobs,
   selectedJobId,
   onJobSelect,
-  label = 'Select Job'
+  label = 'Completed job',
+  compact = false,
+  className = '',
 }) => {
-  const completedJobs = jobs.filter(j => j.status === 'completed');
+  const [filter, setFilter] = useState('');
+  const completedJobs = jobs.filter((j) => j.status === 'completed');
+
+  const visibleJobs = useMemo(() => {
+    if (!filter.trim()) return completedJobs;
+    return completedJobs.filter((job) => jobMatchesFilter(job, filter));
+  }, [completedJobs, filter]);
 
   if (completedJobs.length === 0) {
     return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <p className="text-sm text-yellow-800">
-          No completed jobs available. Submit and complete a job first.
-        </p>
+      <div className={`rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 ${className}`}>
+        <p className="text-xs text-amber-900">No completed jobs yet.</p>
+      </div>
+    );
+  }
+
+  const selectControl = (
+    <select
+      value={selectedJobId || ''}
+      onChange={(e) => onJobSelect(e.target.value)}
+      aria-label={label}
+      className={`min-w-0 rounded-lg border border-gray-300 bg-white text-gray-900 focus:border-navy-600 focus:ring-2 focus:ring-navy-600 ${
+        compact ? 'max-w-md px-3 py-1.5 text-sm' : 'w-full px-4 py-2'
+      }`}
+    >
+      <option value="">Choose a job…</option>
+      {visibleJobs.map((job) => (
+        <option key={job.id} value={job.id}>
+          {formatJobPickerLabel(job)}
+        </option>
+      ))}
+    </select>
+  );
+
+  const showFilter = completedJobs.length > 4;
+
+  if (compact) {
+    return (
+      <div className={`flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center ${className}`}>
+        <span className="shrink-0 text-xs font-medium text-gray-500">{label}</span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row sm:items-center">
+          {selectControl}
+          {showFilter && (
+            <input
+              type="search"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter…"
+              aria-label="Filter completed jobs"
+              className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm sm:w-36"
+            />
+          )}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
-      <label className="block text-sm font-semibold text-gray-700">
-        {label}
-      </label>
-      <select
-        value={selectedJobId || ''}
-        onChange={(e) => onJobSelect(e.target.value)}
-        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 focus:border-navy-600 bg-white text-gray-900"
-      >
-        <option value="">-- Select a completed job --</option>
-        {completedJobs.map((job) => {
-          const subject = deriveJobSubjectLabel(job);
-          const pipeline = job.display_name || job.pipeline_name;
-          const when = new Date(job.completed_at || job.submitted_at).toLocaleDateString();
-          const label = subject
-            ? `${subject} — ${pipeline} (${when})`
-            : `${pipeline} (${when}) · ${job.id.slice(0, 8)}`;
-          return (
-          <option key={job.id} value={job.id}>
-            {label}
-          </option>
-          );
-        })}
-      </select>
-      {selectedJobId && (
-        <div className="flex items-center gap-2 text-sm text-green-600">
-          <CheckCircle className="w-4 h-4" />
-          <span>Job selected</span>
-        </div>
+    <div className={`space-y-2 ${className}`}>
+      <label className="block text-sm font-semibold text-gray-700">{label}</label>
+      {showFilter && (
+        <input
+          type="search"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter by subject, pipeline, or ID…"
+          aria-label="Filter completed jobs"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        />
+      )}
+      {selectControl}
+      {filter.trim() && visibleJobs.length === 0 && (
+        <p className="text-xs text-gray-500">No jobs match &ldquo;{filter}&rdquo;.</p>
       )}
     </div>
   );

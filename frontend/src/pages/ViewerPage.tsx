@@ -1,9 +1,8 @@
 /**
  * ViewerPage — Signal | Imaging | Multimodal (single page, one mode visible at a time).
- * Imaging View uses Niivue; Signal View uses MNE-backed /api/results/.../eeg_preview.
  */
-
 import { useState, useEffect, useCallback } from 'react';
+import { Download } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import type { Job } from '../types';
@@ -11,9 +10,8 @@ import NiivueViewer from '../components/NiivueViewer';
 import EegViewerPanel from '../components/EegViewerPanel';
 import EegBrainFusionPanel from '../components/EegBrainFusionPanel';
 import JobSelector from '../components/JobSelector';
-import FileBrowser, { type ViewerFileMode } from '../components/FileBrowser';
-import Eye from '../components/icons/Eye';
-import Download from '../components/icons/Download';
+import ViewerFileDrawer from '../components/ViewerFileDrawer';
+import { type ViewerFileMode } from '../components/FileBrowser';
 import RefreshCw from '../components/icons/RefreshCw';
 import Brain from '../components/icons/Brain';
 import {
@@ -28,17 +26,30 @@ import {
 } from '../utils/viewerQuery';
 import { LoadingState } from '../components/LoadingState';
 import StatusBadge from '../components/StatusBadge';
+import WorkspacePageHeader from '../components/WorkspacePageHeader';
+import Button from '../components/Button';
+import {
+  deriveJobSubjectLabel,
+  jobPipelineLabel,
+  jobShortId,
+} from '../lib/jobLabels';
 
 export type { ViewerTab } from '../utils/viewerQuery';
 
 interface ViewerPageProps {
   selectedJobId: string | null;
   setSelectedJobId: (jobId: string | null) => void;
-  /** Incremented when app navigates to Viewer (re-sync tab from URL). */
   viewerNavEpoch?: number;
-  /** A locally-opened volume (drag-and-drop / file picker) — viewed without upload. */
   localVolume?: { url: string; name: string } | null;
 }
+
+const VIEWER_TABS: { id: ViewerTab; label: string }[] = [
+  { id: 'eeg', label: 'Signal' },
+  { id: 'imaging', label: 'Imaging' },
+  { id: 'eeg-brain', label: 'Multimodal' },
+];
+
+const VIEWER_DRAWER_KEY = 'nir.viewer.drawerOpen';
 
 const ViewerPage: React.FC<ViewerPageProps> = ({
   selectedJobId,
@@ -53,12 +64,22 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string>('');
   const [segmentationUrl, setSegmentationUrl] = useState<string>('');
-  const [showFileBrowser, setShowFileBrowser] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(() => {
+    try {
+      const stored = window.sessionStorage.getItem(VIEWER_DRAWER_KEY);
+      return stored === null ? true : stored === '1';
+    } catch {
+      return true;
+    }
+  });
+  const [viewportHeight, setViewportHeight] = useState(
+    typeof window !== 'undefined' ? window.innerHeight : 800,
+  );
   const [viewerReady, setViewerReady] = useState(false);
   const [viewerTab, setViewerTab] = useState<ViewerTab>(() =>
     typeof window !== 'undefined'
       ? parseViewerTabFromSearch(window.location.search) ?? 'imaging'
-      : 'imaging'
+      : 'imaging',
   );
   const [eegFileRelPath, setEegFileRelPath] = useState<string | null>(null);
 
@@ -67,9 +88,8 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
     setViewerQueryParam(tab);
   }, []);
 
-  // A locally-opened volume (drag-and-drop / file picker) overrides the
-  // job-driven image and is viewed in place — no upload.
   const effectiveImageUrl = localVolume?.url || imageUrl;
+
   useEffect(() => {
     if (localVolume) commitViewerTab('imaging');
   }, [localVolume, commitViewerTab]);
@@ -88,8 +108,6 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
     setViewerTab(t);
   }, [viewerNavEpoch]);
 
-  // When EEG is disabled, the Signal/Multimodal tabs are hidden — force any
-  // EEG-only tab (e.g. from a stale deep link) back to the Imaging view.
   useEffect(() => {
     if (!eegEnabled && (viewerTab === 'eeg' || viewerTab === 'eeg-brain')) {
       commitViewerTab('imaging');
@@ -99,6 +117,26 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
   useEffect(() => {
     fetchJobs();
   }, []);
+
+  useEffect(() => {
+    const onResize = () => setViewportHeight(window.innerHeight);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const toggleDrawer = useCallback(() => {
+    setDrawerOpen((open) => {
+      const next = !open;
+      try {
+        window.sessionStorage.setItem(VIEWER_DRAWER_KEY, next ? '1' : '0');
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
+
+  const canvasHeightPx = Math.min(820, Math.max(480, Math.floor(viewportHeight * 0.62)));
 
   useEffect(() => {
     setEegFileRelPath(null);
@@ -147,7 +185,6 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
       ]);
 
       const baseUrl = apiService.getBaseUrl();
-
       const volFailed = volData.status === 'rejected';
       const volNotFound = volFailed && String(volData.reason).includes('404');
 
@@ -162,8 +199,7 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
             selectedJob?.backend_type === 'remote_docker';
           if (isRemote) {
             setError(
-              'Cannot access remote results — HPC connection may be lost. ' +
-                'Go to Jobs page and reconnect to the HPC, then try again.'
+              'Cannot access remote results — reconnect to HPC from Jobs, then try again.',
             );
           }
         }
@@ -204,263 +240,211 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
     }
   };
 
-  const handleDownloadVolume = () => {
-    if (imageUrl) window.open(imageUrl, '_blank');
-  };
-
-  const handleDownloadSegmentation = () => {
-    if (segmentationUrl) window.open(segmentationUrl, '_blank');
-  };
-
   const handleExportAll = () => {
     if (selectedJobId) {
-      const url = apiService.exportJobResultsUrl(selectedJobId);
-      window.open(url, '_blank');
+      window.open(apiService.exportJobResultsUrl(selectedJobId), '_blank');
     }
   };
 
   const completedJobs = jobs.filter((j) => j.status === 'completed');
+  const visibleTabs = VIEWER_TABS.filter(
+    (t) => eegEnabled || t.id === 'imaging',
+  );
 
   const fileMode: ViewerFileMode =
     viewerTab === 'imaging' ? 'imaging' : viewerTab === 'eeg' ? 'eeg' : 'multimodal';
 
-  const tabBtn = (id: ViewerTab, label: string) => (
-    <button
-      type="button"
-      key={id}
-      onClick={() => commitViewerTab(id)}
-      className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-        viewerTab === id
-          ? 'bg-navy-600 text-white shadow-sm'
-          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-      }`}
-    >
-      {label}
-    </button>
-  );
+  const subjectLabel = job
+    ? job.is_sample_job
+      ? 'Sample EEG demo'
+      : deriveJobSubjectLabel(job)
+    : null;
+  const pipelineLabel = job ? jobPipelineLabel(job) : '';
+
+  const viewerSubtitle =
+    viewerTab === 'eeg'
+      ? 'Time-series preview from job outputs.'
+      : viewerTab === 'eeg-brain'
+        ? 'Combined EEG and brain imaging.'
+        : 'Multi-planar NIfTI / MGZ viewer with overlays.';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <Eye className="w-8 h-8 text-navy-600" />
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Viewer</h1>
-                <p className="text-gray-600">
-                  {eegEnabled
-                    ? 'Signal View (time series), Imaging View, or Multimodal View (combined)'
-                    : 'Imaging View'}
-                </p>
-              </div>
+    <div className="flex min-h-full flex-col bg-gray-50">
+      <div className="mx-auto flex w-full max-w-[1800px] flex-1 flex-col px-4 py-6 sm:px-6 lg:px-8">
+        <WorkspacePageHeader
+          title="Viewer"
+          subtitle={viewerSubtitle}
+          actions={
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {!loading && completedJobs.length > 0 && (
+                <JobSelector
+                  compact
+                  jobs={jobs}
+                  selectedJobId={selectedJobId}
+                  onJobSelect={setSelectedJobId}
+                  label="Job"
+                />
+              )}
+              <Button variant="secondary" onClick={fetchJobs}>
+                <RefreshCw className="w-4 h-4" />
+                Refresh
+              </Button>
             </div>
-            <button
-              onClick={fetchJobs}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition self-start"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
-          </div>
+          }
+        />
 
-          <div className="flex flex-wrap gap-2 mt-4">
-            {eegEnabled && tabBtn('eeg', 'Signal View')}
-            {tabBtn('imaging', 'Imaging View')}
-            {eegEnabled && tabBtn('eeg-brain', 'Multimodal View')}
-          </div>
+        <div className="mb-5 inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+          {visibleTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => commitViewerTab(tab.id)}
+              className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+                viewerTab === tab.id
+                  ? 'bg-navy-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4">
             <p className="text-sm text-red-800">{error}</p>
           </div>
         )}
 
-        {!loading && completedJobs.length > 0 && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1">
-                <JobSelector
-                  jobs={jobs}
-                  selectedJobId={selectedJobId}
-                  onJobSelect={(jobId) => {
-                    setSelectedJobId(jobId);
-                    setShowFileBrowser(true);
-                  }}
-                  label="Select Job to View"
-                />
-              </div>
-              {selectedJobId && (
-                <button
-                  onClick={() => setShowFileBrowser(!showFileBrowser)}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm"
-                >
-                  {showFileBrowser ? 'Hide' : 'Show'} Files
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {!loading && selectedJobId && showFileBrowser && (
-          <div className="mb-6 max-h-80 overflow-y-auto">
-            <FileBrowser
-              jobId={selectedJobId}
-              onFileSelect={handleFileSelect}
-              showDownload={true}
-              showViewButton={true}
-              viewerFileMode={fileMode}
+        {!loading && !selectedJob && completedJobs.length > 0 && (
+          <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4">
+            <JobSelector
+              jobs={jobs}
+              selectedJobId={selectedJobId}
+              onJobSelect={setSelectedJobId}
+              label="Select a completed job"
             />
           </div>
         )}
 
         {job && (
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-sm font-medium text-gray-900">{job.pipeline_name}</span>
-                <span className="text-sm text-gray-500 ml-3">Job: {job.id.slice(0, 8)}</span>
-              </div>
+          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="truncate text-base font-semibold text-gray-900">
+                {subjectLabel || pipelineLabel}
+              </p>
+              <p className="mt-0.5 text-sm text-gray-500">
+                {subjectLabel && (
+                  <>
+                    <span>{pipelineLabel}</span>
+                    <span className="mx-1.5 text-gray-300">·</span>
+                  </>
+                )}
+                <span className="font-mono text-gray-600">{jobShortId(job)}</span>
+                {localVolume && (
+                  <>
+                    <span className="mx-1.5 text-gray-300">·</span>
+                    <span className="text-navy-600">Local file: {localVolume.name}</span>
+                  </>
+                )}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               <StatusBadge status={job.status} />
+              {selectedJobId && (
+                <Button variant="secondary" size="sm" onClick={handleExportAll}>
+                  <Download className="w-4 h-4" />
+                  Export
+                </Button>
+              )}
             </div>
           </div>
         )}
 
-        {loading && (
-          <div className="bg-white rounded-lg border border-gray-200">
-            <LoadingState message="Loading…" />
-          </div>
-        )}
+        <div className="flex min-h-[calc(100vh-14rem)] flex-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          {selectedJobId && job?.status === 'completed' && (
+            <ViewerFileDrawer
+              open={drawerOpen}
+              onToggle={toggleDrawer}
+              jobId={selectedJobId}
+              onFileSelect={handleFileSelect}
+              viewerFileMode={fileMode}
+            />
+          )}
 
-        {!loading && viewerTab === 'eeg' && (
-          <EegViewerPanel jobId={selectedJobId} eegRelativePath={eegFileRelPath} />
-        )}
-
-        {!loading && viewerTab === 'imaging' && effectiveImageUrl && (
-          <div className="space-y-6">
-            {localVolume && (
-              <div className="bg-navy-600/10 border border-navy-600/20 rounded-lg px-4 py-2.5 text-sm text-gray-700">
-                Viewing local file <span className="font-medium text-navy-600">{localVolume.name}</span> — opened in place, not uploaded.
+          <div className="min-w-0 flex-1 overflow-y-auto p-4">
+            {loading && (
+              <div className="rounded-lg border border-gray-200 bg-white">
+                <LoadingState message="Loading jobs…" />
               </div>
             )}
-            <NiivueViewer
-              imageUrl={effectiveImageUrl}
-              segmentationUrl={localVolume ? undefined : segmentationUrl || undefined}
-              pipelineName={job?.pipeline_name}
-              imageName={localVolume?.name}
-              onLoad={() => setViewerReady(true)}
-            />
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={handleDownloadVolume}
-                  className="flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-800 transition text-sm"
-                >
-                  <Download className="w-4 h-4" />
-                  Download Volume
-                </button>
-                {segmentationUrl && (
-                  <button
-                    onClick={handleDownloadSegmentation}
-                    className="flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-800 transition text-sm"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download Segmentation
-                  </button>
-                )}
-                {selectedJobId && (
-                  <button
-                    onClick={handleExportAll}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm"
-                  >
-                    <Download className="w-4 h-4" />
-                    Export All Results
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
-        {!loading && viewerTab === 'eeg-brain' && imageUrl && (
-          <div className="space-y-6">
-            <EegBrainFusionPanel
-              jobId={selectedJobId}
-              eegRelativePath={eegFileRelPath}
-              imageUrl={imageUrl}
-              segmentationUrl={segmentationUrl || undefined}
-              pipelineName={job?.pipeline_name}
-              onNiivueLoad={() => setViewerReady(true)}
-            />
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={handleDownloadVolume}
-                  className="flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-800 transition text-sm"
-                >
-                  <Download className="w-4 h-4" />
-                  Download Volume
-                </button>
-                {segmentationUrl && (
-                  <button
-                    onClick={handleDownloadSegmentation}
-                    className="flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-800 transition text-sm"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download Segmentation
-                  </button>
-                )}
-                {selectedJobId && (
-                  <button
-                    onClick={handleExportAll}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm"
-                  >
-                    <Download className="w-4 h-4" />
-                    Export All Results
-                  </button>
+            {!loading && viewerTab === 'eeg' && (
+              <EegViewerPanel jobId={selectedJobId} eegRelativePath={eegFileRelPath} />
+            )}
+
+            {!loading && viewerTab === 'imaging' && effectiveImageUrl && (
+              <NiivueViewer
+                imageUrl={effectiveImageUrl}
+                segmentationUrl={localVolume ? undefined : segmentationUrl || undefined}
+                pipelineName={job?.pipeline_name}
+                imageName={localVolume?.name}
+                onLoad={() => setViewerReady(true)}
+                canvasHeightPx={canvasHeightPx}
+              />
+            )}
+
+            {!loading && viewerTab === 'eeg-brain' && imageUrl && (
+              <EegBrainFusionPanel
+                jobId={selectedJobId}
+                eegRelativePath={eegFileRelPath}
+                imageUrl={imageUrl}
+                segmentationUrl={segmentationUrl || undefined}
+                pipelineName={job?.pipeline_name}
+                onNiivueLoad={() => setViewerReady(true)}
+              />
+            )}
+
+            {!loading && viewerTab === 'imaging' && !effectiveImageUrl && !error && (
+              <div className="flex h-full min-h-[420px] flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50/80 p-12 text-center">
+                <Brain className="mx-auto mb-4 h-16 w-16 text-gray-300" />
+                <h3 className="mb-2 text-lg font-semibold text-gray-900">
+                  {completedJobs.length === 0 ? 'No completed jobs yet' : 'Choose a volume to view'}
+                </h3>
+                <p className="mx-auto max-w-md text-sm text-gray-600">
+                  {completedJobs.length === 0
+                    ? 'Run a job first, then open its outputs here.'
+                    : drawerOpen
+                      ? 'Select a NIfTI or MGZ file from the list on the left.'
+                      : 'Open the file list on the left, then pick a volume.'}
+                </p>
+                {completedJobs.length > 0 && selectedJobId && !drawerOpen && (
+                  <Button className="mt-4" onClick={toggleDrawer}>
+                    Show file list
+                  </Button>
                 )}
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {!loading && viewerTab === 'imaging' && !effectiveImageUrl && !error && (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-            <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {completedJobs.length === 0 ? 'No Completed Jobs Yet' : 'Open an imaging volume'}
-            </h3>
-            <p className="text-gray-600">
-              {completedJobs.length === 0
-                ? 'Complete a processing job first, then view results here.'
-                : eegEnabled
-                ? 'Select a job, show files, and open a NIfTI / MGZ file — or switch to Signal View.'
-                : 'Select a job, show files, and open a NIfTI / MGZ file.'}
-            </p>
-          </div>
-        )}
+            {!loading && viewerTab === 'eeg-brain' && !imageUrl && !error && (
+              <div className="flex h-full min-h-[420px] flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50/80 p-12 text-center">
+                <Brain className="mx-auto mb-4 h-16 w-16 text-gray-300" />
+                <h3 className="mb-2 text-lg font-semibold text-gray-900">Add a brain volume</h3>
+                <p className="mb-4 text-sm text-gray-600">
+                  Pick a NIfTI / MGZ volume from the file list on the left.
+                </p>
+                <EegViewerPanel jobId={selectedJobId} eegRelativePath={eegFileRelPath} compact />
+              </div>
+            )}
 
-        {!loading && viewerTab === 'eeg-brain' && !imageUrl && !error && (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-            <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Add a brain volume</h3>
-            <p className="text-gray-600 mb-2">Pick a NIfTI / MGZ volume from files.</p>
-            <EegViewerPanel jobId={selectedJobId} eegRelativePath={eegFileRelPath} compact />
+            {viewerReady && effectiveImageUrl && viewerTab === 'imaging' && (
+              <p className="mt-3 text-center text-xs text-gray-400">
+                L/R = patient orientation · Press{' '}
+                <kbd className="rounded bg-gray-100 px-1">?</kbd> for shortcuts
+              </p>
+            )}
           </div>
-        )}
-
-        {viewerReady && imageUrl && viewerTab === 'imaging' && (
-          <div className="mt-6 py-3 px-4 bg-navy-600/10 border border-navy-600/20 rounded-lg text-center text-sm text-gray-700">
-            <span className="font-medium text-navy-600">L/R</span> = patient orientation.
-          </div>
-        )}
-
-        {viewerTab === 'eeg-brain' && imageUrl && (
-          <div className="mt-6 py-3 px-4 bg-navy-600/10 border border-navy-600/20 rounded-lg text-center text-sm text-gray-700">
-            Signal View (top) · Imaging View (bottom).
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );

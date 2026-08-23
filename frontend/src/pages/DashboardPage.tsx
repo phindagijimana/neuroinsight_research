@@ -21,7 +21,9 @@ import { LoadingState, Spinner } from '../components/LoadingState';
 import WorkspacePageHeader from '../components/WorkspacePageHeader';
 import Button from '../components/Button';
 import StatusBadge from '../components/StatusBadge';
-import { deriveJobSubjectLabel } from '../lib/jobLabels';
+import { deriveJobSubjectLabel, jobComputeLabel, jobPipelineLabel, jobShortId } from '../lib/jobLabels';
+import PathLocationBar from '../components/PathLocationBar';
+import { formatJobOutput, resolveJobOutputPath } from '../lib/jobPaths';
 
 const VIEWER_TABS: ViewerTab[] = ['eeg', 'imaging', 'eeg-brain'];
 
@@ -58,10 +60,25 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
   const [provenance, setProvenance] = useState<Provenance | null>(null);
   const [provenanceLoading, setProvenanceLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'qc' | 'files' | 'stats' | 'provenance'>('qc');
+  const [activeTab, setActiveTab] = useState<'stats' | 'files' | 'qc' | 'provenance'>('stats');
+  const [pathContext, setPathContext] = useState<{
+    dataDir: string;
+    hostDataDir: string | null;
+    homeDir: string | null;
+  }>({ dataDir: './data', hostDataDir: null, homeDir: null });
 
   useEffect(() => {
     fetchJobs();
+    apiService
+      .getBrowseRoot()
+      .then(({ data_dir, host_data_dir, local_root }) => {
+        setPathContext({
+          dataDir: data_dir,
+          hostDataDir: host_data_dir ?? null,
+          homeDir: local_root ?? null,
+        });
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -144,12 +161,27 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <WorkspacePageHeader
           title="Results"
-          subtitle="Inspect outputs, QC images, and provenance for completed jobs."
+          subtitle={
+            selectedJob
+              ? undefined
+              : 'Review statistics, output files, and QC for completed jobs.'
+          }
           actions={
-            <Button variant="secondary" onClick={fetchJobs}>
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {!loading && completedJobs.length > 0 && (
+                <JobSelector
+                  compact
+                  jobs={jobs}
+                  selectedJobId={selectedJobId}
+                  onJobSelect={setSelectedJobId}
+                  label="Job"
+                />
+              )}
+              <Button variant="secondary" onClick={fetchJobs}>
+                <RefreshCw className="w-4 h-4" />
+                Refresh
+              </Button>
+            </div>
           }
         />
 
@@ -173,14 +205,14 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
         )}
 
-        {/* Job Selector */}
-        {!loading && jobs.length > 0 && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+        {/* Job Selector — only when no job is selected yet */}
+        {!loading && jobs.length > 0 && !selectedJob && completedJobs.length > 0 && (
+          <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4">
             <JobSelector
               jobs={jobs}
               selectedJobId={selectedJobId}
               onJobSelect={setSelectedJobId}
-              label="Select a Completed Job"
+              label="Select a completed job"
             />
           </div>
         )}
@@ -200,45 +232,57 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
         {/* Job Details */}
         {selectedJob && (
           <div className="space-y-6">
-            {/* Job Info Card */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
+            {/* Job summary */}
+            <div className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 flex-1">
                   {(() => {
                     const subject = selectedJob.is_sample_job
-                      ? null
+                      ? 'Sample EEG demo'
                       : deriveJobSubjectLabel(selectedJob);
-                    const pipeline = selectedJob.display_name || selectedJob.pipeline_name;
+                    const pipeline = jobPipelineLabel(selectedJob);
                     return (
                       <>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                        <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">
                           {subject || pipeline}
                         </h2>
                         {subject && (
-                          <p className="text-base text-gray-600 mb-1">{pipeline}</p>
+                          <p className="mt-0.5 text-base text-gray-600">{pipeline}</p>
                         )}
                       </>
                     );
                   })()}
-                  <p className="text-gray-600">
-                    Job ID: {selectedJob.id} &middot;{' '}
-                    {selectedJob.execution_mode === 'workflow' ? 'Workflow' : 'Plugin'} Execution
+                  <p className="mt-2 text-sm text-gray-500">
+                    <span className="font-mono text-gray-700">{jobShortId(selectedJob)}</span>
+                    {' · '}
+                    {selectedJob.execution_mode === 'workflow' ? 'Workflow' : 'Plugin'}
+                    {' · '}
+                    {jobComputeLabel(selectedJob)}
+                    {' · '}
+                    {getJobDuration(selectedJob)}
+                    {' · '}
+                    {new Date(selectedJob.submitted_at).toLocaleString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
                     {selectedJob.is_sample_job && (
                       <>
-                        {' '}
-                        &middot;{' '}
-                        <span className="text-emerald-700 font-medium">Bundled sample data</span>
+                        {' · '}
+                        <span className="font-medium text-emerald-700">Bundled sample</span>
                       </>
                     )}
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
                   <StatusBadge status={selectedJob.status} />
                   {selectedJob.status === 'completed' && (
                     <>
                       <Button variant="secondary" onClick={handleExportBundle} disabled={exporting}>
                         {exporting ? <Spinner size="sm" /> : <Download className="w-4 h-4" />}
-                        Export Bundle
+                        Export
                       </Button>
                       <Button onClick={handleViewInViewer}>
                         <Eye className="w-4 h-4" />
@@ -249,62 +293,50 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                 </div>
               </div>
               {eegEnabled && selectedJob.is_sample_job && selectedJob.status === 'completed' && (
-                <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+                <p className="mt-4 text-sm text-emerald-800 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
                   Open in Viewer picks the right mode for this sample.
                 </p>
               )}
-            </div>
-
-            {/* QC Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <p className="text-xs font-medium text-gray-500 tracking-wider mb-1">Status</p>
-                <p className={`text-lg font-bold ${
-                  selectedJob.status === 'completed' ? 'text-green-700' :
-                  selectedJob.status === 'failed' ? 'text-red-700' : 'text-gray-900'
-                }`}>
-                  {selectedJob.status.charAt(0).toUpperCase() + selectedJob.status.slice(1)}
-                </p>
-              </div>
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <p className="text-xs font-medium text-gray-500 tracking-wider mb-1">Duration</p>
-                <p className="text-lg font-bold text-gray-900">{getJobDuration(selectedJob)}</p>
-              </div>
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <p className="text-xs font-medium text-gray-500 tracking-wider mb-1">Submitted</p>
-                <p className="text-lg font-bold text-gray-900">
-                  {new Date(selectedJob.submitted_at).toLocaleDateString()}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {new Date(selectedJob.submitted_at).toLocaleTimeString()}
-                </p>
-              </div>
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <p className="text-xs font-medium text-gray-500 tracking-wider mb-1">Pipeline</p>
-                <p className="text-lg font-bold text-navy-600 truncate">
-                  {selectedJob.display_name || selectedJob.pipeline_name}
-                </p>
-              </div>
+              {selectedJob.output_dir && (
+                <PathLocationBar
+                  compact
+                  className="mt-4"
+                  label="Output"
+                  pathKind="output"
+                  job={selectedJob}
+                  homeDir={pathContext.homeDir}
+                  hostPath={resolveJobOutputPath(selectedJob, {
+                    containerDataDir: pathContext.dataDir,
+                    hostDataDir: pathContext.hostDataDir,
+                  })}
+                  displayPath={formatJobOutput(selectedJob, {
+                    containerDataDir: pathContext.dataDir,
+                    hostDataDir: pathContext.hostDataDir,
+                    homeDir: pathContext.homeDir,
+                  })}
+                  onNavigateToTransfer={() => setActivePage('transfer')}
+                />
+              )}
             </div>
 
             {/* Tab Navigation */}
             {selectedJob.status === 'completed' && (
-              <div className="bg-white rounded-lg border border-gray-200">
+              <div className="rounded-xl border border-gray-200 bg-white">
                 <div className="border-b border-gray-200">
-                  <nav className="flex -mb-px">
-                    {(['qc', 'files', 'stats', 'provenance'] as const).map(tab => (
+                  <nav className="flex -mb-px overflow-x-auto">
+                    {(['stats', 'files', 'qc', 'provenance'] as const).map((tab) => (
                       <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
-                        className={`px-6 py-3 text-sm font-medium border-b-2 transition ${
+                        className={`whitespace-nowrap px-5 py-3 text-sm font-medium border-b-2 transition ${
                           activeTab === tab
                             ? 'border-navy-600 text-navy-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                         }`}
                       >
-                        {tab === 'qc' && 'QC Images'}
-                        {tab === 'files' && 'Output Files'}
                         {tab === 'stats' && 'Statistics'}
+                        {tab === 'files' && 'Output Files'}
+                        {tab === 'qc' && 'QC Images'}
                         {tab === 'provenance' && 'Provenance'}
                       </button>
                     ))}
@@ -312,8 +344,10 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                 </div>
 
                 <div>
-                  {activeTab === 'qc' && (
-                    <QCImageGallery jobId={selectedJob.id} />
+                  {activeTab === 'stats' && (
+                    <div className="p-4">
+                      <StatsViewer jobId={selectedJob.id} pipelineName={selectedJob.pipeline_name} />
+                    </div>
                   )}
 
                   {activeTab === 'files' && (
@@ -324,10 +358,8 @@ const DashboardPage: React.FC<DashboardPageProps> = ({
                     />
                   )}
 
-                  {activeTab === 'stats' && (
-                    <div className="p-4">
-                      <StatsViewer jobId={selectedJob.id} pipelineName={selectedJob.pipeline_name} />
-                    </div>
+                  {activeTab === 'qc' && (
+                    <QCImageGallery jobId={selectedJob.id} />
                   )}
 
                   {activeTab === 'provenance' && (

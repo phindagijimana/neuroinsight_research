@@ -41,6 +41,8 @@ interface FileBrowserPaneProps {
   selectedFiles: FileEntry[];
   onSelectionChange: (files: FileEntry[]) => void;
   onPathChange?: (path: string) => void;
+  /** When set, the pane opens at this path instead of the platform default. */
+  initialPath?: string | null;
 }
 
 const PLATFORM_META: Record<PlatformType, { label: string; icon: React.ReactNode; defaultPath: string }> = {
@@ -69,6 +71,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
   selectedFiles,
   onSelectionChange,
   onPathChange,
+  initialPath = null,
 }) => {
   const meta = PLATFORM_META[platform];
 
@@ -153,12 +156,16 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
       setCurrentPath(path);
       setAddressBar(path);
     };
+    if (initialPath) {
+      applyPath(initialPath);
+      return;
+    }
     if (platform === 'local') {
       resolveBrowseRoot('local').then((root) => applyPath(root || PLATFORM_META.local.defaultPath));
     } else {
       applyPath(PLATFORM_META[platform].defaultPath);
     }
-  }, [platform]);
+  }, [platform, initialPath, onSelectionChange]);
 
   // Load backend directories when path changes
   useEffect(() => {
