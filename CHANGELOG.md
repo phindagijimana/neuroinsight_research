@@ -7,6 +7,12 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-08-23
+
+### Fixed
+- **Desktop auto-update** — only prompt and download when `electron-updater` reports
+  `isUpdateAvailable`, fixing “Please check update first” on Download & Install.
+
 ## [0.1.19] - 2026-08-23
 
 ### Added

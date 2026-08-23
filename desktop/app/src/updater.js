@@ -55,7 +55,13 @@ async function checkForUpdates({ silent = true } = {}) {
   if (!u) return { ok: false, error: "updater unavailable" };
   try {
     const r = await u.checkForUpdates();
-    const version = r && r.updateInfo ? r.updateInfo.version : null;
+    // electron-updater only sets updateInfoAndProvider when isUpdateAvailable is true;
+    // returning updateInfo.version without that flag causes downloadUpdate() to throw
+    // "Please check update first" (e.g. already on latest, staging, or semver mismatch).
+    if (!r?.isUpdateAvailable) {
+      return { ok: true, version: null };
+    }
+    const version = r.updateInfo?.version || null;
     return { ok: true, version };
   } catch (e) {
     desktopState.appendLog("update_check_failed", { error: String(e) });
@@ -64,10 +70,21 @@ async function checkForUpdates({ silent = true } = {}) {
   }
 }
 
-/** Download the already-detected update. Resolves when fully downloaded. */
-function downloadUpdate() {
+/** Ensure electron-updater has prepared update metadata for downloadUpdate(). */
+async function ensureUpdatePrepared() {
   const u = getUpdater();
-  if (!u) return Promise.reject(new Error("updater unavailable"));
+  if (!u) throw new Error("updater unavailable");
+  if (u.updateInfoAndProvider != null) return u;
+  const r = await u.checkForUpdates();
+  if (!r?.isUpdateAvailable) {
+    throw new Error("No update is available to download");
+  }
+  return u;
+}
+
+/** Download the already-detected update. Resolves when fully downloaded. */
+async function downloadUpdate() {
+  const u = await ensureUpdatePrepared();
   return new Promise((resolve, reject) => {
     const cleanup = () => {
       u.removeListener("update-downloaded", onDone);

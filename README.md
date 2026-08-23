@@ -111,7 +111,7 @@ If you use NeuroInsight in your work, please cite:
   title        = {NeuroInsight: Neuroimaging Processing Platform},
   year         = {2026},
   url          = {https://github.com/phindagijimana/neuroinsight_research},
-  version      = {0.1.19}
+  version      = {0.1.20}
 }
 ```
 
