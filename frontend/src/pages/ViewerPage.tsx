@@ -316,7 +316,7 @@ const ViewerPage: React.FC<ViewerPageProps> = ({
           </div>
         )}
 
-        {!loading && !selectedJob && completedJobs.length > 0 && (
+        {!loading && !selectedJobId && completedJobs.length > 0 && (
           <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4">
             <JobSelector
               jobs={jobs}

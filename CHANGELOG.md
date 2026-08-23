@@ -37,6 +37,8 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 - Auto-refresh for recent jobs that may reconcile after false failures (long runs).
 - Viewer and Docs no longer surface internal utility plugins by default.
 - Multi-file job inputs use the first real file path for reveal/open actions.
+- macOS release CI now ships a signed `.zip` alongside the DMG so in-app auto-update
+  works on Mac (Squirrel.Mac requires the zip feed entry in `latest-mac.yml`).
 
 ## [0.1.18] - 2026-08-22
 

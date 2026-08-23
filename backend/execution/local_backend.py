@@ -733,8 +733,8 @@ class LocalDockerBackend(ExecutionBackend):
                     row = db.query(Job).filter_by(id=job_id).first()
                     if row and row.output_dir:
                         output_dir = Path(row.output_dir)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Could not resolve output_dir from DB for %s: %s", job_id[:8], e)
         if output_dir is None:
             output_dir = self.data_dir / "outputs" / job_id
         if output_dir.exists():

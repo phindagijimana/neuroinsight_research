@@ -18,7 +18,7 @@
     "dist:mac": "electron-builder --mac dmg",
     "dist:win": "electron-builder --win nsis",
     "dist:linux:ci": "electron-builder --linux AppImage deb --publish never",
-    "dist:mac:ci": "electron-builder --mac dmg --publish never",
+    "dist:mac:ci": "electron-builder --mac dmg zip --publish never",
     "dist:win:ci": "electron-builder --win nsis --publish never",
     "test:e2e": "playwright test"
   },

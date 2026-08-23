@@ -79,15 +79,6 @@ def _parse_subject_session(
     primary_input = str(input_files[0]) if input_files else ""
     if primary_input:
         normalized = primary_input.replace("\\", "/")
-        if not subject_id:
-            sub_match = _SUB_RE.search(normalized)
-            if sub_match:
-                subject_id = sub_match.group(1)
-        if not session_id:
-            ses_match = _SES_RE.search(normalized)
-            if ses_match:
-                session_id = ses_match.group(1)
-
         name = Path(normalized).name
         if not subject_id:
             sub_match = _SUB_FILE_RE.search(name)
@@ -95,6 +86,14 @@ def _parse_subject_session(
                 subject_id = sub_match.group(1)
         if not session_id:
             ses_match = _SES_FILE_RE.search(name)
+            if ses_match:
+                session_id = ses_match.group(1)
+        if not subject_id:
+            sub_match = _SUB_RE.search(normalized)
+            if sub_match:
+                subject_id = sub_match.group(1)
+        if not session_id:
+            ses_match = _SES_RE.search(normalized)
             if ses_match:
                 session_id = ses_match.group(1)
 
