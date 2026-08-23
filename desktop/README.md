@@ -14,6 +14,7 @@ Packaged **NeuroInsight** app — Electron shell (`desktop/app/`) plus release o
 ## User & maintainer docs
 
 - Install: [docs/INSTALL.md](../docs/INSTALL.md)
+- Updates: [docs/DESKTOP_UPDATES.md](../docs/DESKTOP_UPDATES.md)
 - Release: [docs/RELEASING.md](../docs/RELEASING.md)
 - Signing: [docs/SIGNING_AND_TRUST.md](../docs/SIGNING_AND_TRUST.md)
 

@@ -82,8 +82,17 @@ Subsequent launches are fast (the image is cached).
 
 ## Updating
 
-NeuroInsight checks for updates automatically and can install them in the
-background. You can also check via **Help → Check for Updates…**.
+NeuroInsight can update the **desktop app** in place. Full guide:
+**[DESKTOP_UPDATES.md](DESKTOP_UPDATES.md)** (menu location, timing, engine refresh,
+DMG vs zip, troubleshooting).
+
+Quick version:
+
+- **macOS:** top menu bar → **Help → Check for Updates…** (not inside the app window).
+- Install via the **`.dmg`**; drag to **Applications**. Do not use the `.zip` for manual install.
+- After a desktop update, **Settings → Stop engine → Start engine** so the workspace UI matches.
+
+The app also checks silently on startup; if you are already on the latest version, no dialog appears.
 
 ## Troubleshooting
 
@@ -97,6 +106,7 @@ background. You can also check via **Help → Check for Updates…**.
   happens once.
 - **Something's wrong** — open **Settings**, expand **Advanced → Diagnostics**, and
   **Export bundle**; attach it when reporting an issue.
+- **Updates** — see [DESKTOP_UPDATES.md](DESKTOP_UPDATES.md) (Help menu, restart timing, engine refresh).
 
 More issues: [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 

@@ -55,9 +55,15 @@ keeps the desktop/frontend `package.json` in sync.
 
 5. **Verify the release:**
    - [ ] GitHub Release has `.dmg`, `.exe`, `.AppImage`/`.deb`, and checksum files.
-   - [ ] macOS: `spctl -a -vvv -t install <dmg>` reports *Notarized Developer ID*.
+   - [ ] macOS: release includes **`NeuroInsight-*-arm64-mac.zip`** and **`latest-mac.yml`**
+         (Squirrel auto-update; CI `dist:mac:ci` must build `dmg zip`).
+   - [ ] macOS: `spctl -a -vvv -t install <dmg>` reports *Notarized Developer ID* (when signed).
    - [ ] Fresh-machine test: install → first launch downloads the engine (~1.8 GB).
-   - [ ] `docs/INSTALL.md` links resolve.
+   - [ ] `docs/INSTALL.md` and `docs/DESKTOP_UPDATES.md` links resolve.
+
+## Auto-update (end users)
+
+User-facing flow and troubleshooting: [DESKTOP_UPDATES.md](DESKTOP_UPDATES.md).
 
 ## Workflow notes
 

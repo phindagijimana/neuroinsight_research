@@ -5,6 +5,7 @@
 | Doc | Purpose |
 |---|---|
 | [INSTALL.md](INSTALL.md) | Download, verify, first launch |
+| [DESKTOP_UPDATES.md](DESKTOP_UPDATES.md) | In-app updates, Help menu, engine refresh |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common problems |
 
 ## Advanced usage
