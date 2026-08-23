@@ -48,7 +48,7 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
   onSubmit,
   onBidsSubmit,
   sshConnected = true,
-  bidsAppMode = false,
+  bidsAppMode: _bidsAppMode = false,
 }) => {
   const [inputDir, setInputDir] = useState('');
   const [directoryInfo, setDirectoryInfo] = useState<DirectoryInfo | null>(null);
@@ -254,10 +254,7 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
           Batch Input Directory <span className="text-red-500">*</span>
         </label>
         <p className="text-[11px] text-gray-500">
-          BIDS dataset or folder with NIfTI files &mdash;{' '}
-          {bidsAppMode
-            ? 'one workflow job per selected subject (sessions handled inside each subject)'
-            : 'one job per subject or file'}
+          Folder with multiple subjects or NIfTI files
         </p>
         <div className="flex gap-2">
           <input
@@ -514,14 +511,6 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
             Submit Batch &mdash; {directoryInfo.nifti_files.length} File{directoryInfo.nifti_files.length !== 1 ? 's' : ''} (one job per file)
           </button>
         )}
-      </div>
-
-      {/* Help */}
-      <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-md">
-        <p className="text-[11px] text-gray-600">
-          <strong>Tip:</strong> Point to a <strong>BIDS dataset</strong> (with sub-* folders) and each subject
-          will be submitted as a separate parallel job. For non-BIDS data, each NIfTI file becomes one job.
-        </p>
       </div>
     </div>
   );

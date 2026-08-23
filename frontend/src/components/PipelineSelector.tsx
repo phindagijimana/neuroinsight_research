@@ -4,8 +4,8 @@
  * Allows users to select plugins (single tools) or workflows (plugin chains)
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Zap, GitBranch, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Zap, GitBranch } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import type { Pipeline } from '../types';
@@ -394,121 +394,6 @@ const getCategoryLabel = (category: string) => {
   }
 };
 
-interface CatalogRow {
-  id: string;
-  name: string;
-  version: string;
-  category: PipelineCategory;
-  meta?: string;
-  inputFormatName?: string;
-  description?: string;
-}
-
-function filterCatalog(items: CatalogRow[], query: string): CatalogRow[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return items;
-  return items.filter(
-    (item) =>
-      item.name.toLowerCase().includes(q) ||
-      item.id.toLowerCase().includes(q) ||
-      getCategoryLabel(item.category).toLowerCase().includes(q) ||
-      (item.meta && item.meta.toLowerCase().includes(q)) ||
-      (item.inputFormatName && item.inputFormatName.toLowerCase().includes(q))
-  );
-}
-
-const PipelineCatalogList: React.FC<{
-  label: string;
-  items: CatalogRow[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  searchPlaceholder?: string;
-}> = ({ label, items, selectedId, onSelect, searchPlaceholder = 'Search by name, category, or input type…' }) => {
-  const [query, setQuery] = useState('');
-
-  const filtered = useMemo(() => filterCatalog(items, query), [items, query]);
-
-  return (
-    <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700">
-        {label} <span className="text-red-500">*</span>
-      </label>
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={searchPlaceholder}
-          aria-label={`Search ${label.toLowerCase()}`}
-          className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm shadow-sm focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-600/20"
-        />
-      </div>
-      <div
-        className="max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-inner"
-        role="listbox"
-        aria-label={label}
-      >
-        {filtered.length === 0 ? (
-          <p className="px-3 py-6 text-center text-xs text-gray-500">No matches — try a different search.</p>
-        ) : (
-          filtered.map((item) => {
-            const selected = item.id === selectedId;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                role="option"
-                aria-selected={selected}
-                onClick={() => onSelect(item.id)}
-                className={`flex w-full flex-col gap-0.5 border-b border-gray-100 px-3 py-2.5 text-left transition-colors last:border-b-0 ${
-                  selected
-                    ? 'bg-navy-50 ring-1 ring-inset ring-navy-600/25'
-                    : 'hover:bg-gray-50'
-                }`}
-              >
-                <span className="flex items-start justify-between gap-2">
-                  <span className={`text-sm font-semibold leading-snug ${selected ? 'text-navy-800' : 'text-gray-900'}`}>
-                    {item.name}
-                  </span>
-                  <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600">
-                    {getCategoryLabel(item.category)}
-                  </span>
-                </span>
-                <span className="text-[11px] text-gray-500">
-                  v{item.version}
-                  {item.meta ? ` · ${item.meta}` : ''}
-                  {item.inputFormatName ? ` · ${item.inputFormatName}` : ''}
-                </span>
-              </button>
-            );
-          })
-        )}
-      </div>
-      <p className="text-[11px] text-gray-400">
-        {filtered.length === items.length
-          ? `${items.length} available`
-          : `${filtered.length} of ${items.length} shown`}
-      </p>
-    </div>
-  );
-};
-
-const SelectedInputHint: React.FC<{ formatName?: string; description?: string }> = ({
-  formatName,
-  description,
-}) => {
-  if (!formatName) return null;
-  return (
-    <div className="mt-3 rounded-lg border border-navy-100 bg-navy-50/50 px-3 py-2.5">
-      <p className="text-xs font-semibold text-navy-800">Expects: {formatName}</p>
-      {description && (
-        <p className="mt-1 text-[11px] leading-relaxed text-navy-900/75">{description}</p>
-      )}
-    </div>
-  );
-};
-
 export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   onPipelineSelect,
   selectedPipeline,
@@ -521,7 +406,6 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   const [selectedPluginId, setSelectedPluginId] = useState<string | null>(null);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
   const [usingLiveData, setUsingLiveData] = useState(false);
-  const [catalogEpoch, setCatalogEpoch] = useState(0);
   const [livePlugins, setLivePlugins] = useState<Plugin[]>([]);
   const [liveWorkflows, setLiveWorkflows] = useState<Workflow[]>([]);
   // Decide which data source to use. When EEG is disabled, drop EEG/multimodal
@@ -530,36 +414,6 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   const activePlugins = (usingLiveData ? livePlugins : MOCK_PLUGINS).filter(p => categoryAllowed(p.category));
   const activeWorkflows = (usingLiveData ? liveWorkflows : MOCK_WORKFLOWS).filter(w => categoryAllowed(w.category));
   const userSelectablePlugins = activePlugins.filter(p => p.user_selectable !== false);
-
-  const pluginCatalog: CatalogRow[] = useMemo(
-    () =>
-      userSelectablePlugins.map((p) => ({
-        id: p.id,
-        name: p.name,
-        version: p.version,
-        category: p.category,
-        inputFormatName: p.input_format_name,
-        description: p.input_format_description,
-      })),
-    [userSelectablePlugins]
-  );
-
-  const workflowCatalog: CatalogRow[] = useMemo(
-    () =>
-      activeWorkflows.map((w) => ({
-        id: w.id,
-        name: w.name,
-        version: w.version,
-        category: w.category,
-        meta: `${w.plugins.length} step${w.plugins.length !== 1 ? 's' : ''}`,
-        inputFormatName: w.input_format_name,
-        description: w.input_format_description,
-      })),
-    [activeWorkflows]
-  );
-
-  const selectedPlugin = activePlugins.find((p) => p.id === selectedPluginId);
-  const selectedWorkflow = activeWorkflows.find((w) => w.id === selectedWorkflowId);
 
   useEffect(() => {
     async function fetchData() {
@@ -716,7 +570,6 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
 
   const switchToPlugins = () => {
     setMode('plugins');
-    setCatalogEpoch((e) => e + 1);
     const first = userSelectablePlugins[0];
     if (first) handlePluginSelect(first.id);
     else {
@@ -727,7 +580,6 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
 
   const switchToWorkflows = () => {
     setMode('workflows');
-    setCatalogEpoch((e) => e + 1);
     const first = activeWorkflows[0];
     if (first) handleWorkflowSelect(first.id);
     else {
@@ -772,37 +624,43 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
       )}
 
       {mode === 'plugins' && (
-        <PipelineCatalogList
-          key={`plugins-${catalogEpoch}`}
-          label="Select plugin"
-          items={pluginCatalog}
-          selectedId={selectedPluginId}
-          onSelect={handlePluginSelect}
-        />
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Select Plugin <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={selectedPluginId || ''}
+            onChange={(e) => handlePluginSelect(e.target.value)}
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-navy-600 text-base"
+          >
+            {userSelectablePlugins.map((plugin) => (
+              <option key={plugin.id} value={plugin.id}>
+                {plugin.name} (v{plugin.version}) - {getCategoryLabel(plugin.category)}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
 
       {mode === 'workflows' && (
-        <PipelineCatalogList
-          key={`workflows-${catalogEpoch}`}
-          label="Select workflow"
-          items={workflowCatalog}
-          selectedId={selectedWorkflowId}
-          onSelect={handleWorkflowSelect}
-        />
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Select Workflow <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={selectedWorkflowId || ''}
+            onChange={(e) => handleWorkflowSelect(e.target.value)}
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-navy-600 focus:border-navy-600 text-base"
+          >
+            {activeWorkflows.map((workflow) => (
+              <option key={workflow.id} value={workflow.id}>
+                {workflow.name} ({workflow.plugins.length} plugin{workflow.plugins.length !== 1 ? 's' : ''}) - {getCategoryLabel(workflow.category)}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
 
-      {mode === 'plugins' && (
-        <SelectedInputHint
-          formatName={selectedPlugin?.input_format_name}
-          description={selectedPlugin?.input_format_description}
-        />
-      )}
-      {mode === 'workflows' && (
-        <SelectedInputHint
-          formatName={selectedWorkflow?.input_format_name}
-          description={selectedWorkflow?.input_format_description}
-        />
-      )}
     </div>
   );
 };
