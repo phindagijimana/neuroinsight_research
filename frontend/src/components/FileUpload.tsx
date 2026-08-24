@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Upload, FolderOpen, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Upload, FolderOpen, AlertTriangle, Settings2 } from 'lucide-react';
 import { DirectorySelector } from './DirectorySelector';
 import { SingleFileUpload } from './SingleFileUpload';
 import { PipelineSelector } from './PipelineSelector';
@@ -23,12 +23,12 @@ import {
 } from '../lib/inputFormat';
 import { consumeJobsOpenAt } from '../lib/openJobPath';
 import { checkPathComputeMismatch } from '../lib/pathMismatch';
+import WorkspaceEmptyState from './WorkspaceEmptyState';
 
 type UploadMode = 'directory' | 'single';
 
 interface FileUploadProps {
   onJobsSubmitted: (jobIds: string[]) => void;
-  onBack?: () => void;
   onNavigateToTransfer?: () => void;
 }
 
@@ -49,9 +49,13 @@ function computeBrowseMode(backend: BackendType): 'local' | 'remote' | 'hpc' {
   return 'local';
 }
 
+const JOBS_GRID_ROW = 'grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 items-stretch';
+const JOBS_GRID_CELL = 'flex flex-col min-h-[18rem] h-full';
+const JOBS_PANEL =
+  'rounded-xl border border-gray-100 bg-white p-5 shadow-sm h-full min-h-[18rem] flex flex-col';
+
 export const FileUpload: React.FC<FileUploadProps> = ({
   onJobsSubmitted,
-  onBack,
   onNavigateToTransfer,
 }) => {
   const toast = useToast();
@@ -274,43 +278,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Process MRI Data</h2>
-          <p className="mt-0.5 text-sm text-gray-500">
-            Connect compute, browse input on that backend, and submit. Copy data from
-            Pennsieve, XNAT, or another host with Transfer first.
-          </p>
-        </div>
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="shrink-0 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            &larr; Back
-          </button>
-        )}
-      </div>
-
-      {onNavigateToTransfer && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200/80 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
-          <span>
-            Need data from Pennsieve, XNAT, or another machine? Stage it with Transfer — Jobs runs
-            on the compute backend only.
-          </span>
-          <button
-            type="button"
-            onClick={onNavigateToTransfer}
-            className="inline-flex items-center gap-1 font-medium text-navy-700 hover:text-navy-900"
-          >
-            Open Transfer
-            <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5 lg:items-start">
-        <div className="space-y-4 min-w-0">
+      {/* Row 1: Compute | Pipeline */}
+      <div className={JOBS_GRID_ROW}>
+        <div className={JOBS_GRID_CELL}>
           <BackendSelector
             selectedBackend={selectedBackend}
             onBackendChange={setSelectedBackend}
@@ -319,15 +289,32 @@ export const FileUpload: React.FC<FileUploadProps> = ({
             onSSHConnectionChange={setSSHConnected}
             jobsMode
           />
+        </div>
+        <div className={JOBS_GRID_CELL}>
+          <PipelineSelector
+            onPipelineSelect={setSelectedPipeline}
+            selectedPipeline={selectedPipeline}
+            onExecutionSelect={setSelectedExecution}
+            fillHeight
+          />
+        </div>
+      </div>
 
-          {selectedPipeline && (
-            <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 space-y-4">
-              <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
+      {/* Row 2: Subject path | Resources */}
+      <div className={JOBS_GRID_ROW}>
+        <div className={JOBS_GRID_CELL}>
+          <div className={JOBS_PANEL}>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <h3 className="text-sm font-semibold text-gray-900">Subject path</h3>
+              <div className="inline-flex rounded-lg border border-gray-200 bg-slate-50/80 p-0.5">
                 <button
                   type="button"
                   onClick={() => setMode('single')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition ${
-                    mode === 'single' ? 'bg-navy-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  disabled={!selectedPipeline}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${
+                    mode === 'single'
+                      ? 'bg-navy-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900 disabled:opacity-40'
                   }`}
                 >
                   <Upload className="h-3.5 w-3.5" />
@@ -336,96 +323,117 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                 <button
                   type="button"
                   onClick={() => setMode('directory')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition ${
-                    mode === 'directory' ? 'bg-navy-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  disabled={!selectedPipeline}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${
+                    mode === 'directory'
+                      ? 'bg-navy-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900 disabled:opacity-40'
                   }`}
                 >
                   <FolderOpen className="h-3.5 w-3.5" />
                   Batch
                 </button>
               </div>
+            </div>
 
-              {pathMismatch && (
-                <div className="flex gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
-                  <p>{pathMismatch.message}</p>
-                </div>
-              )}
+            {!selectedPipeline ? (
+              <WorkspaceEmptyState
+                icon={<FolderOpen className="h-6 w-6" />}
+                title="Select a pipeline first"
+                description="Choose a plugin or workflow above, then browse input on the connected compute backend."
+                action={
+                  onNavigateToTransfer ? (
+                    <button
+                      type="button"
+                      onClick={onNavigateToTransfer}
+                      className="text-xs font-medium text-navy-600 hover:text-navy-800 hover:underline"
+                    >
+                      Need data elsewhere? Open Transfer
+                    </button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <div className="flex-1 flex flex-col min-h-0 space-y-3">
+                {pathMismatch && (
+                  <div className="flex gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                    <p>{pathMismatch.message}</p>
+                  </div>
+                )}
 
-              {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded">
-                  <p className="text-xs text-red-700">{error}</p>
-                </div>
-              )}
-              {submitting && (
-                <div className="p-3 bg-navy-50 border border-navy-200 rounded">
-                  <p className="text-xs text-navy-700">Submitting jobs...</p>
-                </div>
-              )}
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded">
+                    <p className="text-xs text-red-700">{error}</p>
+                  </div>
+                )}
+                {submitting && (
+                  <div className="p-3 bg-navy-50 border border-navy-200 rounded">
+                    <p className="text-xs text-navy-700">Submitting jobs...</p>
+                  </div>
+                )}
 
-              <div style={submitting ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
-                {mode === 'directory' ? (
-                  <DirectorySelector
-                    mode={browseMode}
-                    sshConnected={selectedBackend === 'local' ? true : sshConnected}
-                    onSubmit={handleBatchSubmit}
-                    onBidsSubmit={handleBidsBatchSubmit}
-                    bidsAppMode={bidsWorkflow}
-                    initialPath={prefillInputDir}
-                    onInputDirChange={setBatchInputDir}
-                  />
-                ) : (
-                  <>
-                    <SingleFileUpload
-                      browseMode={browseMode}
+                <div
+                  className="flex-1 min-h-0 flex flex-col"
+                  style={submitting ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
+                >
+                  {mode === 'directory' ? (
+                    <DirectorySelector
+                      mode={browseMode}
                       sshConnected={selectedBackend === 'local' ? true : sshConnected}
-                      onFileUploaded={(path) => {
-                        setUploadedFilePath(path);
-                        setError(null);
-                      }}
-                      executionContext={
-                        selectedExecution
-                          ? { type: selectedExecution.type, id: selectedExecution.id }
-                          : null
-                      }
-                      inputFormatName={selectedExecution?.inputFormatName}
+                      onSubmit={handleBatchSubmit}
+                      onBidsSubmit={handleBidsBatchSubmit}
                       bidsAppMode={bidsWorkflow}
                       initialPath={prefillInputDir}
+                      onInputDirChange={setBatchInputDir}
                     />
-                    <div className="mt-3">
-                      <button
-                        onClick={handleSingleFileSubmit}
-                        disabled={!uploadedFilePath || submitting || submitBlocked}
-                        className="w-full py-2 px-4 bg-navy-600 text-white rounded-md hover:bg-navy-800 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {submitting ? 'Submitting…' : 'Submit Job'}
-                      </button>
-                      {!uploadedFilePath && (
-                        <p className="mt-1.5 text-[11px] text-gray-500 text-center">
-                          Choose a subject path above to enable submit.
-                        </p>
-                      )}
-                      {uploadedFilePath && submitBlocked && (
-                        <p className="mt-1.5 text-[11px] text-amber-700 text-center">
-                          Fix the path warning above before submitting.
-                        </p>
-                      )}
-                    </div>
-                  </>
-                )}
+                  ) : (
+                    <>
+                      <SingleFileUpload
+                        browseMode={browseMode}
+                        sshConnected={selectedBackend === 'local' ? true : sshConnected}
+                        onFileUploaded={(path) => {
+                          setUploadedFilePath(path);
+                          setError(null);
+                        }}
+                        executionContext={
+                          selectedExecution
+                            ? { type: selectedExecution.type, id: selectedExecution.id }
+                            : null
+                        }
+                        inputFormatName={selectedExecution?.inputFormatName}
+                        bidsAppMode={bidsWorkflow}
+                        initialPath={prefillInputDir}
+                      />
+                      <div className="mt-auto pt-3">
+                        <button
+                          onClick={handleSingleFileSubmit}
+                          disabled={!uploadedFilePath || submitting || submitBlocked}
+                          className="w-full py-2 px-4 bg-navy-600 text-white rounded-md hover:bg-navy-800 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {submitting ? 'Submitting…' : 'Submit Job'}
+                        </button>
+                        {!uploadedFilePath && (
+                          <p className="mt-1.5 text-[11px] text-gray-500 text-center">
+                            Choose a subject path above to enable submit.
+                          </p>
+                        )}
+                        {uploadedFilePath && submitBlocked && (
+                          <p className="mt-1.5 text-[11px] text-amber-700 text-center">
+                            Fix the path warning above before submitting.
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        <div className="space-y-4 min-w-0">
-          <PipelineSelector
-            onPipelineSelect={setSelectedPipeline}
-            selectedPipeline={selectedPipeline}
-            onExecutionSelect={setSelectedExecution}
-          />
-
-          {selectedPipeline && (
+        <div className={JOBS_GRID_CELL}>
+          {selectedPipeline ? (
             <ResourceSelector
               plugin={selectedPipeline}
               backendType={
@@ -436,7 +444,20 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                     : 'remote'
               }
               onResourcesChange={setCustomResources}
+              fillHeight
             />
+          ) : (
+            <div className={JOBS_PANEL}>
+              <div className="flex items-center gap-2 mb-2">
+                <Settings2 className="h-4 w-4 shrink-0 text-navy-600" />
+                <span className="text-sm font-semibold text-gray-900">Resources</span>
+              </div>
+              <WorkspaceEmptyState
+                icon={<Settings2 className="h-6 w-6" />}
+                title="Select a pipeline"
+                description="Configure CPU, memory, and SLURM options after choosing a plugin or workflow."
+              />
+            </div>
           )}
         </div>
       </div>

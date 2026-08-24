@@ -5,7 +5,7 @@ import React from 'react';
 
 interface WorkspacePageHeaderProps {
   title: string;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   actions?: React.ReactNode;
 }
 

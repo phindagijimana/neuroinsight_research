@@ -25,6 +25,8 @@ import type { ViewerTab } from '../utils/viewerQuery';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { useToast, useConfirm } from '../contexts/NotificationContext';
 import PathLocationBar from '../components/PathLocationBar';
+import WorkspacePageHeader from '../components/WorkspacePageHeader';
+import { WORKSPACE_PAGE_INNER, WORKSPACE_PAGE_OUTER } from '../lib/workspaceLayout';
 import {
   formatDisplayPath,
   formatJobInput,
@@ -310,13 +312,29 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50/90 to-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-8">
-        {/* Submit — top */}
+    <div className={WORKSPACE_PAGE_OUTER}>
+      <div className={WORKSPACE_PAGE_INNER}>
+        <WorkspacePageHeader
+          title="Jobs"
+          subtitle={
+            <>
+              Connect compute, browse input on that backend, and submit. Copy data from
+              Pennsieve, XNAT, or another host with{' '}
+              <button
+                type="button"
+                onClick={() => setActivePage('transfer')}
+                className="font-medium text-navy-600 hover:text-navy-800 hover:underline"
+              >
+                Transfer
+              </button>{' '}
+              first.
+            </>
+          }
+        />
+
         <div className="relative z-10 mb-6 md:mb-8">
           <FileUpload
             onJobsSubmitted={handleJobsSubmitted}
-            onBack={() => setActivePage('home')}
             onNavigateToTransfer={() => setActivePage('transfer')}
           />
         </div>

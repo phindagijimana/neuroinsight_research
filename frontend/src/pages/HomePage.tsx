@@ -9,8 +9,8 @@
 import Brain from '../components/icons/Brain';
 import Shield from '../components/icons/Shield';
 import { Server, ArrowRight } from 'lucide-react';
-import WorkspacePageHeader from '../components/WorkspacePageHeader';
 import { isDesktopApp } from '../lib/desktopBridge';
+import { WORKSPACE_PAGE_INNER } from '../lib/workspaceLayout';
 
 interface HomePageProps {
   // Kept for call-site compatibility; the intro page navigates via the app nav.
@@ -32,20 +32,15 @@ const CAPABILITIES = [
   },
   {
     icon: Shield,
-    title: 'Data sources & compute',
-    desc: 'Browse Pennsieve, XNAT, local, or HPC paths; jobs run on copies staged where compute can read them.',
+    title: 'Transfer & compute',
+    desc: 'Stage data with Transfer from Pennsieve, XNAT, or remote hosts; run jobs on the compute backend you connect.',
   },
 ];
 
 const HomePage: React.FC<HomePageProps> = ({ setActivePage }) => {
   return (
-    <div className="min-h-full">
-      <div className="mx-auto max-w-6xl px-6 py-8 sm:px-8">
-        <WorkspacePageHeader
-          title="Overview"
-          subtitle="NeuroInsight runs reproducible neuroimaging pipelines locally, on HPC, or in the cloud."
-        />
-
+    <div className="min-h-full bg-gradient-to-b from-slate-50/90 to-white">
+      <div className={`${WORKSPACE_PAGE_INNER} max-w-6xl`}>
         <div className="flex flex-col items-center py-8 text-center">
           <div className="w-20 h-20 rounded-2xl bg-navy-600 text-white flex items-center justify-center font-extrabold text-3xl tracking-wide mb-6 shadow-sm">
             NI

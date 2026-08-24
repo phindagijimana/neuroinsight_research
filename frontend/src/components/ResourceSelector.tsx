@@ -41,6 +41,8 @@ interface ResourceSelectorProps {
   plugin: PluginResources | null;
   backendType: 'local' | 'remote' | 'hpc';
   onResourcesChange: (resources: ResourceConfig) => void;
+  /** Stretch to fill a grid cell (Jobs page layout). */
+  fillHeight?: boolean;
 }
 
 /* --- Helpers -------------------------------------------------------------- */
@@ -55,6 +57,7 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
   plugin,
   backendType,
   onResourcesChange,
+  fillHeight = false,
 }) => {
   /* -- State --------------------------------------------------------------- */
   const [systemRes, setSystemRes] = useState<SystemResources | null>(null);
@@ -182,7 +185,11 @@ export const ResourceSelector: React.FC<ResourceSelectorProps> = ({
   /*  RENDER                                                                 */
   /* ----------------------------------------------------------------------- */
   return (
-    <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-3 shadow-sm">
+    <div
+      className={`rounded-xl border border-gray-100 bg-white p-5 shadow-sm ${
+        fillHeight ? 'h-full min-h-[18rem] flex flex-col' : ''
+      }`}
+    >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <Settings2 className="h-4 w-4 shrink-0 text-navy-600" />

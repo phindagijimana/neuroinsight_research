@@ -27,6 +27,12 @@ import ConnectionPanel from '../components/ConnectionPanel';
 import { TransferProgress } from '../components/TransferProgress';
 import type { FileEntry, PlatformType } from '../components/FileBrowserPane';
 import { consumeTransferOpenAt, stashJobsOpenAt, platformToJobsBackend, browseDirectoryForPath } from '../lib/openJobPath';
+import { canBrowsePlatform, isLocalPlatform, probePlatformConnected } from '../lib/platformConnection';
+import { usePlatformSession } from '../contexts/PlatformSessionContext';
+import WorkspacePageHeader from '../components/WorkspacePageHeader';
+import WorkspaceEmptyState from '../components/WorkspaceEmptyState';
+import { WORKSPACE_PAGE_INNER, WORKSPACE_PAGE_OUTER } from '../lib/workspaceLayout';
+import { Wifi } from 'lucide-react';
 
 interface TransferPageProps {
   setActivePage?: (page: string) => void;
@@ -54,7 +60,7 @@ interface PlatformTabDef {
 
 const PLATFORM_TABS: PlatformTabDef[] = [
   { id: 'local',     label: 'Local',  icon: <Monitor className="h-3.5 w-3.5" />,  activeClass: 'border-navy-600 bg-navy-50 text-navy-700' },
-  { id: 'remote',    label: 'Remote',        icon: <Cloud className="h-3.5 w-3.5" />,    activeClass: 'border-green-600 bg-green-50 text-green-700' },
+  { id: 'remote',    label: 'Remote',        icon: <Cloud className="h-3.5 w-3.5" />,    activeClass: 'border-navy-600 bg-navy-50 text-navy-700' },
   { id: 'hpc',       label: 'HPC',           icon: <Server className="h-3.5 w-3.5" />,   activeClass: 'border-navy-600 bg-navy-50 text-navy-700' },
   { id: 'pennsieve', label: 'Pennsieve',     icon: <Database className="h-3.5 w-3.5" />, activeClass: 'border-navy-600 bg-navy-50 text-navy-700' },
   { id: 'xnat',      label: 'XNAT',          icon: <Globe className="h-3.5 w-3.5" />,    activeClass: 'border-navy-600 bg-navy-50 text-navy-700' },
@@ -67,6 +73,7 @@ function isPlatformType(value: string): value is PlatformType {
 }
 
 function TransferPage({ setActivePage }: TransferPageProps) {
+  const { sessions, hydrating, getSession } = usePlatformSession();
   // Pane platforms
   const [leftPlatform, setLeftPlatform] = useState<PlatformType>('local');
   const [rightPlatform, setRightPlatform] = useState<PlatformType>('remote');
@@ -81,8 +88,8 @@ function TransferPage({ setActivePage }: TransferPageProps) {
   const [leftSelected, setLeftSelected] = useState<FileEntry[]>([]);
   const [rightSelected, setRightSelected] = useState<FileEntry[]>([]);
 
-  // Connection state per pane
-  const [leftConnected, setLeftConnected] = useState(false);
+  // Connection state per pane (local is always browsable)
+  const [leftConnected, setLeftConnected] = useState(true);
   const [rightConnected, setRightConnected] = useState(false);
   const [leftUploadReady, setLeftUploadReady] = useState(true);
   const [rightUploadReady, setRightUploadReady] = useState(true);
@@ -168,6 +175,41 @@ function TransferPage({ setActivePage }: TransferPageProps) {
   useEffect(() => {
     persistActiveTransfers(activeTransfers);
   }, [activeTransfers, persistActiveTransfers]);
+
+  const syncPaneConnection = useCallback(
+    async (platform: PlatformType, setConnected: (v: boolean) => void) => {
+      if (isLocalPlatform(platform)) {
+        setConnected(true);
+        return;
+      }
+      setConnected(false);
+      try {
+        setConnected(await probePlatformConnected(platform));
+      } catch {
+        setConnected(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    syncPaneConnection(leftPlatform, setLeftConnected);
+  }, [leftPlatform, syncPaneConnection]);
+
+  useEffect(() => {
+    syncPaneConnection(rightPlatform, setRightConnected);
+  }, [rightPlatform, syncPaneConnection]);
+
+  // After platform sessions hydrate, enable browse for connected Pennsieve/XNAT tabs.
+  useEffect(() => {
+    if (hydrating) return;
+    if (leftPlatform === 'pennsieve' || leftPlatform === 'xnat') {
+      if (getSession(leftPlatform)?.connected) setLeftConnected(true);
+    }
+    if (rightPlatform === 'pennsieve' || rightPlatform === 'xnat') {
+      if (getSession(rightPlatform)?.connected) setRightConnected(true);
+    }
+  }, [hydrating, sessions, leftPlatform, rightPlatform, getSession]);
 
   useEffect(() => {
     if (leftPlatform !== 'pennsieve') {
@@ -336,22 +378,32 @@ function TransferPage({ setActivePage }: TransferPageProps) {
     setRightSelected(tmpS);
   };
 
+  const leftCanBrowse = canBrowsePlatform(leftPlatform, leftConnected);
+  const rightCanBrowse = canBrowsePlatform(rightPlatform, rightConnected);
+
   const leftTab = PLATFORM_TABS.find(t => t.id === leftPlatform)!;
   const rightTab = PLATFORM_TABS.find(t => t.id === rightPlatform)!;
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col" style={{ height: 'calc(100vh - 140px)' }}>
-      {/* Title */}
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-gray-900">Data Transfer</h1>
-        <button
-          onClick={() => setShowHistory(!showHistory)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600"
-        >
-          <ChevronDown className={`h-3 w-3 transition ${showHistory ? 'rotate-180' : ''}`} />
-          History ({recentTransfers.length})
-        </button>
-      </div>
+    <div className={WORKSPACE_PAGE_OUTER}>
+      <div
+        className={`${WORKSPACE_PAGE_INNER} flex flex-col`}
+        style={{ minHeight: 'calc(100vh - 3.5rem)' }}
+      >
+        <WorkspacePageHeader
+          title="Transfer"
+          subtitle="Move data between Local, Remote Server, HPC, Pennsieve, and XNAT. Stage files here before running jobs."
+          actions={
+            <button
+              type="button"
+              onClick={() => setShowHistory(!showHistory)}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
+            >
+              <ChevronDown className={`h-3 w-3 transition ${showHistory ? 'rotate-180' : ''}`} />
+              History ({recentTransfers.length})
+            </button>
+          }
+        />
 
       {jobsHandoff && (
         <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900">
@@ -413,9 +465,9 @@ function TransferPage({ setActivePage }: TransferPageProps) {
             />
           </div>
           <div className="flex-1 min-h-0">
-            {leftConnected ? (
+            {leftCanBrowse ? (
               <FileBrowserPane
-                key={`left-${leftPlatform}-${leftConnected}-${leftInitialPath || ''}`}
+                key={`left-${leftPlatform}-${leftInitialPath || ''}`}
                 platform={leftPlatform}
                 side="source"
                 selectedFiles={leftSelected}
@@ -424,8 +476,12 @@ function TransferPage({ setActivePage }: TransferPageProps) {
                 initialPath={leftInitialPath}
               />
             ) : (
-              <div className="h-full flex items-center justify-center bg-white rounded-lg border border-gray-200">
-                <p className="text-xs text-gray-400">Connect to {leftTab.label} to browse files</p>
+              <div className="flex h-full min-h-[12rem] items-stretch rounded-lg border border-gray-200 bg-white">
+                <WorkspaceEmptyState
+                  icon={<Wifi className="h-6 w-6" />}
+                  title={`Connect to ${leftTab.label}`}
+                  description="Use the connection panel above to sign in, then browse files here."
+                />
               </div>
             )}
           </div>
@@ -524,9 +580,9 @@ function TransferPage({ setActivePage }: TransferPageProps) {
             />
           </div>
           <div className="flex-1 min-h-0">
-            {rightConnected ? (
+            {rightCanBrowse ? (
               <FileBrowserPane
-                key={`right-${rightPlatform}-${rightConnected}-${rightInitialPath || ''}`}
+                key={`right-${rightPlatform}-${rightInitialPath || ''}`}
                 platform={rightPlatform}
                 side="destination"
                 selectedFiles={rightSelected}
@@ -535,8 +591,12 @@ function TransferPage({ setActivePage }: TransferPageProps) {
                 initialPath={rightInitialPath}
               />
             ) : (
-              <div className="h-full flex items-center justify-center bg-white rounded-lg border border-gray-200">
-                <p className="text-xs text-gray-400">Connect to {rightTab.label} to browse files</p>
+              <div className="flex h-full min-h-[12rem] items-stretch rounded-lg border border-gray-200 bg-white">
+                <WorkspaceEmptyState
+                  icon={<Wifi className="h-6 w-6" />}
+                  title={`Connect to ${rightTab.label}`}
+                  description="Use the connection panel above to sign in, then browse files here."
+                />
               </div>
             )}
           </div>
@@ -596,6 +656,7 @@ function TransferPage({ setActivePage }: TransferPageProps) {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

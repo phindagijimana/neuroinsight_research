@@ -26,6 +26,8 @@ interface PipelineSelectorProps {
     inputFormatDescription?: string;
     requiresBidsDir?: boolean;
   } | null) => void;
+  /** Stretch to fill a grid cell (Jobs page layout). */
+  fillHeight?: boolean;
 }
 
 type SelectionMode = 'plugins' | 'workflows';
@@ -398,7 +400,11 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   onPipelineSelect,
   selectedPipeline,
   onExecutionSelect,
+  fillHeight = false,
 }) => {
+  const panelClass = fillHeight
+    ? 'rounded-xl border border-gray-100 bg-white p-5 flex flex-col shadow-sm h-full min-h-[18rem]'
+    : 'rounded-xl border border-gray-100 bg-white p-5 flex flex-col shadow-sm';
   const { eegEnabled } = useFeatureFlags();
   const [mode, setMode] = useState<SelectionMode>('workflows');
   const [loading, setLoading] = useState(true);
@@ -559,7 +565,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-gray-100 bg-white p-5 flex items-center justify-center shadow-sm">
+      <div className={`${panelClass} items-center justify-center`}>
         <div className="flex items-center">
           <Spinner size="md" className="text-navy-600 mr-2" />
           <span className="text-sm text-gray-500">Loading pipelines…</span>
@@ -589,7 +595,7 @@ export const PipelineSelector: React.FC<PipelineSelectorProps> = ({
   };
 
   return (
-    <div className="rounded-xl border border-gray-100 bg-white p-5 flex flex-col shadow-sm">
+    <div className={panelClass}>
       <div className="flex gap-2 mb-4">
         <button
           type="button"

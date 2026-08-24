@@ -7,6 +7,16 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.24] - 2026-08-24
+
+### Changed
+- **Jobs UI** — 2×2 submit grid (Compute | Pipeline, Subject path | Resources);
+  unified page header; removed Back button; Transfer link in subtitle.
+- **Transfer UI** — unified header and page width; navy Remote tab; auto-browse
+  when platform/SSH already connected; improved empty states.
+- **Navigation** — responsive hamburger menu on narrow screens; active-tab highlight.
+- **Home** — Transfer-first capability copy; removed duplicate Overview header.
+
 ## [0.1.23] - 2026-08-24
 
 ### Added

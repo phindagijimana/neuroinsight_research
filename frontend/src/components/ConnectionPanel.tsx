@@ -9,7 +9,7 @@
  * "local" is always connected -- renders nothing.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import {
   ChevronDown, AlertCircle, CheckCircle2, Wifi, KeyRound, Server, Cloud,
 } from 'lucide-react';
@@ -17,6 +17,7 @@ import { apiService } from '../services/api';
 import type { PlatformType } from './FileBrowserPane';
 import { Spinner } from './LoadingState';
 import { usePlatformSession } from '../contexts/PlatformSessionContext';
+import { isLocalPlatform } from '../lib/platformConnection';
 
 interface ConnectionPanelProps {
   platform: PlatformType;
@@ -34,9 +35,17 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   onConnectionChange,
   onPlatformStatusChange,
 }) => {
-  const { setSession, logOut } = usePlatformSession();
-  const [connected, setConnected] = useState(false);
-  const [checking, setChecking] = useState(true);
+  const { setSession, logOut, getSession } = usePlatformSession();
+  const platformSession =
+    platform === 'pennsieve' || platform === 'xnat' ? getSession(platform) : null;
+  const sessionKnownConnected = platformSession?.connected === true;
+
+  const [connected, setConnected] = useState(
+    isLocalPlatform(platform) || sessionKnownConnected,
+  );
+  const [checking, setChecking] = useState(
+    !isLocalPlatform(platform) && !sessionKnownConnected,
+  );
   const [expanded, setExpanded] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,10 +68,21 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   const [xnatPass, setXnatPass] = useState('');
   const [xnatSkipSsl, setXnatSkipSsl] = useState(false);
 
-  const needsConnection = platform !== 'local';
+  const needsConnection = !isLocalPlatform(platform);
+
+  useLayoutEffect(() => {
+    if (isLocalPlatform(platform)) {
+      setConnected(true);
+      setChecking(false);
+      onConnectionChange(true);
+      onPlatformStatusChange?.({ connected: true, uploadReady: true });
+    } else if (sessionKnownConnected) {
+      onConnectionChange(true);
+    }
+  }, [platform, sessionKnownConnected, onConnectionChange, onPlatformStatusChange]);
 
   const checkStatus = useCallback(async () => {
-    if (platform === 'local') {
+    if (isLocalPlatform(platform)) {
       setConnected(true);
       setChecking(false);
       setUploadReady(null);
@@ -127,11 +147,11 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
     } finally {
       setChecking(false);
     }
-  }, [platform, onConnectionChange]);
+  }, [platform, onConnectionChange, onPlatformStatusChange]);
 
   useEffect(() => {
     checkStatus();
-  }, [platform]);
+  }, [checkStatus]);
 
   if (!needsConnection) return null;
 

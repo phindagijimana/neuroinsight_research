@@ -367,7 +367,13 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
   })();
 
   return (
-    <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 h-full flex flex-col shadow-sm">
+    <div
+      className={`rounded-xl border border-gray-100 flex flex-col shadow-sm h-full ${
+        jobsMode
+          ? 'bg-white p-5 min-h-[18rem]'
+          : 'bg-slate-50/40 p-4'
+      }`}
+    >
 
       {/* Row 1: Data Source -- all 5 options */}
       {showPlatformTabs && !computeOnly && !jobsMode && (
