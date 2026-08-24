@@ -7,6 +7,16 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.22] - 2026-08-23
+
+### Changed
+- **Jobs page layout** — submit form on top; full-width stacked stats, SLURM queue,
+  and jobs list at the bottom (matches classic vertical flow).
+- **Submit panel** — left column: data/compute + input browser; right column:
+  pipeline + resources (matches prior Process MRI Data layout).
+- **Scroll consistency** — jobs list uses `nir-scroll-panel`; SLURM table aligned
+  to the same `min(24rem, 55vh)` cap as other page panels.
+
 ## [0.1.21] - 2026-08-23
 
 ### Changed
