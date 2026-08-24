@@ -7,6 +7,28 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.23] - 2026-08-24
+
+### Added
+- **Large-file transfer** — per-file timeouts (24h default), `curl -C -` and HTTP
+  Range resume, skip complete files on re-run, Pennsieve URL retries; shared I/O in
+  `transfer_io.py` / `transfer_manager.py`; Celery tasks delegate to TransferManager.
+- **Transfer docs** — `docs/TRANSFER.md` (5×5 matrix + `NIR_TRANSFER_*` env vars).
+- **Pennsieve browse pagination** — `limit` / `offset` / `has_more`; session persists
+  via `PlatformSessionContext`.
+- **Jobs compute-only** — Data Source row and Pennsieve/XNAT wizard removed; compute
+  backend + path browse only; Transfer callout on Jobs page.
+- **Transfer → Jobs handoff** — “Open in Jobs” after transfer completes; prefills path
+  and compute backend via `consumeJobsOpenAt`.
+- **Path mismatch warnings** — amber alert before Submit when path does not match
+  compute backend (e.g. Mac path on HPC).
+- **Per-tab SSH panels** — Remote Server vs HPC (SLURM) connect copy under Compute.
+
+### Changed
+- **Jobs / SSH UX** — connected banner (HPC / Remote / SSH only), auto-expand SSH,
+  compute tab auto backend switch; honest staging copy on Home and README.
+- **SSH broker** — SCP timeout passthrough for large transfers.
+
 ## [0.1.22] - 2026-08-23
 
 ### Changed

@@ -153,18 +153,40 @@ class BrokerSSHManager:
     # ------------------------------------------------------------------
     # file operations
     # ------------------------------------------------------------------
-    def put_file(self, local_path: str, remote_path: str) -> None:
+    def put_file(self, local_path: str, remote_path: str, timeout: Optional[int] = None) -> None:
+        from backend.core import transfer_settings as ts
+
         remote_dir = str(PurePosixPath(remote_path).parent)
         self.execute(f'mkdir -p "{remote_dir}"', timeout=30)
-        res = self._call("put", {**self._target(), "localPath": local_path, "remotePath": remote_path},
-                         timeout=1800)
+        xfer_timeout = timeout or ts.SCP_TIMEOUT_SEC
+        res = self._call(
+            "put",
+            {
+                **self._target(),
+                "localPath": local_path,
+                "remotePath": remote_path,
+                "timeoutSec": xfer_timeout,
+            },
+            timeout=xfer_timeout + 15,
+        )
         if not res.get("ok"):
             raise SSHConnectionError(f"put_file {local_path} -> {remote_path} failed: {res.get('error')}")
 
-    def get_file(self, remote_path: str, local_path: str) -> None:
+    def get_file(self, remote_path: str, local_path: str, timeout: Optional[int] = None) -> None:
+        from backend.core import transfer_settings as ts
+
         Path(local_path).parent.mkdir(parents=True, exist_ok=True)
-        res = self._call("get", {**self._target(), "remotePath": remote_path, "localPath": local_path},
-                         timeout=1800)
+        xfer_timeout = timeout or ts.SCP_TIMEOUT_SEC
+        res = self._call(
+            "get",
+            {
+                **self._target(),
+                "remotePath": remote_path,
+                "localPath": local_path,
+                "timeoutSec": xfer_timeout,
+            },
+            timeout=xfer_timeout + 15,
+        )
         if not res.get("ok"):
             raise SSHConnectionError(f"get_file {remote_path} -> {local_path} failed: {res.get('error')}")
 

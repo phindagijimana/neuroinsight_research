@@ -22,6 +22,21 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
+from backend.core import transfer_settings as ts
+from backend.core.transfer_io import (
+    copy_local_file,
+    curl_download_with_retries,
+    destination_complete,
+    local_file_size,
+    log_batch_progress,
+    platform_download_file,
+    remote_copy_file,
+    remote_file_size,
+    scp_get_file,
+    scp_put_file,
+    stream_download_resumable,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -304,30 +319,36 @@ class TransferManager:
         return self._filename_from_id(file_id, index)
 
     def _download_to_local(self, record: TransferRecord, connector) -> None:
-        """Platform -> local filesystem."""
+        """Platform -> local filesystem (file-by-file; HTTP Range resume)."""
         expanded = getattr(record, "_expanded_names", None)
         os.makedirs(record.target_path, exist_ok=True)
+        total = record.total_files or len(record.file_ids)
         for i, file_id in enumerate(record.file_ids):
             if record.cancelled:
                 return
+            fname = file_id
             try:
                 info = self._get_download_info(connector, file_id, i, expanded)
+                fname = info["fname"]
                 dest = os.path.join(record.target_path, info["fname"])
                 Path(dest).parent.mkdir(parents=True, exist_ok=True)
-                if info.get("url"):
-                    with connector._client.stream("GET", info["url"]) as resp:
-                        resp.raise_for_status()
-                        with open(dest, "wb") as f:
-                            for chunk in resp.iter_bytes(chunk_size=65536):
-                                f.write(chunk)
-                    path = str(Path(dest).resolve())
+                expected_size = info.get("size_bytes")
+                if destination_complete(local_path=dest, expected_size=expected_size):
+                    logger.info("Skipping complete local file %s", dest)
+                    record.local_paths.append(str(Path(dest).resolve()))
+                elif info.get("url") and hasattr(connector, "_client"):
+                    stream_download_resumable(connector._client, info["url"], dest)
+                    record.local_paths.append(str(Path(dest).resolve()))
                 else:
-                    path = connector.download_file(file_id, dest)
-                record.local_paths.append(path)
+                    platform_download_file(
+                        connector, file_id, dest, expected_size=expected_size
+                    )
+                    record.local_paths.append(str(Path(dest).resolve()))
             except Exception as e:
                 logger.warning("Failed to download %s: %s", file_id, e)
+            log_batch_progress("Download", i, total, fname)
             record.files_completed = i + 1
-            record.progress_percent = ((i + 1) / record.total_files) * 100
+            record.progress_percent = ((i + 1) / total) * 100
 
     def _download_to_remote(self, record: TransferRecord, connector) -> None:
         """Platform -> HPC/remote.
@@ -354,14 +375,17 @@ class TransferManager:
         # that only exists on the NIR server, so direct curl from HPC
         # cannot work.  Skip the attempt entirely.
         skip_direct = record.platform == "xnat"
+        total = record.total_files or len(record.file_ids)
 
         for i, file_id in enumerate(record.file_ids):
             if record.cancelled:
                 return
+            fname = file_id
             try:
                 info = self._get_download_info(connector, file_id, i, expanded)
                 fname = info["fname"]
                 remote_dest = os.path.join(record.target_path, fname)
+                expected_size = info.get("size_bytes")
 
                 remote_parent = os.path.dirname(remote_dest)
                 if remote_parent != record.target_path:
@@ -370,26 +394,30 @@ class TransferManager:
                     except Exception as e:
                         logger.debug("Could not create remote parent %s: %s", remote_parent, e)
 
+                if destination_complete(
+                    ssh=ssh,
+                    remote_path=remote_dest,
+                    expected_size=expected_size,
+                ):
+                    logger.info("Skipping complete remote file %s", remote_dest)
+                    record.local_paths.append(remote_dest)
+                    continue
+
                 downloaded = False
 
                 if not skip_direct:
                     try:
-                        url = info.get("url") or connector.get_download_url(file_id)
-                        exit_code, stdout, stderr = ssh.execute(
-                            f'curl -fsSL -o "{remote_dest}" "{url}"',
-                            timeout=600,
+                        curl_download_with_retries(
+                            ssh,
+                            url_supplier=lambda fid=file_id: connector.get_download_url(fid),
+                            remote_dest=remote_dest,
                         )
-                        if exit_code == 0:
-                            record.local_paths.append(remote_dest)
-                            logger.info(
-                                "Direct download %s -> %s complete",
-                                fname, remote_dest,
-                            )
-                            downloaded = True
-                        else:
-                            raise RuntimeError(
-                                f"curl failed (exit {exit_code}): {stderr[:200]}"
-                            )
+                        record.local_paths.append(remote_dest)
+                        logger.info(
+                            "Direct download %s -> %s complete",
+                            fname, remote_dest,
+                        )
+                        downloaded = True
                     except Exception as direct_err:
                         logger.info(
                             "Direct download failed for %s, falling back to indirect: %s",
@@ -398,15 +426,16 @@ class TransferManager:
 
                 if not downloaded:
                     self._indirect_download_single(
-                        connector, ssh, file_id, fname, remote_dest
+                        connector, ssh, file_id, fname, remote_dest, expected_size
                     )
                     record.local_paths.append(remote_dest)
 
             except Exception as e:
                 logger.warning("Failed to transfer %s: %s", file_id, e)
 
+            log_batch_progress("Transfer", i, total, fname)
             record.files_completed = i + 1
-            record.progress_percent = ((i + 1) / record.total_files) * 100
+            record.progress_percent = ((i + 1) / total) * 100
 
     @staticmethod
     def _get_download_info(connector, file_id: str, index: int, expanded_names: dict | None = None) -> dict:
@@ -416,22 +445,44 @@ class TransferManager:
         try:
             info = connector.get_download_info(file_id)
             fname = rel_path or info.get("filename", "") or f"file_{index}"
-            return {"fname": fname, "url": info.get("url", "")}
+            return {
+                "fname": fname,
+                "url": info.get("url", ""),
+                "size_bytes": info.get("size_bytes"),
+            }
         except Exception:
             if not rel_path:
                 fallback = os.path.basename(file_id.rstrip("/"))
                 if not fallback or fallback.startswith("N:") or len(fallback) >= 200:
                     fallback = f"file_{index}"
                 rel_path = fallback
-            return {"fname": rel_path, "url": ""}
+            return {"fname": rel_path, "url": "", "size_bytes": None}
 
     @staticmethod
-    def _indirect_download_single(connector, ssh, file_id, fname, remote_dest):
-        """Fallback: platform -> NIR temp -> SFTP to remote."""
+    def _indirect_download_single(
+        connector,
+        ssh,
+        file_id,
+        fname,
+        remote_dest,
+        expected_size: Optional[int] = None,
+    ):
+        """Fallback: platform -> NIR (resumable HTTP) -> SFTP to remote/HPC."""
+        if destination_complete(
+            ssh=ssh, remote_path=remote_dest, expected_size=expected_size
+        ):
+            return
         with tempfile.TemporaryDirectory(prefix="neuroinsight_xfer_") as tmpdir:
-            local_tmp = os.path.join(tmpdir, fname)
-            connector.download_file(file_id, local_tmp)
-            ssh.put_file(local_tmp, remote_dest)
+            local_tmp = os.path.join(tmpdir, os.path.basename(fname))
+            platform_download_file(
+                connector, file_id, local_tmp, expected_size=expected_size
+            )
+            scp_put_file(
+                ssh,
+                local_tmp,
+                remote_dest,
+                expected_size=expected_size or local_file_size(local_tmp),
+            )
 
     # ---------------------------------------------------------- upload logic
 
@@ -533,6 +584,7 @@ class TransferManager:
             )
 
         failed: list[str] = []
+        total = record.total_files
         for i, (fpath, rel_dir) in enumerate(local_files):
             if record.cancelled:
                 return
@@ -542,8 +594,9 @@ class TransferManager:
             except Exception as e:
                 logger.warning("Failed to upload %s: %s", fpath, e)
                 failed.append(f"{fpath}: {e}")
+            log_batch_progress("Upload", i, total, fpath)
             record.files_completed = i + 1
-            record.progress_percent = ((i + 1) / record.total_files) * 100
+            record.progress_percent = ((i + 1) / total) * 100
 
         if failed:
             preview = "; ".join(failed[:3])
@@ -622,15 +675,21 @@ class TransferManager:
 
         failed: list[str] = []
         completed_units = 0
+        total = record.total_files
         try:
-            for remote_path, upload_name, rel_dir in upload_items:
+            for idx, (remote_path, upload_name, rel_dir) in enumerate(upload_items):
                 if record.cancelled:
                     return
                 try:
-                    # Preserve upload_name in platform by staging with that filename.
                     with tempfile.TemporaryDirectory(prefix="neuroinsight_up_") as tmpdir:
                         local_tmp = os.path.join(tmpdir, upload_name)
-                        ssh.get_file(remote_path, local_tmp)
+                        remote_sz = remote_file_size(ssh, remote_path)
+                        scp_get_file(
+                            ssh,
+                            remote_path,
+                            local_tmp,
+                            expected_size=remote_sz,
+                        )
                         remote_dir = self._join_remote_dir(remote_base_path, rel_dir)
                         uploaded_units = self._upload_with_fallbacks(
                             connector, local_tmp, dataset_id, remote_path=remote_dir
@@ -643,6 +702,7 @@ class TransferManager:
                     failed.append(f"{remote_path}: {e}")
                     completed_units += 1
 
+                log_batch_progress("Upload", idx, total, remote_path)
                 record.files_completed = completed_units
                 record.progress_percent = (
                     completed_units / max(record.total_files, 1)
@@ -717,7 +777,7 @@ class TransferManager:
             cmd = (
                 f'tar -C "{source_path}" -czf "{remote_archive}" "{folder}"'
             )
-            exit_code, _stdout, stderr = ssh.execute(cmd, timeout=1800)
+            exit_code, _stdout, stderr = ssh.execute(cmd, timeout=ts.SCP_TIMEOUT_SEC)
             if exit_code != 0:
                 raise RuntimeError(
                     f"Failed to archive {folder} for upload: {stderr[:200]}"
@@ -842,33 +902,86 @@ class TransferManager:
             record.error = str(e)
             record.completed_at = datetime.utcnow()
 
+    @staticmethod
+    def _collect_local_file_items(source_path: str) -> list[tuple[str, str]]:
+        """Return (absolute_path, rel_path) under source_path."""
+        items: list[tuple[str, str]] = []
+        if os.path.isdir(source_path):
+            for root, _dirs, filenames in os.walk(source_path):
+                for fname in filenames:
+                    fpath = os.path.join(root, fname)
+                    if _should_skip_work_path(fpath):
+                        continue
+                    rel = os.path.relpath(fpath, source_path)
+                    items.append((fpath, rel))
+        elif os.path.isfile(source_path):
+            if not _should_skip_work_path(source_path):
+                items.append((source_path, os.path.basename(source_path)))
+        return items
+
+    @staticmethod
+    def _collect_remote_file_items(ssh, source_path: str) -> list[tuple[str, str]]:
+        """Return (remote_path, rel_path) under source_path."""
+        root = source_path.rstrip("/") or source_path
+        paths = TransferManager._collect_remote_files_recursive(ssh, source_path)
+        items: list[tuple[str, str]] = []
+        for remote_path in paths:
+            if _should_skip_work_path(remote_path):
+                continue
+            rel = os.path.relpath(remote_path, root)
+            items.append((remote_path, rel))
+        if not items and source_path:
+            try:
+                rc, out, _ = ssh.execute(
+                    f'test -f "{source_path}" && echo file || echo missing', timeout=20
+                )
+                if (out or "").strip() == "file":
+                    items.append((source_path, os.path.basename(source_path)))
+            except Exception:
+                items.append((source_path, os.path.basename(source_path)))
+        return items
+
     def _move_platform_to_platform(
         self, record: TransferRecord, src_platform: str, dst_platform: str
     ) -> None:
-        """Platform -> temp local -> Platform."""
+        """Platform -> temp local (resumable) -> Platform."""
         src_connector = self._get_connector(src_platform)
         dst_connector = self._get_connector(dst_platform)
         dst_dataset_id, dst_remote_path = self._parse_dataset_target(record.dataset_id)
 
-        with tempfile.TemporaryDirectory(prefix="neuroinsight_p2p_") as tmpdir:
-            file_ids = record.file_ids
-            record.total_files = len(file_ids)
+        self._expand_folders(record, src_connector)
+        expanded = getattr(record, "_expanded_names", None)
+        file_ids = record.file_ids
+        record.total_files = len(file_ids)
+        total = record.total_files or 1
 
+        with tempfile.TemporaryDirectory(prefix="neuroinsight_p2p_") as tmpdir:
             for i, fid in enumerate(file_ids):
                 if record.cancelled:
                     return
+                fname = fid
                 try:
-                    fname = self._filename_from_id(fid, i)
+                    info = self._get_download_info(src_connector, fid, i, expanded)
+                    fname = info["fname"]
                     tmp_path = os.path.join(tmpdir, fname)
-                    src_connector.download_file(fid, tmp_path)
-                    dst_connector.upload_file(
-                        tmp_path, dst_dataset_id, remote_path=dst_remote_path
+                    Path(tmp_path).parent.mkdir(parents=True, exist_ok=True)
+                    platform_download_file(
+                        src_connector,
+                        fid,
+                        tmp_path,
+                        expected_size=info.get("size_bytes"),
+                    )
+                    rel_dir = os.path.dirname(fname).replace("\\", "/")
+                    remote_dir = self._join_remote_dir(dst_remote_path, rel_dir)
+                    self._upload_with_fallbacks(
+                        dst_connector, tmp_path, dst_dataset_id, remote_path=remote_dir
                     )
                 except Exception as e:
                     logger.warning("P2P transfer file %s: %s", fid, e)
 
+                log_batch_progress("P2P transfer", i, total, fname)
                 record.files_completed = i + 1
-                record.progress_percent = ((i + 1) / max(record.total_files, 1)) * 100
+                record.progress_percent = ((i + 1) / total) * 100
 
             if not record.cancelled:
                 record.status = "completed"
@@ -878,55 +991,56 @@ class TransferManager:
     def _move_backend_to_backend(
         self, record: TransferRecord, src_backend: str, dst_backend: str
     ) -> None:
-        """Backend -> Backend via SSH/local copy."""
+        """Backend -> Backend: local copy, scp, or remote cp (same host)."""
         from backend.core.ssh_manager import get_ssh_manager
 
         ssh = get_ssh_manager()
 
-        src_files: List[str] = []
         if src_backend == "local":
-            if os.path.isdir(record.source_path):
-                for root, _dirs, filenames in os.walk(record.source_path):
-                    for fname in filenames:
-                        src_files.append(os.path.join(root, fname))
-            elif os.path.isfile(record.source_path):
-                src_files.append(record.source_path)
+            file_items = self._collect_local_file_items(record.source_path)
         else:
-            try:
-                listing = ssh.list_dir(record.source_path)
-                src_files = [f["path"] for f in listing if f.get("type") == "file"]
-            except Exception as e:
-                logger.debug("Could not list source dir %s, treating as single file: %s", record.source_path, e)
-                src_files = [record.source_path]
+            file_items = self._collect_remote_file_items(ssh, record.source_path)
 
-        record.total_files = len(src_files)
+        record.total_files = len(file_items)
+        total = record.total_files or 1
+        if record.total_files == 0:
+            raise RuntimeError(
+                f"No files found to transfer from {src_backend} path: {record.source_path}"
+            )
+
+        both_remote = src_backend != "local" and dst_backend != "local"
 
         with tempfile.TemporaryDirectory(prefix="neuroinsight_b2b_") as tmpdir:
-            for i, fpath in enumerate(src_files):
+            for i, (src_path, rel) in enumerate(file_items):
                 if record.cancelled:
                     return
                 try:
-                    fname = os.path.basename(fpath)
-                    if src_backend != "local":
-                        local_tmp = os.path.join(tmpdir, fname)
-                        ssh.get_file(fpath, local_tmp)
+                    dest_path = os.path.join(record.target_path, rel)
+                    if src_backend == "local" and dst_backend == "local":
+                        copy_local_file(src_path, dest_path)
+                    elif src_backend == "local" and dst_backend != "local":
+                        scp_put_file(ssh, src_path, dest_path)
+                    elif src_backend != "local" and dst_backend == "local":
+                        scp_get_file(ssh, src_path, dest_path)
+                    elif both_remote:
+                        try:
+                            remote_copy_file(ssh, src_path, dest_path)
+                        except Exception:
+                            local_tmp = os.path.join(
+                                tmpdir, f"{i}_{os.path.basename(rel)}"
+                            )
+                            scp_get_file(ssh, src_path, local_tmp)
+                            scp_put_file(ssh, local_tmp, dest_path)
                     else:
-                        local_tmp = fpath
-
-                    if dst_backend == "local":
-                        os.makedirs(record.target_path, exist_ok=True)
-                        dest = os.path.join(record.target_path, fname)
-                        if local_tmp != dest:
-                            import shutil
-                            shutil.copy2(local_tmp, dest)
-                    else:
-                        remote_dest = os.path.join(record.target_path, fname)
-                        ssh.put_file(local_tmp, remote_dest)
+                        local_tmp = os.path.join(tmpdir, f"{i}_{os.path.basename(rel)}")
+                        scp_get_file(ssh, src_path, local_tmp)
+                        scp_put_file(ssh, local_tmp, dest_path)
                 except Exception as e:
-                    logger.warning("B2B transfer file %s: %s", fpath, e)
+                    logger.warning("B2B transfer %s: %s", src_path, e)
 
+                log_batch_progress("Move", i, total, rel)
                 record.files_completed = i + 1
-                record.progress_percent = ((i + 1) / max(record.total_files, 1)) * 100
+                record.progress_percent = ((i + 1) / total) * 100
 
             if not record.cancelled:
                 record.status = "completed"

@@ -26,8 +26,25 @@ import FileBrowserPane from '../components/FileBrowserPane';
 import ConnectionPanel from '../components/ConnectionPanel';
 import { TransferProgress } from '../components/TransferProgress';
 import type { FileEntry, PlatformType } from '../components/FileBrowserPane';
-import { consumeTransferOpenAt } from '../lib/openJobPath';
+import { consumeTransferOpenAt, stashJobsOpenAt, platformToJobsBackend, browseDirectoryForPath } from '../lib/openJobPath';
 
+interface TransferPageProps {
+  setActivePage?: (page: string) => void;
+}
+
+interface ActiveTransfer {
+  id: string;
+  direction: 'left-to-right' | 'right-to-left';
+  sourceLabel: string;
+  destLabel: string;
+  destPlatform: PlatformType;
+}
+
+interface JobsHandoff {
+  backend: 'local' | 'remote' | 'remote_hpc';
+  path: string;
+  destLabel: string;
+}
 interface PlatformTabDef {
   id: PlatformType;
   label: string;
@@ -43,16 +60,13 @@ const PLATFORM_TABS: PlatformTabDef[] = [
   { id: 'xnat',      label: 'XNAT',          icon: <Globe className="h-3.5 w-3.5" />,    activeClass: 'border-navy-600 bg-navy-50 text-navy-700' },
 ];
 
-interface ActiveTransfer {
-  id: string;
-  direction: 'left-to-right' | 'right-to-left';
-  sourceLabel: string;
-  destLabel: string;
-}
-
 const ACTIVE_TRANSFERS_STORAGE_KEY = 'neuroinsight.activeTransfers.v1';
 
-function TransferPage() {
+function isPlatformType(value: string): value is PlatformType {
+  return ['local', 'remote', 'hpc', 'pennsieve', 'xnat'].includes(value);
+}
+
+function TransferPage({ setActivePage }: TransferPageProps) {
   // Pane platforms
   const [leftPlatform, setLeftPlatform] = useState<PlatformType>('local');
   const [rightPlatform, setRightPlatform] = useState<PlatformType>('remote');
@@ -80,6 +94,7 @@ function TransferPage() {
   const [error, setError] = useState<string | null>(null);
   const [recentTransfers, setRecentTransfers] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [jobsHandoff, setJobsHandoff] = useState<JobsHandoff | null>(null);
 
   const persistActiveTransfers = useCallback((items: ActiveTransfer[]) => {
     try {
@@ -112,6 +127,7 @@ function TransferPage() {
           direction: t.direction,
           sourceLabel: t.sourceLabel,
           destLabel: t.destLabel,
+          destPlatform: isPlatformType(t.destPlatform) ? t.destPlatform : 'local',
         }));
     } catch {
       return [];
@@ -182,6 +198,7 @@ function TransferPage() {
           direction: 'left-to-right',
           sourceLabel: String(t.platform || 'Source'),
           destLabel: 'Destination',
+          destPlatform: 'local',
         }));
         enqueueTransfers(recovered);
       }
@@ -219,6 +236,7 @@ function TransferPage() {
         direction: 'left-to-right',
         sourceLabel: PLATFORM_TABS.find(t => t.id === leftPlatform)?.label || leftPlatform,
         destLabel: PLATFORM_TABS.find(t => t.id === rightPlatform)?.label || rightPlatform,
+        destPlatform: rightPlatform,
       }]);
       setLeftSelected([]);
     } catch (err: any) {
@@ -264,6 +282,7 @@ function TransferPage() {
         direction: 'right-to-left',
         sourceLabel: PLATFORM_TABS.find(t => t.id === rightPlatform)?.label || rightPlatform,
         destLabel: PLATFORM_TABS.find(t => t.id === leftPlatform)?.label || leftPlatform,
+        destPlatform: leftPlatform,
       }]);
       setRightSelected([]);
     } catch (err: any) {
@@ -280,9 +299,29 @@ function TransferPage() {
     enqueueTransfers,
   ]);
 
-  const handleTransferComplete = (transferId: string) => {
-    setActiveTransfers(prev => prev.filter(t => t.id !== transferId));
+  const handleTransferComplete = (
+    transfer: ActiveTransfer,
+    info?: { localPaths: string[]; targetPath: string },
+  ) => {
+    if (info?.targetPath) {
+      const backend = platformToJobsBackend(transfer.destPlatform);
+      if (backend) {
+        setJobsHandoff({
+          backend,
+          path: browseDirectoryForPath(info.targetPath, 'input'),
+          destLabel: transfer.destLabel,
+        });
+      }
+    }
+    setActiveTransfers((prev) => prev.filter((item) => item.id !== transfer.id));
     loadHistory();
+  };
+
+  const openTransferInJobs = () => {
+    if (!jobsHandoff || !setActivePage) return;
+    stashJobsOpenAt({ backend: jobsHandoff.backend, path: jobsHandoff.path });
+    setActivePage('jobs');
+    setJobsHandoff(null);
   };
 
   const handleSwapPlatforms = () => {
@@ -313,6 +352,25 @@ function TransferPage() {
           History ({recentTransfers.length})
         </button>
       </div>
+
+      {jobsHandoff && (
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 mb-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900">
+          <span>
+            Transfer complete on <strong>{jobsHandoff.destLabel}</strong> at{' '}
+            <code className="font-mono text-[11px]">{jobsHandoff.path}</code>
+          </span>
+          {setActivePage ? (
+            <button
+              type="button"
+              onClick={openTransferInJobs}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-navy-600 text-white font-medium hover:bg-navy-800"
+            >
+              Open in Jobs
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </div>
+      )}
 
       {/* Error bar */}
       {error && (
@@ -499,8 +557,8 @@ function TransferPage() {
                 <TransferProgress
                   transferId={t.id}
                   direction="download"
-                  onComplete={() => handleTransferComplete(t.id)}
-                  onCancel={() => handleTransferComplete(t.id)}
+                  onComplete={(info) => handleTransferComplete(t, info)}
+                  onCancel={() => handleTransferComplete(t)}
                 />
               </div>
             </div>

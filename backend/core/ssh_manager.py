@@ -414,13 +414,15 @@ class SSHManager:
         self._reset_idle_timer()
         return self._sftp
 
-    def put_file(self, local_path: str, remote_path: str) -> None:
+    def put_file(self, local_path: str, remote_path: str, timeout: Optional[int] = None) -> None:
         """Upload a local file to the remote host.
 
         Args:
             local_path: Path to local file
             remote_path: Destination path on remote
+            timeout: Ignored for direct paramiko SFTP (broker path honors this)
         """
+        _ = timeout
         with self._lock:
             sftp = self._get_sftp()
             self._last_activity = time.time()
@@ -432,13 +434,15 @@ class SSHManager:
             sftp.put(local_path, remote_path)
             logger.debug(f"SFTP put: {local_path} -> {remote_path}")
 
-    def get_file(self, remote_path: str, local_path: str) -> None:
+    def get_file(self, remote_path: str, local_path: str, timeout: Optional[int] = None) -> None:
         """Download a file from the remote host.
 
         Args:
             remote_path: Path on remote host
             local_path: Destination path on local
+            timeout: Ignored for direct paramiko SFTP (broker path honors this)
         """
+        _ = timeout
         with self._lock:
             sftp = self._get_sftp()
             self._last_activity = time.time()

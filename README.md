@@ -84,13 +84,13 @@ cd neuroinsight_research
 
 Open **http://localhost:3000**.
 
-For connectors (HPC, Pennsieve, XNAT) and deployment options, see **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**. Plugin and workflow catalog: in-app **Docs** tab (generated from `plugins/` and `workflows/`).
+For connectors (HPC, Pennsieve, XNAT), Transfer (large files), and deployment options, see **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** and **[docs/TRANSFER.md](docs/TRANSFER.md)**. Plugin and workflow catalog: in-app **Docs** tab (generated from `plugins/` and `workflows/`).
 
 ## Key Features
 
 - **Multiple data sources** -- Local files, Remote Server (SSH), HPC filesystem, Pennsieve, or XNAT
-- **Multiple compute backends** -- Local Docker, Remote Server (SSH + Docker), or HPC/SLURM (SSH + Singularity)
-- **Mix and match** -- Browse data on XNAT, process on HPC; pull from Pennsieve, process locally
+- **Multiple compute backends** -- Local Docker, **Remote Server** (SSH + Docker on any Linux host — lab VM, cloud instance, or workstation; not cloud-only), or HPC/SLURM (SSH + Singularity on a cluster). See [Remote Server vs HPC](docs/USER_GUIDE.md#remote-server-vs-hpc) in the user guide.
+- **Flexible pairing** -- e.g. stage Pennsieve data onto HPC and run SLURM there, or download XNAT scans and process locally (platform data is copied to compute before the job runs)
 - **Real-time monitoring** -- SLURM queue monitor, job progress tracking, and log streaming
 - **Plugins** -- Each tool is a single YAML file; drop a new one in `plugins/` to add support for a new tool
 - **Workflows** -- Chain multiple plugins into one job with automatic data passing between steps
@@ -98,11 +98,13 @@ For connectors (HPC, Pennsieve, XNAT) and deployment options, see **[docs/USER_G
 
 ## Security & data
 
-NeuroInsight is designed as a **local, single-user desktop application**. Your
-data stays on your machine (or your HPC) — nothing is uploaded to a third-party
-service. The engine and all its internal services (database, cache, object
-store) bind to `127.0.0.1` only, and the all-in-one container generates unique
-credentials per install.
+NeuroInsight is designed as a **local, single-user desktop application**. Processing
+runs on your machine or on infrastructure you connect (remote server, HPC). The
+engine and its internal services bind to `127.0.0.1` by default.
+
+When you use Pennsieve or XNAT, selected files are **downloaded or staged to
+compute** for the job — pipelines do not read those platforms in place. Connector
+credentials are stored in your OS keychain (desktop) or local config, not in the repo.
 
 > **Do not expose the backend to the internet.** The local API has no built-in
 > authentication because it is meant to listen only on localhost. If you change
@@ -110,8 +112,7 @@ credentials per install.
 > your own authenticating reverse proxy / VPN — otherwise anyone on the network
 > could submit jobs or read results.
 
-Credentials you enter for connectors (Pennsieve, XNAT, SSH/HPC) are stored in
-your OS keychain via the desktop Credential Vault, not in the repo. For installer
+For installer
 trust (code signing / notarization), see [docs/SIGNING_AND_TRUST.md](docs/SIGNING_AND_TRUST.md).
 
 ## Documentation
@@ -121,6 +122,7 @@ See **[docs/README.md](docs/README.md)** for the full index. Quick links:
 - [Install (desktop)](docs/INSTALL.md) — start here for end users
 - [Desktop updates](docs/DESKTOP_UPDATES.md) — Help menu, auto-update, engine refresh
 - [User Guide](docs/USER_GUIDE.md) — HPC/SLURM, Pennsieve, XNAT, source deployment
+- [Transfer guide](docs/TRANSFER.md) — route matrix, large-file resume, env vars
 - [Tool licenses](docs/TOOL_LICENSES.md) — FreeSurfer / MELD setup
 - [Quick Start (developers)](QUICK_START.md) — `./research` from source
 - [Troubleshooting](docs/TROUBLESHOOTING.md)

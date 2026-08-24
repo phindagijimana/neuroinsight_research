@@ -32,8 +32,8 @@ const CAPABILITIES = [
   },
   {
     icon: Shield,
-    title: 'Your data stays in place',
-    desc: 'Process data where it lives.',
+    title: 'Data sources & compute',
+    desc: 'Browse Pennsieve, XNAT, local, or HPC paths; jobs run on copies staged where compute can read them.',
   },
 ];
 

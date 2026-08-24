@@ -199,22 +199,24 @@ class SshBroker {
     };
   }
 
-  put({ host, user, port = 22, localPath, remotePath }) {
+  put({ host, user, port = 22, localPath, remotePath, timeoutSec = 86400 }) {
     const key = this._key(host, user, port);
     const c = this.conns.get(key) || { cp: this._controlPath(key) };
     const src = this.toHostPath(localPath);
+    const xferMs = Math.max(60000, Number(timeoutSec) * 1000 || 86400000);
     const r = spawnSync(
       "scp",
       [...this._baseOpts(c.cp), "-p", "-P", String(port), src, `${user}@${host}:${remotePath}`],
-      { timeout: 1800000, maxBuffer: 16 * 1024 * 1024, env: this.env }
+      { timeout: xferMs, maxBuffer: 16 * 1024 * 1024, env: this.env }
     );
     return { ok: r.status === 0, error: (r.stderr || "").toString().slice(0, 400) };
   }
 
-  get({ host, user, port = 22, remotePath, localPath }) {
+  get({ host, user, port = 22, remotePath, localPath, timeoutSec = 86400 }) {
     const key = this._key(host, user, port);
     const c = this.conns.get(key) || { cp: this._controlPath(key) };
     const dst = this.toHostPath(localPath);
+    const xferMs = Math.max(60000, Number(timeoutSec) * 1000 || 86400000);
     try {
       fs.mkdirSync(path.dirname(dst), { recursive: true });
     } catch (_e) {
@@ -223,7 +225,7 @@ class SshBroker {
     const r = spawnSync(
       "scp",
       [...this._baseOpts(c.cp), "-p", "-P", String(port), `${user}@${host}:${remotePath}`, dst],
-      { timeout: 1800000, maxBuffer: 16 * 1024 * 1024, env: this.env }
+      { timeout: xferMs, maxBuffer: 16 * 1024 * 1024, env: this.env }
     );
     return { ok: r.status === 0, error: (r.stderr || "").toString().slice(0, 400) };
   }

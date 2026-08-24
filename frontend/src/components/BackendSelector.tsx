@@ -1,15 +1,15 @@
 /**
  * BackendSelector Component
  *
- * Independent data source & compute backend selector.
+ * Data source & compute backend selector.
  *
  * Data Source row:  [Local] [Remote Server] [HPC] [Pennsieve] [XNAT]
  * Compute row:     [Local Docker] [Remote Server] [HPC/SLURM]
  *
- * Data source and compute are independent -- you can browse data on a
- * remote server while running jobs on an HPC cluster, for instance.
- * SSH connection is shared: when either data or compute points to a
- * remote host, the SSH form is shown and the connection serves both.
+ * You pick where to browse/select input and where to run jobs independently,
+ * but processing always uses filesystem paths on the compute side. Pennsieve and
+ * XNAT selections are downloaded (or curled directly to HPC) before submit.
+ * Local/remote/HPC filesystem inputs must already be visible to the chosen compute.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -45,6 +45,8 @@ interface BackendSelectorProps {
   showPlatformTabs?: boolean;
   /** Compute row + SSH only (platform transfer step). */
   computeOnly?: boolean;
+  /** Jobs page: compute-only; SSH follows selected compute tab only. */
+  jobsMode?: boolean;
 }
 
 interface HPCConfig {
@@ -76,6 +78,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
   onSSHConnectionChange,
   showPlatformTabs = true,
   computeOnly = false,
+  jobsMode = false,
 }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
@@ -98,6 +101,8 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
   });
 
   const [partitions, setPartitions] = useState<Array<{ name: string; timelimit: string; nodes: string }>>([]);
+  /** Active execution backend on the server (may differ from selected tab until switch). */
+  const [activeServerBackend, setActiveServerBackend] = useState<'local' | 'remote_docker' | 'slurm'>('local');
 
   // Platform auth state
   const [platformConnecting, setPlatformConnecting] = useState(false);
@@ -115,7 +120,23 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
   const activeDataSource = dataSource;
   const dataSourceNeedsSSH = dataSource === 'remote' || dataSource === 'hpc';
   const computeNeedsSSH = selectedBackend === 'remote' || selectedBackend === 'remote_hpc';
-  const needsSSH = !isPlatformSelected && (dataSourceNeedsSSH || computeNeedsSSH);
+  const needsSSH = jobsMode
+    ? computeNeedsSSH
+    : !isPlatformSelected && (dataSourceNeedsSSH || computeNeedsSSH);
+
+  const sshPanelTitle =
+    selectedBackend === 'remote_hpc'
+      ? 'HPC (SLURM) connection'
+      : selectedBackend === 'remote'
+        ? 'Remote Server (Docker) connection'
+        : 'SSH Connection';
+
+  const sshConnectPrompt =
+    selectedBackend === 'remote_hpc'
+      ? 'Connect SSH for HPC (SLURM)'
+      : selectedBackend === 'remote'
+        ? 'Connect SSH for Remote Server (Docker)'
+        : 'Connect SSH to browse or run jobs remotely';
 
   const setSSHConnected = (value: boolean) => {
     setConnectionStatus(value ? 'connected' : 'disconnected');
@@ -130,6 +151,15 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
       apiService.getSshHosts().then(setSshHosts).catch(() => {});
     }
   }, [needsSSH]);
+
+  // Expand SSH form when remote/HPC is selected so Connect is visible immediately.
+  useEffect(() => {
+    if (needsSSH && connectionStatus !== 'connected') {
+      setSshExpanded(true);
+    } else if (!needsSSH) {
+      setSshExpanded(false);
+    }
+  }, [needsSSH, activeDataSource, selectedBackend, connectionStatus]);
 
   const applySshAlias = (alias: string) => {
     const h = sshHosts.find((x) => x.alias === alias);
@@ -149,6 +179,10 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
     try {
       const resp = await fetch(`${apiService.getBaseUrl()}/api/hpc/backend/current`);
       const data = await resp.json();
+      const serverType = data.backend_type as 'local' | 'remote_docker' | 'slurm';
+      if (serverType === 'local' || serverType === 'remote_docker' || serverType === 'slurm') {
+        setActiveServerBackend(serverType);
+      }
       if (data.backend_type === 'slurm') {
         onBackendChange('remote_hpc');
         const statusResp = await fetch(`${apiService.getBaseUrl()}/api/hpc/status`);
@@ -161,6 +195,14 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
         }
       } else if (data.backend_type === 'remote_docker') {
         onBackendChange('remote');
+        const statusResp = await fetch(`${apiService.getBaseUrl()}/api/hpc/status`);
+        const status = await statusResp.json();
+        if (status.connected) {
+          setSSHConnected(true);
+          if (status.host) setHost(status.host);
+          if (status.username) setUsername(status.username);
+        }
+      } else {
         const statusResp = await fetch(`${apiService.getBaseUrl()}/api/hpc/status`);
         const status = await statusResp.json();
         if (status.connected) {
@@ -188,7 +230,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
         setSshExpanded(true);
         if (selectedBackend === 'remote_hpc') fetchPartitions();
         if (computeNeedsSSH) {
-          switchToRemote(true);
+          switchToRemote(true, selectedBackend);
         }
       } else {
         setConnectionStatus('error');
@@ -216,12 +258,13 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
     } catch { /* ignore */ }
   };
 
-  const switchToRemote = async (skipCheck = false) => {
+  const switchToRemote = async (skipCheck = false, backendOverride?: BackendType) => {
     if (!skipCheck && connectionStatus !== 'connected') {
       setErrorMessage('Connect to the remote server first');
       return;
     }
-    const backendType = selectedBackend === 'remote_hpc' ? 'slurm' : 'remote_docker';
+    const target = backendOverride ?? selectedBackend;
+    const backendType = target === 'remote_hpc' ? 'slurm' : 'remote_docker';
     setIsSwitching(true);
     try {
       const resp = await fetch(`${apiService.getBaseUrl()}/api/hpc/backend/switch`, {
@@ -238,7 +281,9 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
       });
       const data = await resp.json();
       if (resp.ok) {
-        onBackendChange(selectedBackend === 'remote_hpc' ? 'remote_hpc' : 'remote');
+        setActiveServerBackend(backendType);
+        onBackendChange(target === 'remote_hpc' ? 'remote_hpc' : 'remote');
+        if (backendType === 'slurm') fetchPartitions();
       } else {
         setErrorMessage(data.detail || 'Failed to switch backend');
       }
@@ -259,9 +304,11 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
       });
       onBackendChange('local');
       setSSHConnected(false);
+      setActiveServerBackend('local');
     } catch {
       onBackendChange('local');
       setSSHConnected(false);
+      setActiveServerBackend('local');
     } finally {
       setIsSwitching(false);
     }
@@ -273,6 +320,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
     } catch { /* ignore */ }
     setSSHConnected(false);
     setPartitions([]);
+    setActiveServerBackend('local');
   };
 
   const handleTabClick = (tab: typeof TABS[0]) => {
@@ -311,11 +359,18 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
 
   const backendTabs = TABS.filter(t => t.backendId);
 
+  const serverModeLabel = (() => {
+    if (activeServerBackend === 'slurm') return 'HPC (SLURM)';
+    if (activeServerBackend === 'remote_docker') return 'Remote Server (Docker)';
+    if (connectionStatus === 'connected') return 'SSH only (browse files; compute is local)';
+    return '';
+  })();
+
   return (
     <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 h-full flex flex-col shadow-sm">
 
       {/* Row 1: Data Source -- all 5 options */}
-      {showPlatformTabs && !computeOnly && (
+      {showPlatformTabs && !computeOnly && !jobsMode && (
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1.5">
             <h3 className="text-xs font-semibold text-gray-500 tracking-wider">Data Source</h3>
@@ -354,8 +409,11 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
                 onClick={() => {
                   if (tab.backendId === 'local' && selectedBackend !== 'local') {
                     switchToLocal();
-                  } else if (tab.backendId) {
+                  } else if (tab.backendId && tab.backendId !== selectedBackend) {
                     onBackendChange(tab.backendId);
+                    if (connectionStatus === 'connected') {
+                      switchToRemote(true, tab.backendId);
+                    }
                   }
                 }}
                 disabled={isSwitching}
@@ -375,24 +433,35 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
       {needsSSH && (
         <div className="border-t border-gray-200 pt-3 mt-1">
           {connectionStatus === 'connected' ? (
-            <div className="flex items-center justify-between gap-2 px-2 py-1.5 bg-green-50 border border-green-200 rounded text-xs">
-              <div className="flex items-center gap-1.5 text-green-700 min-w-0">
-                <Wifi className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">Connected to <strong>{host}</strong></span>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2 px-2 py-1.5 bg-green-50 border border-green-200 rounded text-xs">
+                <div className="flex items-center gap-1.5 text-green-700 min-w-0">
+                  <Wifi className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">
+                    Connected to <strong>{host}</strong>
+                    {serverModeLabel && <> · {serverModeLabel}</>}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSshExpanded((open) => !open)}
+                    className="text-green-700 hover:text-navy-700 font-medium transition flex items-center gap-0.5"
+                  >
+                    {sshExpanded ? 'Hide' : 'Settings'}
+                    <ChevronDown className={`h-3 w-3 transition-transform ${sshExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+                  <button onClick={disconnect} className="text-green-600 hover:text-red-600 font-medium transition">
+                    Disconnect
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setSshExpanded((open) => !open)}
-                  className="text-green-700 hover:text-navy-700 font-medium transition flex items-center gap-0.5"
-                >
-                  {sshExpanded ? 'Hide' : 'Settings'}
-                  <ChevronDown className={`h-3 w-3 transition-transform ${sshExpanded ? 'rotate-180' : ''}`} />
-                </button>
-                <button onClick={disconnect} className="text-green-600 hover:text-red-600 font-medium transition">
-                  Disconnect
-                </button>
-              </div>
+              {(jobsMode ? computeNeedsSSH : dataSource === 'remote' || dataSource === 'hpc') && (
+                <p className="text-[10px] text-gray-500 px-1">
+                  Remote Server and HPC share this SSH session to the same host.
+                  Disconnect and reconnect to use a different machine.
+                </p>
+              )}
             </div>
           ) : !sshExpanded ? (
             <button
@@ -402,7 +471,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
             >
               <span className="flex items-center gap-1.5">
                 <Server className="h-3.5 w-3.5 text-navy-600" />
-                Connect SSH to browse or run jobs remotely
+                {sshConnectPrompt}
               </span>
               <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
             </button>
@@ -415,7 +484,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
           <div className="mb-3">
             <h4 className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
               <Server className="h-3.5 w-3.5" />
-              SSH Connection
+              {jobsMode ? sshPanelTitle : 'SSH Connection'}
             </h4>
           </div>
 
@@ -613,7 +682,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
       )}
 
       {/* Platform auth forms (Pennsieve / XNAT) */}
-      {!computeOnly && isPlatformSelected && !isPlatformConnected && (
+      {!computeOnly && !jobsMode && isPlatformSelected && !isPlatformConnected && (
         <div className="border-t border-gray-200 pt-3 mt-1 space-y-3">
           <h4 className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
             <KeyRound className="h-3.5 w-3.5" />
@@ -691,7 +760,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
       )}
 
       {/* Platform connected status */}
-      {isPlatformSelected && isPlatformConnected && (
+      {isPlatformSelected && isPlatformConnected && !jobsMode && (
         <div className="border-t border-gray-200 pt-3 mt-1">
           <div className="flex items-center justify-between px-2 py-1.5 bg-green-50 border border-green-200 rounded text-xs">
             <div className="flex items-center gap-1.5 text-green-700">
@@ -701,8 +770,8 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
                 {platformConnection?.user && <> as {platformConnection.user}</>}
               </span>
             </div>
-            <button onClick={handlePlatformDisconnect} className="text-green-600 hover:text-red-600 font-medium transition">
-              Disconnect
+            <button onClick={handlePlatformDisconnect} className="text-green-600 hover:text-red-600 font-medium transition" title="Clear saved credentials and end session">
+              Log out
             </button>
           </div>
         </div>

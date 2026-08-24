@@ -10,6 +10,8 @@ Reference guide for deploying and using NeuroInsight. **New desktop users:** sta
 - [Deployment from source](#deployment-from-source)
 - [Terminology](#terminology)
 - [Compute and data sources](#compute-and-data-sources)
+- [Remote Server vs HPC](#remote-server-vs-hpc)
+- [Large file transfers](#large-file-transfers) — full matrix in **[TRANSFER.md](TRANSFER.md)**
 - [Plugins and workflows](#plugins-and-workflows)
 - [Connecting to a remote server](#connecting-to-a-remote-server)
 - [Connecting to Pennsieve](#connecting-to-pennsieve)
@@ -207,6 +209,7 @@ If you are new to research computing, here are the key terms used in this guide.
 | **SLURM** | The job scheduler used on most HPC clusters. When you submit a job, SLURM places it in a queue and runs it when resources (CPU, memory, GPU) become available. |
 | **Partition** | A group of compute nodes on an HPC cluster designated for certain types of work (e.g., `general`, `gpu`, `short`). You select a partition when submitting a job. |
 | **Login node** | The computer you SSH into when connecting to an HPC cluster. It is used for submitting jobs and transferring files, not for heavy computation. |
+| **Remote Server** | In the NeuroInsight UI, any **SSH-accessible Linux machine** where jobs run via **Docker** — not cloud-specific. Typical examples: a lab workstation, a department VM, or a cloud instance (AWS EC2, GCP Compute Engine, Azure VM). When connected, the banner may show **Remote Server (Docker)** to distinguish it from HPC/SLURM mode on the same SSH host. |
 | **Singularity / Apptainer** | Container software designed for HPC environments. It serves the same purpose as Docker but is allowed on shared clusters where Docker is not (for security reasons). Apptainer is the newer name for Singularity. |
 | **API key** | A credential (like a username and password combined into one token) used to authenticate with a web service programmatically. Pennsieve uses API keys for access. |
 | **SSL certificate** | A digital certificate that verifies a website's identity and enables encrypted (HTTPS) connections. When you connect through an SSH tunnel, the certificate check may fail because the certificate was issued for the real hostname, not `localhost`. |
@@ -215,27 +218,85 @@ If you are new to research computing, here are the key terms used in this guide.
 
 ## Compute and Data Sources
 
-NeuroInsight separates **where your data lives** from **where processing runs**. You can mix and match any data source with any compute backend to suit your environment.
+NeuroInsight lets you choose **where to select input** and **where to run jobs** separately, but **processing always uses files on the compute side**. Jobs do not run directly against Pennsieve or XNAT in place — platform data is **downloaded or staged** to local disk, a remote server, or HPC scratch before the pipeline starts.
 
 ### Data Sources
 
-| Source | Description | Authentication |
-|--------|-------------|----------------|
-| **Local** | Files on the machine running NeuroInsight | None (filesystem access) |
-| **Remote Server** | Files on any SSH-accessible Linux machine | SSH key (same credentials as compute) |
-| **HPC** | Files on an HPC cluster filesystem | SSH key (same credentials as compute) |
-| **Pennsieve** | Browse and download from the Pennsieve platform | API key + secret |
-| **XNAT** | Browse and download from any XNAT instance | XNAT username + password |
+| Source | Description | What happens before the job runs |
+|--------|-------------|----------------------------------|
+| **Local** | Files on the machine running NeuroInsight | Job reads those paths directly (local compute) or paths must be reachable from remote/HPC compute |
+| **Remote Server** | Files on an SSH-accessible Linux machine (lab VM, cloud instance, workstation — see [Remote Server vs HPC](#remote-server-vs-hpc)) | Browse over SSH; job uses paths on that host when compute is Remote Server or HPC on the same host |
+| **HPC** | Files on an HPC cluster filesystem | Browse over SSH; job uses cluster paths (often scratch or project space) |
+| **Pennsieve** | Browse datasets on Pennsieve | Selected files are **downloaded** to the chosen compute backend (HPC download can bypass the NeuroInsight container via presigned URLs) |
+| **XNAT** | Browse projects on XNAT | Selected files are **downloaded** to the chosen compute backend |
 
 ### Compute Backends
 
 | Backend | Description | Requirements |
 |---------|-------------|--------------|
-| **Local Docker** | Process on the NeuroInsight server using Docker containers | Docker installed |
-| **Remote Server** | Process on a remote Linux machine via SSH + Docker | SSH access, Docker on remote |
+| **Local Docker** | Process on the NeuroInsight host using Docker containers | Docker installed |
+| **Remote Server** | Process on a remote Linux machine via SSH + Docker | SSH access, Docker installed on the remote host |
 | **HPC/SLURM** | Submit jobs to an HPC cluster via SLURM | SSH access, SLURM, Singularity/Apptainer |
 
-You select a **data source** and a **compute backend** on the main processing page. Any combination works. For example: Local + Local Docker (simplest), Pennsieve + HPC/SLURM (download from cloud, process on cluster), or XNAT + Local Docker (download from hospital archive, process locally).
+### Remote Server vs HPC
+
+Both options use **SSH**, and on many setups they can point at the **same hostname** (NeuroInsight keeps one SSH session and switches mode when you change the Compute tab). The difference is **how jobs run**, not whether the machine is “in the cloud”:
+
+| | **Remote Server** | **HPC / SLURM** |
+|---|-------------------|-----------------|
+| **Typical machine** | Lab workstation, department Linux server, single cloud VM (AWS/GCP/Azure) | University or institutional **cluster** with a job scheduler |
+| **How jobs run** | Docker containers on that host | SLURM submits to compute nodes; containers via Singularity/Apptainer |
+| **UI when active** | Connected · **Remote Server (Docker)** | Connected · **HPC (SLURM)** |
+| **Requirements** | Docker for your SSH user | SLURM, modules, cluster filesystem (scratch/project space) |
+| **When to choose it** | One powerful Linux box you control; Docker is allowed | Shared cluster; Docker is usually **not** allowed on compute nodes |
+
+**Remote Server is not limited to AWS, GCP, or Azure** — those are common examples. Any Linux server you can SSH into with Docker works. If your institution gives you a **cluster login node** and expects you to use **SLURM**, choose **HPC** instead of Remote Server even if the hostname looks like a normal server.
+
+You select a **data source** and a **compute backend** on the Jobs page. Common setups:
+
+- **Local + Local Docker** — data and compute on the same machine (simplest).
+- **HPC + HPC/SLURM** — data already on the cluster; jobs read cluster paths (no Pennsieve copy).
+- **Pennsieve + HPC/SLURM** — files are staged onto the cluster, then SLURM runs there.
+- **XNAT + Local Docker** — files are downloaded to the NeuroInsight host, then processed locally.
+
+**Not supported today:** leaving canonical data only on Pennsieve/XNAT while the pipeline reads/writes there without a local or HPC copy. Use the **Transfer** page to move results back to a platform after a job if needed.
+
+### Transfer page vs Jobs page (planned simplification)
+
+| Page | Role | Direction |
+|------|------|-----------|
+| **Transfer** | All data movement — copy files between Local, Remote, HPC, Pennsieve, and XNAT | **Both ways** (either pane can be source or destination) |
+| **Jobs** | Run pipelines on paths that already exist on the chosen compute backend | Compute only — no platform browse/download wizard |
+
+**Transfer stays as it is today:** dual-pane WinSCP-style UI, left ↔ right arrows, queue with progress, and history. Pennsieve → HPC, HPC → Pennsieve, local ↔ remote, and every other combination remain on **Transfer**, not Jobs.
+
+**Typical workflow after this split:**
+
+1. **Transfer** — move data to where you want to compute (e.g. Pennsieve → HPC scratch).
+2. **Jobs** — pick compute (Local / Remote / HPC), browse **that** filesystem, submit.
+3. **Transfer** (optional) — move results back (e.g. HPC outputs → Pennsieve).
+
+Jobs may offer **Open in Jobs** after a transfer completes (prefilled path); it does not replace Transfer.
+
+### Large file transfers
+
+NeuroInsight Transfer handles **multi-GB and 300GB+** datasets with per-file timeouts, resume, and re-run skip. **Full route matrix, env vars, and limits:** **[TRANSFER.md](TRANSFER.md)**.
+
+Summary:
+
+- **Pennsieve → HPC** — direct `curl` on the cluster (preferred for huge data).
+- **All routes** — file-by-file batching; default **24 h timeout per file**.
+- **Re-run** the same Transfer to the same destination — completed files skipped, partials resume.
+- **Tune** via `NIR_TRANSFER_*` in `.env.example`.
+
+**Practices for very large moves:**
+
+- Prefer **Pennsieve → HPC** (or HPC ↔ HPC) over routing through your laptop.
+- Transfer **folders** on Pennsieve — the backend expands to files and preserves paths.
+- Use **HPC scratch or project space** with enough quota; watch cluster retention policies.
+- For XNAT, large moves may use the indirect path (via NeuroInsight) when the archive is behind a tunnel — plan extra time and disk on the orchestrator host.
+
+If manual recovery is needed on a cluster, use `curl -C -` or `rsync` to the same destination path, then submit from Jobs using that path.
 
 ### EEG workflows: layout and channels
 
@@ -270,6 +331,8 @@ specialized tasks. For the Tuberous Sclerosis Detection workflow these are:
 ---
 
 ## Connecting to a Remote Server
+
+**Remote Server** in the Jobs and Transfer tabs means: connect over SSH and run pipelines in **Docker on that Linux host**. It applies to lab workstations, on-prem VMs, and cloud instances alike — the label does not mean “AWS only.” See [Remote Server vs HPC](#remote-server-vs-hpc) if you are unsure whether to use Remote Server or HPC/SLURM.
 
 NeuroInsight can run neuroimaging jobs on any SSH-accessible Linux machine with Docker installed. This is useful for offloading processing to a more powerful server, a cloud VM (AWS, GCP, Azure), or a lab workstation.
 
@@ -371,7 +434,7 @@ Workspace (Organization)
 
 ### Step 4: Process Data
 
-After selecting files from Pennsieve, the files are downloaded to the NeuroInsight server and submitted to your chosen compute backend (Local Docker, Remote Server, or HPC/SLURM) for processing.
+After selecting files from Pennsieve, NeuroInsight **downloads a copy** to your chosen compute backend (local disk, remote server, or HPC scratch), then submits the job against those paths. Your Pennsieve dataset is unchanged; results stay on compute unless you upload them back via **Transfer**.
 
 ### Troubleshooting Pennsieve Connection
 
@@ -673,7 +736,7 @@ Use the breadcrumb navigation at the top to go back to any level.
 
 ### Step 3: Process Data
 
-After selecting files from XNAT, the files are downloaded to the NeuroInsight server and submitted to your chosen compute backend (Local Docker, Remote Server, or HPC/SLURM) for processing.
+After selecting files from XNAT, NeuroInsight **downloads a copy** to your chosen compute backend, then submits the job against those paths. Your XNAT archive is unchanged; results stay on compute unless you upload them back via **Transfer**.
 
 ### XNAT Behind a Firewall (SSH Tunnel)
 

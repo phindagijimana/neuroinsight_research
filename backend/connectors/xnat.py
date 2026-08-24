@@ -405,6 +405,16 @@ class XNATConnector(BasePlatformConnector):
             return file_id
         return f"{self._api_url}{file_id}"
 
+    def get_download_info(self, file_id: str) -> Dict[str, Any]:
+        """Return URL, filename, and size (when known) for resumable transfers."""
+        filename = file_id.rsplit("/", 1)[-1] if "/" in file_id else file_id
+        size_bytes: Optional[int] = None
+        return {
+            "url": self.get_download_url(file_id),
+            "filename": filename,
+            "size_bytes": size_bytes,
+        }
+
     # -------------------------------------------------------------- upload
 
     def upload_file(

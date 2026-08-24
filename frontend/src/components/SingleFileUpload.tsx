@@ -46,6 +46,8 @@ interface SingleFileUploadProps {
   sshConnected?: boolean;
   inputFormatName?: string;
   bidsAppMode?: boolean;
+  /** Prefill selected path (e.g. Transfer → Jobs handoff). */
+  initialPath?: string | null;
 }
 
 const isNifti = (name: string) => /\.(nii|nii\.gz)$/i.test(name);
@@ -82,6 +84,7 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
   sshConnected = true,
   inputFormatName: _inputFormatName,
   bidsAppMode: _bidsAppMode = false,
+  initialPath = null,
 }) => {
   const defaultPath = browseMode === 'local' ? './data' : '~';
 
@@ -100,6 +103,13 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
   const [prevLoading, setPrevLoading] = useState(false);
   const [prevError, setPrevError] = useState<string | null>(null);
   const [selectedPrevResult, setSelectedPrevResult] = useState<ReusableOutput | null>(null);
+
+  useEffect(() => {
+    if (!initialPath) return;
+    setSelectedPath(initialPath);
+    setManualPath(initialPath);
+    onFileUploaded(initialPath);
+  }, [initialPath]);
 
   useEffect(() => {
     setSelectedPath(null);
@@ -253,6 +263,14 @@ export const SingleFileUpload: React.FC<SingleFileUploadProps> = ({
 
   return (
     <div className="space-y-3">
+      {(browseMode === 'remote' || browseMode === 'hpc') && !sshConnected && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <span>
+            Connect SSH in the panel above before browsing {browseMode === 'hpc' ? 'HPC' : 'remote'} files.
+          </span>
+        </div>
+      )}
       {/* Path input */}
       <div className="space-y-1.5">
         <label className="block text-xs font-semibold text-gray-700">

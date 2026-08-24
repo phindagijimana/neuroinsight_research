@@ -199,17 +199,38 @@ def platform_browse(
     platform: str,
     dataset_id: str = Query(..., description="Dataset or experiment ID"),
     path: str = Query("/", description="Sub-path within the dataset"),
+    limit: int = Query(100, ge=1, le=500, description="Page size"),
+    offset: int = Query(0, ge=0, description="Page offset"),
 ):
     """List files and folders within a dataset at the given path."""
     connector = _get_connector(platform)
     _require_connected(connector)
     try:
+        if hasattr(connector, "list_files_page"):
+            page = connector.list_files_page(
+                dataset_id, path, limit=limit, offset=offset
+            )
+            items = page["items"]
+            return {
+                "items": [item.to_dict() for item in items],
+                "dataset_id": dataset_id,
+                "path": path,
+                "total": len(items),
+                "has_more": page.get("has_more", False),
+                "limit": limit,
+                "offset": offset,
+                "next_offset": page.get("next_offset"),
+            }
         items = connector.list_files(dataset_id, path)
         return {
             "items": [item.to_dict() for item in items],
             "dataset_id": dataset_id,
             "path": path,
             "total": len(items),
+            "has_more": False,
+            "limit": limit,
+            "offset": offset,
+            "next_offset": None,
         }
     except Exception as e:
         logger.error("browse failed: %s", e)

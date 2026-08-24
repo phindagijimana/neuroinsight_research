@@ -16,6 +16,7 @@ import {
 import { apiService } from '../services/api';
 import type { PlatformType } from './FileBrowserPane';
 import { Spinner } from './LoadingState';
+import { usePlatformSession } from '../contexts/PlatformSessionContext';
 
 interface ConnectionPanelProps {
   platform: PlatformType;
@@ -33,6 +34,7 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   onConnectionChange,
   onPlatformStatusChange,
 }) => {
+  const { setSession, logOut } = usePlatformSession();
   const [connected, setConnected] = useState(false);
   const [checking, setChecking] = useState(true);
   const [expanded, setExpanded] = useState(false);
@@ -159,6 +161,12 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
         if (result?.connected) {
           setConnected(true);
           setConnectedInfo(result.user || 'Pennsieve');
+          setSession('pennsieve', {
+            platform: 'pennsieve',
+            connected: true,
+            user: result.user,
+            workspace: result.workspace,
+          });
           onConnectionChange(true);
           try {
             const agent = await apiService.getPennsieveAgentStatus();
@@ -193,6 +201,12 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
         if (result?.connected) {
           setConnected(true);
           setConnectedInfo(result.user || 'XNAT');
+          setSession('xnat', {
+            platform: 'xnat',
+            connected: true,
+            user: result.user,
+            workspace: result.workspace,
+          });
           onConnectionChange(true);
           setExpanded(false);
         } else {
@@ -210,8 +224,8 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
     try {
       if (platform === 'remote' || platform === 'hpc') {
         await fetch(`${apiService.getBaseUrl()}/api/hpc/disconnect`, { method: 'POST' });
-      } else {
-        await apiService.platformDisconnect(platform);
+      } else if (platform === 'pennsieve' || platform === 'xnat') {
+        await logOut(platform);
       }
     } catch { /* ignore */ }
     setConnected(false);
@@ -254,8 +268,12 @@ const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
             </span>
           )}
         </div>
-        <button onClick={handleDisconnect} className="shrink-0 text-green-600 hover:text-red-600 font-medium transition">
-          Disconnect
+        <button
+          onClick={handleDisconnect}
+          className="shrink-0 text-green-600 hover:text-red-600 font-medium transition"
+          title={platform === 'pennsieve' || platform === 'xnat' ? 'Clear saved credentials and end session' : undefined}
+        >
+          {platform === 'pennsieve' || platform === 'xnat' ? 'Log out' : 'Disconnect'}
         </button>
       </div>
     );

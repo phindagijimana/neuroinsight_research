@@ -3,6 +3,14 @@ import type { PlatformType } from '../components/FileBrowserPane';
 import { canRevealInFinder, revealPathInFinder } from './desktopBridge';
 
 export const TRANSFER_OPEN_AT_KEY = 'nir.transfer.openAt';
+export const JOBS_OPEN_AT_KEY = 'nir.jobs.openAt';
+
+export type JobsComputeBackend = 'local' | 'remote' | 'remote_hpc';
+
+export interface JobsOpenAt {
+  backend: JobsComputeBackend;
+  path: string;
+}
 
 export type PathKind = 'input' | 'output';
 
@@ -194,6 +202,51 @@ export function stashTransferOpenAt(target: TransferOpenAt): void {
   } catch {
     // Ignore storage errors.
   }
+}
+
+function isJobsComputeBackend(value: string): value is JobsComputeBackend {
+  return value === 'local' || value === 'remote' || value === 'remote_hpc';
+}
+
+export function platformToJobsBackend(platform: PlatformType): JobsComputeBackend | null {
+  switch (platform) {
+    case 'local':
+      return 'local';
+    case 'remote':
+      return 'remote';
+    case 'hpc':
+      return 'remote_hpc';
+    default:
+      return null;
+  }
+}
+
+export function stashJobsOpenAt(target: JobsOpenAt): void {
+  try {
+    window.sessionStorage.setItem(JOBS_OPEN_AT_KEY, JSON.stringify(target));
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
+export function consumeJobsOpenAt(): JobsOpenAt | null {
+  try {
+    const raw = window.sessionStorage.getItem(JOBS_OPEN_AT_KEY);
+    if (!raw) return null;
+    window.sessionStorage.removeItem(JOBS_OPEN_AT_KEY);
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      isJobsComputeBackend(parsed.backend) &&
+      typeof parsed.path === 'string' &&
+      parsed.path.trim()
+    ) {
+      return { backend: parsed.backend, path: parsed.path.trim() };
+    }
+  } catch {
+    // Ignore parse errors.
+  }
+  return null;
 }
 
 export function consumeTransferOpenAt(): TransferOpenAt | null {

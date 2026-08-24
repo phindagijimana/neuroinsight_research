@@ -188,33 +188,80 @@ class PennsieveConnector(BasePlatformConnector):
     def list_files(
         self, dataset_id: str, path: str = "/"
     ) -> List[PlatformItem]:
-        if path and path != "/":
-            pkg_id = path.lstrip("/")
-            data = self._get(f"/packages/{self._enc(pkg_id)}")
-            children = data.get("children", []) if isinstance(data, dict) else []
-            if children:
-                return self._items_from_packages(children, dataset_id)
-            return self._parse_package_children(data, dataset_id)
+        page = self.list_files_page(dataset_id, path, limit=100, offset=0)
+        return page["items"]
 
-        data = self._list_dataset_packages(dataset_id)
-        packages = data.get("packages", []) if isinstance(data, dict) else data
-        # Pennsieve dataset package listings are flat and can include both
-        # folders and files from many levels. At root view we only show
-        # top-level folders (Collections) so files stay inside folders until
-        # users navigate into them.
-        if isinstance(packages, list):
-            # Keep only true top-level folders at dataset root. Pennsieve's
-            # dataset package listing is flat and can contain nested folders
-            # and files; top-level items are marked with parentId=None.
-            packages = [
-                pkg
-                for pkg in packages
-                if (pkg.get("content", {}) or {}).get("packageType") == "Collection"
-                and ((pkg.get("content", {}) or {}).get("parentId") is None)
-            ]
-        return self._items_from_packages(
-            packages if isinstance(packages, list) else [],
-            dataset_id,
+    def list_files_page(
+        self,
+        dataset_id: str,
+        path: str = "/",
+        *,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
+        """Return one page of direct children (dataset or package), not the full flat tree."""
+        if path and path != "/":
+            package_id = path.lstrip("/")
+            data = self._get(
+                f"/packages/{self._enc(package_id)}",
+                params={"limit": limit, "offset": offset},
+            )
+        else:
+            data = self._get_dataset_children_page(dataset_id, limit, offset)
+
+        children = data.get("children", []) if isinstance(data, dict) else []
+        if children:
+            items = self._items_from_packages(children, dataset_id)
+        else:
+            items = self._parse_package_children(data, dataset_id)
+
+        # Root browse historically showed only top-level folders.
+        if (not path or path == "/") and children:
+            items = [item for item in items if item.type == "directory"]
+
+        child_count = len(children) if children else len(items)
+        has_more = child_count >= limit
+        return {
+            "items": items,
+            "has_more": has_more,
+            "limit": limit,
+            "offset": offset,
+            "next_offset": offset + child_count if has_more else None,
+        }
+
+    def _dataset_id_attempts(self, dataset_id: str) -> List[str]:
+        attempts: List[str] = []
+        if dataset_id.startswith("N:"):
+            attempts.append(self._enc(dataset_id))
+        int_id = self._dataset_int_ids.get(dataset_id)
+        if int_id is not None:
+            attempts.append(str(int_id))
+        if not dataset_id.startswith("N:"):
+            attempts.append(dataset_id)
+        return attempts
+
+    def _get_dataset_children_page(
+        self, dataset_id: str, limit: int, offset: int
+    ) -> Any:
+        """Paginated direct children via GET /datasets/{id} (not flat /packages list)."""
+        last_err: Optional[Exception] = None
+        for ds_id in self._dataset_id_attempts(dataset_id):
+            try:
+                logger.debug(
+                    "Trying GET /datasets/%s limit=%s offset=%s",
+                    ds_id,
+                    limit,
+                    offset,
+                )
+                return self._get(
+                    f"/datasets/{ds_id}",
+                    params={"limit": limit, "offset": offset},
+                )
+            except httpx.HTTPStatusError as exc:
+                logger.debug("  -> %s %s", exc.response.status_code, ds_id)
+                last_err = exc
+        raise RuntimeError(
+            f"Could not list children for dataset {dataset_id}: {last_err}"
         )
 
     def _list_dataset_packages(self, dataset_id: str) -> Any:
@@ -333,12 +380,14 @@ class PennsieveConnector(BasePlatformConnector):
             if str(content.get("state", "")).upper() == "DELETED":
                 continue
             pkg_type = content.get("packageType", "")
+            node_id = content.get("nodeId") or content.get("id", "")
+            is_dir = pkg_type == "Collection"
             items.append(
                 PlatformItem(
-                    id=content.get("id", ""),
+                    id=str(node_id),
                     name=content.get("name", ""),
-                    path=f"/{content.get('name', '')}",
-                    type="directory" if pkg_type == "Collection" else "file",
+                    path=str(node_id) if is_dir else f"/{content.get('name', '')}",
+                    type="directory" if is_dir else "file",
                     size=content.get("size", 0) or 0,
                     modified=content.get("updatedAt"),
                     platform=self.platform_name,
@@ -423,6 +472,7 @@ class PennsieveConnector(BasePlatformConnector):
             raise ValueError(f"No source file ID in package {file_id}")
 
         filename = content.get("fileName", content.get("name", ""))
+        size_raw = content.get("size") or content.get("fileSize") or content.get("contentSize")
 
         url_resp = self._get(
             f"/packages/{self._enc(file_id)}/files/{source_id}"
@@ -430,7 +480,13 @@ class PennsieveConnector(BasePlatformConnector):
         url = url_resp.get("url", "") if isinstance(url_resp, dict) else ""
         if not url:
             raise ValueError(f"No presigned URL returned for {file_id}/files/{source_id}")
-        return {"url": url, "filename": filename}
+        size_bytes: Optional[int] = None
+        if size_raw is not None:
+            try:
+                size_bytes = int(size_raw)
+            except (TypeError, ValueError):
+                size_bytes = None
+        return {"url": url, "filename": filename, "size_bytes": size_bytes}
 
     def get_download_url(self, file_id: str) -> str:
         """Get a pre-signed S3 URL for the first source file in a package."""

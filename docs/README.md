@@ -12,7 +12,8 @@
 
 | Doc | Purpose |
 |---|---|
-| [USER_GUIDE.md](USER_GUIDE.md) | HPC/SLURM, remote servers, Pennsieve, XNAT, macOS notes |
+| [USER_GUIDE.md](USER_GUIDE.md) | HPC/SLURM, Remote Server, Pennsieve, XNAT, macOS notes |
+| [TRANSFER.md](TRANSFER.md) | **Transfer page** — route matrix, large files (300GB+), resume, env vars |
 | [HPC_PIPELINE_SUBMISSION_GUIDE.md](HPC_PIPELINE_SUBMISSION_GUIDE.md) | Pipeline-specific input layouts on HPC |
 | [TOOL_LICENSES.md](TOOL_LICENSES.md) | FreeSurfer / MELD license files |
 

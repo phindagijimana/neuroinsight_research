@@ -1,42 +1,35 @@
 /**
  * FileUpload Component
  *
- * Main orchestrator for job submission. Supports two flows:
- *
- * A) Filesystem flow (Local / Remote / HPC):
- *    BackendSelector -> DirectorySelector -> PipelineSelector -> Submit
- *    Data source and compute are independent -- data source controls
- *    filesystem browsing, compute controls where jobs run.
- *
- * B) Platform flow (Pennsieve / XNAT):
- *    BackendSelector (connect) -> PlatformBrowser -> BackendSelector (processing target)
- *    -> TransferProgress -> PipelineSelector -> Submit
+ * Jobs page: compute-only submission.
+ * Connect one compute backend, browse paths on that backend, pick pipeline, submit.
+ * Data from Pennsieve/XNAT or other hosts must be staged via Transfer first.
  */
 
-import React, { useState } from 'react';
-import { Upload, FolderOpen, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Upload, FolderOpen, ArrowRight, AlertTriangle } from 'lucide-react';
 import { DirectorySelector } from './DirectorySelector';
 import { SingleFileUpload } from './SingleFileUpload';
 import { PipelineSelector } from './PipelineSelector';
 import { ResourceSelector, ResourceConfig } from './ResourceSelector';
-import { BackendSelector, BackendType, SSHConfig } from './BackendSelector';
-import { PlatformBrowser } from './PlatformBrowser';
-import { TransferProgress } from './TransferProgress';
+import { BackendSelector, BackendType } from './BackendSelector';
 import { apiService } from '../services/api';
-import type { Pipeline, DataSourceType, PlatformConnection, PlatformFile } from '../types';
+import type { Pipeline } from '../types';
 import { useToast } from '../contexts/NotificationContext';
 import {
   type ExecutionInputProfile,
   isBidsInput,
   parseBidsSubjectPath,
 } from '../lib/inputFormat';
+import { consumeJobsOpenAt } from '../lib/openJobPath';
+import { checkPathComputeMismatch } from '../lib/pathMismatch';
 
 type UploadMode = 'directory' | 'single';
-type Step = 'source' | 'browse' | 'backend' | 'transfer' | 'pipeline';
 
 interface FileUploadProps {
   onJobsSubmitted: (jobIds: string[]) => void;
   onBack?: () => void;
+  onNavigateToTransfer?: () => void;
 }
 
 interface SelectedExecution extends ExecutionInputProfile {
@@ -45,140 +38,65 @@ interface SelectedExecution extends ExecutionInputProfile {
   name: string;
 }
 
-/**
- * Build plugin parameters from resource config (threads, etc.).
- */
 function resourceParams(customResources: ResourceConfig | null): Record<string, unknown> {
   if (!customResources?.threads) return {};
   return { threads: customResources.threads };
 }
 
-export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack }) => {
-  const toast = useToast();
-  // Data source (where data lives)
-  const [dataSource, setDataSource] = useState<DataSourceType>('local');
-  const [platformConnection, setPlatformConnection] = useState<PlatformConnection | null>(null);
-  const [platformFiles, setPlatformFiles] = useState<PlatformFile[]>([]);
+function computeBrowseMode(backend: BackendType): 'local' | 'remote' | 'hpc' {
+  if (backend === 'remote_hpc') return 'hpc';
+  if (backend === 'remote') return 'remote';
+  return 'local';
+}
 
-  // Processing target (where to run the job)
+export const FileUpload: React.FC<FileUploadProps> = ({
+  onJobsSubmitted,
+  onBack,
+  onNavigateToTransfer,
+}) => {
+  const toast = useToast();
+
   const [selectedBackend, setSelectedBackend] = useState<BackendType>('local');
-  const [sshConfig, setSSHConfig] = useState<SSHConfig>({ host: '', username: '', port: 22 });
+  const [sshConfig, setSSHConfig] = useState({ host: '', username: '', port: 22 });
   const [sshConnected, setSSHConnected] = useState(false);
 
-  // Transfer state
-  const [transferId, setTransferId] = useState<string | null>(null);
-  const [transferredPath, setTransferredPath] = useState<string | null>(null);
-  const [transferredFilePaths, setTransferredFilePaths] = useState<string[]>([]);
-  const [platformDatasetId, setPlatformDatasetId] = useState<string | null>(null);
-
-  // Pipeline / execution
   const [selectedPipeline, setSelectedPipeline] = useState<Pipeline | null>(null);
   const [selectedExecution, setSelectedExecution] = useState<SelectedExecution | null>(null);
   const [customResources, setCustomResources] = useState<ResourceConfig | null>(null);
 
-  // Input mode (single subject vs batch)
   const [mode, setMode] = useState<UploadMode>('single');
   const [uploadedFilePath, setUploadedFilePath] = useState<string | null>(null);
+  const [batchInputDir, setBatchInputDir] = useState('');
+  const [prefillInputDir, setPrefillInputDir] = useState<string | null>(null);
 
-  // UI state
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isPlatformSource = dataSource === 'pennsieve' || dataSource === 'xnat';
-  const isPlatformConnected = platformConnection?.connected && platformConnection.platform === dataSource;
-
-  const getCurrentStep = (): Step => {
-    if (!isPlatformSource) return 'source';
-    if (!isPlatformConnected) return 'source';
-    if (platformFiles.length === 0) return 'browse';
-    if (!transferId && !transferredPath) return 'backend';
-    if (transferId && !transferredPath) return 'transfer';
-    return 'pipeline';
-  };
-
-  const currentStep = getCurrentStep();
-
-  const platformLabel = dataSource === 'pennsieve' ? 'Pennsieve' : 'XNAT';
-  const platformStatusLine = (() => {
-    switch (currentStep) {
-      case 'browse':
-        return `${platformLabel} · select files to download`;
-      case 'backend':
-        return `${platformLabel} · ${platformFiles.length} file${platformFiles.length !== 1 ? 's' : ''} · choose compute target`;
-      case 'transfer':
-        return `${platformLabel} · downloading…`;
-      case 'pipeline':
-        return `${platformLabel} · ${platformFiles.length} file${platformFiles.length !== 1 ? 's' : ''} · choose pipeline`;
-      default:
-        return `${platformLabel} · connected`;
-    }
-  })();
-
+  const browseMode = computeBrowseMode(selectedBackend);
   const bidsWorkflow = isBidsInput(selectedExecution);
-  const filesystemBrowseMode =
-    dataSource === 'hpc' ? 'hpc' : dataSource === 'remote' ? 'remote' : 'local';
+  const activeInputPath = mode === 'single' ? uploadedFilePath : batchInputDir || null;
+  const pathMismatch = checkPathComputeMismatch(activeInputPath, selectedBackend);
+  const submitBlocked = Boolean(pathMismatch?.blockSubmit);
 
-  // ---- Platform flow handlers ----
-
-  const handlePlatformFilesSelected = (files: PlatformFile[], datasetId: string) => {
-    setPlatformFiles(files);
-    setPlatformDatasetId(datasetId);
-  };
-
-  const expandDirectories = async (files: PlatformFile[], datasetId: string): Promise<PlatformFile[]> => {
-    const result: PlatformFile[] = [];
-    for (const item of files) {
-      if (item.type === 'file') {
-        result.push(item);
-      } else if (item.type === 'directory' && datasetId) {
-        try {
-          const contents = await apiService.platformBrowse(dataSource, datasetId, item.path);
-          const expanded = await expandDirectories(contents.items as PlatformFile[], datasetId);
-          result.push(...expanded);
-        } catch {
-          result.push(item);
-        }
-      }
-    }
-    return result;
-  };
-
-  const handleStartTransfer = async () => {
-    if (platformFiles.length === 0) return;
-    setError(null);
-    const targetPath = `/tmp/neuroinsight/transfers/${Date.now()}`;
-    try {
-      // Expand any selected directories into individual files
-      const expandedFiles = await expandDirectories(platformFiles, platformDatasetId || '');
-      const fileIds = expandedFiles.filter(f => f.type === 'file').map(f => f.id);
-      if (fileIds.length === 0) {
-        setError('No downloadable files found in the selected items');
-        return;
-      }
-      const backendType = selectedBackend === 'remote_hpc' ? 'hpc' : selectedBackend;
-      const result = await apiService.startTransferDownload(
-        dataSource, fileIds, backendType, targetPath,
-      );
-      setTransferId(result.transfer_id);
-      setTransferredPath((result as any).target_path || targetPath);
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Failed to start transfer.');
-    }
-  };
-
-  const handleTransferComplete = (info: { localPaths: string[]; targetPath: string }) => {
-    if (info.localPaths.length > 0) {
-      setTransferredFilePaths(info.localPaths);
-    }
-    if (info.targetPath) {
-      setTransferredPath(info.targetPath);
-    }
-  };
-
-  // ---- Job submission handlers ----
+  useEffect(() => {
+    const openAt = consumeJobsOpenAt();
+    if (!openAt) return;
+    setSelectedBackend(openAt.backend);
+    setUploadedFilePath(openAt.path);
+    setPrefillInputDir(openAt.path);
+    setMode('single');
+  }, []);
 
   const handleBatchSubmit = async (inputDir: string, _outputDir: string, files: string[]) => {
-    if (!selectedPipeline) { setError('Please select a plugin or workflow first'); return; }
+    if (!selectedPipeline) {
+      setError('Please select a plugin or workflow first');
+      return;
+    }
+    const mismatch = checkPathComputeMismatch(inputDir, selectedBackend);
+    if (mismatch?.blockSubmit) {
+      setError(mismatch.message);
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -188,21 +106,29 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
       for (const file of files) {
         const filePath = `${inputDir}/${file}`;
         if (selectedExecution?.type === 'plugin' && selectedExecution.id) {
-          const result = await apiService.submitPluginJob(selectedExecution.id, [filePath], resourceParams(customResources), customResources || undefined);
+          const result = await apiService.submitPluginJob(
+            selectedExecution.id,
+            [filePath],
+            resourceParams(customResources),
+            customResources || undefined,
+          );
           jobIds.push(result.job_id);
         } else if (selectedExecution?.type === 'workflow' && selectedExecution.id) {
-          const inputs = [filePath];
           const result = await apiService.submitWorkflowJob(
             selectedExecution.id,
-            inputs,
+            [filePath],
             wfP,
-            customResources || undefined
+            customResources || undefined,
           );
           jobIds.push(result.job_id);
         } else {
           const result = await apiService.submitBatchJob({
-            pipeline_name: selectedPipeline.name, input_dir: inputDir, output_dir: '',
-            parameters: {}, file_pattern: '*.nii.gz', custom_resources: customResources || undefined,
+            pipeline_name: selectedPipeline.name,
+            input_dir: inputDir,
+            output_dir: '',
+            parameters: {},
+            file_pattern: '*.nii.gz',
+            custom_resources: customResources || undefined,
           });
           jobIds.push(...result.job_ids);
           break;
@@ -217,9 +143,17 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
   };
 
   const handleBidsBatchSubmit = async (bidsDir: string, subjectIds: string[]) => {
-    if (!selectedExecution) { setError('Please select a plugin or workflow first'); return; }
+    if (!selectedExecution) {
+      setError('Please select a plugin or workflow first');
+      return;
+    }
     if (selectedExecution.type !== 'workflow') {
       setError('BIDS batch mode is only available for workflows. Select a workflow pipeline.');
+      return;
+    }
+    const mismatch = checkPathComputeMismatch(bidsDir, selectedBackend);
+    if (mismatch?.blockSubmit) {
+      setError(mismatch.message);
       return;
     }
     setSubmitting(true);
@@ -234,10 +168,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
         wfP,
         customResources || undefined,
       );
-      const jobIds = result.jobs.map(j => j.job_id);
+      const jobIds = result.jobs.map((j) => j.job_id);
 
       if (result.errors.length > 0) {
-        const errMsg = result.errors.map(e => `${e.subject_id}: ${e.error}`).join('; ');
+        const errMsg = result.errors.map((e) => `${e.subject_id}: ${e.error}`).join('; ');
         setError(`Submitted ${result.submitted}/${result.total_subjects} jobs. Failures: ${errMsg}`);
       }
 
@@ -250,15 +184,24 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
   };
 
   const handleSingleFileSubmit = async () => {
-    if (!selectedPipeline) { setError('Please select a plugin or workflow first'); return; }
-    if (!uploadedFilePath) { setError('Please select a file or folder first'); return; }
+    if (!selectedPipeline) {
+      setError('Please select a plugin or workflow first');
+      return;
+    }
+    if (!uploadedFilePath) {
+      setError('Please select a file or folder first');
+      return;
+    }
+    if (pathMismatch?.blockSubmit) {
+      setError(pathMismatch.message);
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
     try {
       const wfP: Record<string, string> = {};
 
-      // BIDS App workflows: dataset root + subject (sessions discovered inside the subject folder).
       if (bidsWorkflow && selectedExecution?.type === 'workflow' && selectedExecution.id) {
         const parsed = parseBidsSubjectPath(uploadedFilePath);
         let bidsDir = uploadedFilePath;
@@ -268,7 +211,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
           bidsDir = parsed.bidsDir;
           subjectId = parsed.subjectId;
         } else {
-          const info = await apiService.browseDirectory(uploadedFilePath, filesystemBrowseMode);
+          const info = await apiService.browseDirectory(uploadedFilePath, browseMode);
           const subjects = (info.directories || [])
             .map((d: { name: string }) => d.name)
             .filter((n: string) => n.startsWith('sub-'))
@@ -277,7 +220,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
             subjectId = subjects[0];
           } else if (subjects.length > 1) {
             setError(
-              'Multiple subjects in this dataset — select a sub-XXX folder for one subject, or use BIDS batch mode.'
+              'Multiple subjects in this dataset — select a sub-XXX folder for one subject, or use BIDS batch mode.',
             );
             return;
           } else {
@@ -291,59 +234,34 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
           selectedExecution.id,
           [bidsDir],
           params,
-          customResources || undefined
+          customResources || undefined,
         );
         onJobsSubmitted([result.job_id]);
         return;
       }
 
       if (selectedExecution?.type === 'plugin' && selectedExecution.id) {
-        const result = await apiService.submitPluginJob(selectedExecution.id, [uploadedFilePath], resourceParams(customResources), customResources || undefined);
+        const result = await apiService.submitPluginJob(
+          selectedExecution.id,
+          [uploadedFilePath],
+          resourceParams(customResources),
+          customResources || undefined,
+        );
         onJobsSubmitted([result.job_id]);
       } else if (selectedExecution?.type === 'workflow' && selectedExecution.id) {
-        const inputs = [uploadedFilePath];
         const result = await apiService.submitWorkflowJob(
           selectedExecution.id,
-          inputs,
+          [uploadedFilePath],
           wfP,
-          customResources || undefined
+          customResources || undefined,
         );
         onJobsSubmitted([result.job_id]);
       } else {
-        const result = await apiService.submitJob(selectedPipeline.name, [uploadedFilePath], {}, customResources || undefined);
-        onJobsSubmitted([result.job_id]);
-      }
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Failed to submit job.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handlePlatformJobSubmit = async () => {
-    if (!selectedPipeline || !transferredPath) { setError('Missing data'); return; }
-    setSubmitting(true);
-    setError(null);
-    try {
-      // Use actual file paths from transfer, or fall back to directory
-      const inputFiles = transferredFilePaths.length > 0
-        ? transferredFilePaths
-        : [transferredPath];
-      const srcPlatform = isPlatformSource ? dataSource : undefined;
-      const srcDatasetId = isPlatformSource ? (platformDatasetId || undefined) : undefined;
-      const wfP: Record<string, string> = {};
-      const pathsForSubmit = inputFiles;
-      if (selectedExecution?.type === 'plugin' && selectedExecution.id) {
-        const result = await apiService.submitPluginJob(selectedExecution.id, inputFiles, resourceParams(customResources), customResources || undefined, srcPlatform, srcDatasetId);
-        onJobsSubmitted([result.job_id]);
-      } else if (selectedExecution?.type === 'workflow' && selectedExecution.id) {
-        const result = await apiService.submitWorkflowJob(
-          selectedExecution.id,
-          pathsForSubmit,
-          wfP,
+        const result = await apiService.submitJob(
+          selectedPipeline.name,
+          [uploadedFilePath],
+          {},
           customResources || undefined,
-          srcPlatform,
-          srcDatasetId
         );
         onJobsSubmitted([result.job_id]);
       }
@@ -354,117 +272,14 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
     }
   };
 
-  const resetPlatformFlow = () => {
-    setPlatformFiles([]);
-    setPlatformDatasetId(null);
-    setTransferId(null);
-    setTransferredPath(null);
-    setTransferredFilePaths([]);
-  };
-
-  // Shared BackendSelector props
-  const backendProps = {
-    selectedBackend,
-    onBackendChange: setSelectedBackend,
-    sshConfig,
-    onSSHConfigChange: setSSHConfig,
-    dataSource,
-    onDataSourceChange: (s: DataSourceType) => { setDataSource(s); resetPlatformFlow(); },
-    platformConnection,
-    onPlatformConnect: setPlatformConnection,
-    onPlatformDisconnect: () => { setPlatformConnection(null); resetPlatformFlow(); },
-    onSSHConnectionChange: setSSHConnected,
-    showPlatformTabs: true,
-  };
-
-  // ===========================================================================
-  // PLATFORM FLOW (step-by-step after connection)
-  // ===========================================================================
-  if (isPlatformSource && isPlatformConnected) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Process MRI Data</h2>
-          {onBack && (
-            <button onClick={onBack} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-              &larr; Back
-            </button>
-          )}
-        </div>
-
-        <p className="text-sm text-gray-500">{platformStatusLine}</p>
-
-        {/* Backend: data source on early steps, compute-only when files are selected */}
-        <BackendSelector
-          {...backendProps}
-          showPlatformTabs={currentStep === 'browse'}
-          computeOnly={currentStep !== 'browse'}
-        />
-
-        {/* Step: Browse */}
-        {currentStep === 'browse' && (
-          <PlatformBrowser platform={dataSource} onFilesSelected={handlePlatformFilesSelected} />
-        )}
-
-        {/* Step: Backend selection for processing */}
-        {currentStep === 'backend' && (
-          <div className="space-y-3">
-            <div className="flex gap-2">
-              <button onClick={resetPlatformFlow} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">
-                <ArrowLeft className="h-3.5 w-3.5 inline mr-1" />Back
-              </button>
-              <button onClick={handleStartTransfer} className="flex-1 px-4 py-2 text-sm bg-navy-600 text-white rounded-md hover:bg-navy-800 font-medium">
-                Download & Continue
-              </button>
-            </div>
-            {error && <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">{error}</div>}
-          </div>
-        )}
-
-        {/* Step: Transfer */}
-        {currentStep === 'transfer' && transferId && (
-          <TransferProgress transferId={transferId} direction="download" onComplete={handleTransferComplete} onCancel={resetPlatformFlow} />
-        )}
-
-        {/* Step: Pipeline + submit */}
-        {currentStep === 'pipeline' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:items-start">
-            <div className="space-y-4">
-              <PipelineSelector onPipelineSelect={setSelectedPipeline} selectedPipeline={selectedPipeline} onExecutionSelect={setSelectedExecution} />
-              {selectedPipeline && (
-                <ResourceSelector plugin={selectedPipeline} backendType={selectedBackend === 'local' ? 'local' : selectedBackend === 'remote_hpc' ? 'hpc' : 'remote'} onResourcesChange={setCustomResources} />
-              )}
-            </div>
-            <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 space-y-4">
-              <h3 className="text-sm font-semibold text-gray-800">Ready to submit</h3>
-              <div className="text-xs text-gray-600 space-y-1">
-                <p><strong>Source:</strong> {dataSource === 'pennsieve' ? 'Pennsieve' : 'XNAT'}</p>
-                <p><strong>Files:</strong> {platformFiles.length}</p>
-                <p><strong>Backend:</strong> {selectedBackend === 'local' ? 'Local Docker' : selectedBackend === 'remote' ? 'Remote Server' : 'HPC (SLURM)'}</p>
-                <p><strong>Data:</strong> Downloaded to {transferredPath}</p>
-              </div>
-              {error && <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">{error}</div>}
-              <button onClick={handlePlatformJobSubmit} disabled={!selectedPipeline || submitting}
-                className="w-full py-2.5 px-4 bg-navy-600 text-white rounded-md hover:bg-navy-800 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                {submitting ? 'Submitting...' : 'Submit Job'}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // ===========================================================================
-  // FILESYSTEM FLOW (Local / Remote / HPC)
-  // ===========================================================================
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Process MRI Data</h2>
           <p className="mt-0.5 text-sm text-gray-500">
-            Select execution backend, pipeline, and input data.
+            Connect compute, browse input on that backend, and submit. Copy data from
+            Pennsieve, XNAT, or another host with Transfer first.
           </p>
         </div>
         {onBack && (
@@ -477,10 +292,33 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
         )}
       </div>
 
+      {onNavigateToTransfer && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200/80 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+          <span>
+            Need data from Pennsieve, XNAT, or another machine? Stage it with Transfer — Jobs runs
+            on the compute backend only.
+          </span>
+          <button
+            type="button"
+            onClick={onNavigateToTransfer}
+            className="inline-flex items-center gap-1 font-medium text-navy-700 hover:text-navy-900"
+          >
+            Open Transfer
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5 lg:items-start">
-        {/* Left: data source + input */}
         <div className="space-y-4 min-w-0">
-          <BackendSelector {...backendProps} />
+          <BackendSelector
+            selectedBackend={selectedBackend}
+            onBackendChange={setSelectedBackend}
+            sshConfig={sshConfig}
+            onSSHConfigChange={setSSHConfig}
+            onSSHConnectionChange={setSSHConnected}
+            jobsMode
+          />
 
           {selectedPipeline && (
             <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 space-y-4">
@@ -507,6 +345,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
                 </button>
               </div>
 
+              {pathMismatch && (
+                <div className="flex gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                  <p>{pathMismatch.message}</p>
+                </div>
+              )}
+
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded">
                   <p className="text-xs text-red-700">{error}</p>
@@ -521,17 +366,19 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
               <div style={submitting ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
                 {mode === 'directory' ? (
                   <DirectorySelector
-                    mode={dataSource === 'hpc' ? 'hpc' : dataSource === 'remote' ? 'remote' : 'local'}
-                    sshConnected={dataSource === 'local' ? true : sshConnected}
+                    mode={browseMode}
+                    sshConnected={selectedBackend === 'local' ? true : sshConnected}
                     onSubmit={handleBatchSubmit}
                     onBidsSubmit={handleBidsBatchSubmit}
                     bidsAppMode={bidsWorkflow}
+                    initialPath={prefillInputDir}
+                    onInputDirChange={setBatchInputDir}
                   />
                 ) : (
                   <>
                     <SingleFileUpload
-                      browseMode={dataSource === 'hpc' ? 'hpc' : dataSource === 'remote' ? 'remote' : 'local'}
-                      sshConnected={dataSource === 'local' ? true : sshConnected}
+                      browseMode={browseMode}
+                      sshConnected={selectedBackend === 'local' ? true : sshConnected}
                       onFileUploaded={(path) => {
                         setUploadedFilePath(path);
                         setError(null);
@@ -543,17 +390,27 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
                       }
                       inputFormatName={selectedExecution?.inputFormatName}
                       bidsAppMode={bidsWorkflow}
+                      initialPath={prefillInputDir}
                     />
-                    {uploadedFilePath && (
-                      <div className="mt-3">
-                        <button
-                          onClick={handleSingleFileSubmit}
-                          className="w-full py-2 px-4 bg-navy-600 text-white rounded-md hover:bg-navy-800 font-medium text-sm"
-                        >
-                          Submit Job
-                        </button>
-                      </div>
-                    )}
+                    <div className="mt-3">
+                      <button
+                        onClick={handleSingleFileSubmit}
+                        disabled={!uploadedFilePath || submitting || submitBlocked}
+                        className="w-full py-2 px-4 bg-navy-600 text-white rounded-md hover:bg-navy-800 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {submitting ? 'Submitting…' : 'Submit Job'}
+                      </button>
+                      {!uploadedFilePath && (
+                        <p className="mt-1.5 text-[11px] text-gray-500 text-center">
+                          Choose a subject path above to enable submit.
+                        </p>
+                      )}
+                      {uploadedFilePath && submitBlocked && (
+                        <p className="mt-1.5 text-[11px] text-amber-700 text-center">
+                          Fix the path warning above before submitting.
+                        </p>
+                      )}
+                    </div>
                   </>
                 )}
               </div>
@@ -561,7 +418,6 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
           )}
         </div>
 
-        {/* Right: pipeline + resources */}
         <div className="space-y-4 min-w-0">
           <PipelineSelector
             onPipelineSelect={setSelectedPipeline}

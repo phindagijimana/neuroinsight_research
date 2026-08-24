@@ -342,7 +342,7 @@ function App() {
           />
         )}
 
-        {activePage === 'transfer' && <TransferPage />}
+        {activePage === 'transfer' && <TransferPage setActivePage={navigateTo} />}
 
         {activePage === 'docs' && <DocsPage setActivePage={navigateTo} />}
 

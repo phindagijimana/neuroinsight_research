@@ -4,6 +4,7 @@ import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { PlatformSessionProvider } from './contexts/PlatformSessionContext';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -11,7 +12,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <NotificationProvider>
         <FeatureFlagsProvider>
-          <App />
+          <PlatformSessionProvider>
+            <App />
+          </PlatformSessionProvider>
         </FeatureFlagsProvider>
       </NotificationProvider>
     </ErrorBoundary>

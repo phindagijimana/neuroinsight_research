@@ -918,8 +918,30 @@ export const apiService = {
   },
 
   /** Browse files within a dataset. */
-  async platformBrowse(platform: string, datasetId: string, path: string = '/'): Promise<{ items: any[]; dataset_id: string; path: string; total: number }> {
-    const resp = await api.get(`/api/platforms/${platform}/browse`, { params: { dataset_id: datasetId, path } });
+  async platformBrowse(
+    platform: string,
+    datasetId: string,
+    path: string = '/',
+    opts?: { limit?: number; offset?: number },
+  ): Promise<{
+    items: any[];
+    dataset_id: string;
+    path: string;
+    total: number;
+    has_more?: boolean;
+    limit?: number;
+    offset?: number;
+    next_offset?: number | null;
+  }> {
+    const resp = await api.get(`/api/platforms/${platform}/browse`, {
+      params: {
+        dataset_id: datasetId,
+        path,
+        limit: opts?.limit ?? 100,
+        offset: opts?.offset ?? 0,
+      },
+      timeout: 120000,
+    });
     return resp.data;
   },
 

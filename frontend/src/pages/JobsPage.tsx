@@ -317,6 +317,7 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
           <FileUpload
             onJobsSubmitted={handleJobsSubmitted}
             onBack={() => setActivePage('home')}
+            onNavigateToTransfer={() => setActivePage('transfer')}
           />
         </div>
 

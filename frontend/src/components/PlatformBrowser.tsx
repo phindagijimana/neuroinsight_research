@@ -44,6 +44,15 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+const PAGE_SIZE = 100;
+
+function browseErrorMessage(err: any, fallback: string): string {
+  if (err?.code === 'ECONNABORTED') {
+    return 'Browse timed out. Large datasets load one folder at a time — open a subfolder or use Load more.';
+  }
+  return err?.response?.data?.detail || fallback;
+}
+
 export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
   platform,
   onFilesSelected,
@@ -56,6 +65,9 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'datasets' | 'files'>('datasets');
 
@@ -78,26 +90,50 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
     }
   };
 
-  const browseDataset = useCallback(async (datasetId: string, path: string = '/') => {
-    setLoading(true);
+  const browseDataset = useCallback(async (
+    datasetId: string,
+    path: string = '/',
+    opts: { append?: boolean; offset?: number } = {},
+  ) => {
+    const append = opts.append ?? false;
+    const offset = append ? (opts.offset ?? 0) : 0;
+    if (append) setLoadingMore(true);
+    else setLoading(true);
     setError(null);
     try {
-      const resp = await apiService.platformBrowse(platform, datasetId, path);
-      setItems(resp.items || []);
+      const resp = await apiService.platformBrowse(platform, datasetId, path, {
+        limit: PAGE_SIZE,
+        offset,
+      });
+      const pageItems = resp.items || [];
+      setItems((prev) => (append ? [...prev, ...pageItems] : pageItems));
+      setHasMore(Boolean(resp.has_more));
+      setNextOffset(
+        resp.next_offset ?? (resp.has_more ? offset + pageItems.length : null),
+      );
       setSelectedDatasetId(datasetId);
       setCurrentPath(path);
       setView('files');
 
-      if (path === '/') {
+      if (!append && path === '/') {
         const ds = datasets.find(d => d.id === datasetId);
         setBreadcrumbs([{ label: ds?.name || datasetId, datasetId, path: '/' }]);
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to browse');
+      setError(browseErrorMessage(err, 'Failed to browse'));
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [platform, datasets]);
+
+  const loadMore = () => {
+    if (!selectedDatasetId || !hasMore || loadingMore || nextOffset == null) return;
+    const path = breadcrumbs.length > 0
+      ? breadcrumbs[breadcrumbs.length - 1].path
+      : '/';
+    browseDataset(selectedDatasetId, path, { append: true, offset: nextOffset });
+  };
 
   const navigateTo = (item: PlatformFile) => {
     if (item.type === 'directory' && selectedDatasetId) {
@@ -329,6 +365,17 @@ export const PlatformBrowser: React.FC<PlatformBrowserProps> = ({
               );
             })}
           </div>
+
+          {hasMore && (
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {loadingMore ? 'Loading…' : 'Load more'}
+            </button>
+          )}
 
           {/* Action button */}
           {selectedFiles.size > 0 && (

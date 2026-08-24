@@ -90,6 +90,9 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
   const [platformView, setPlatformView] = useState<'datasets' | 'files'>('datasets');
   const [platformDatasetId, setPlatformDatasetId] = useState<string | null>(null);
   const [platformPathStack, setPlatformPathStack] = useState<string[]>(['/']);
+  const [platformHasMore, setPlatformHasMore] = useState(false);
+  const [platformNextOffset, setPlatformNextOffset] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const selectedSet = new Set(selectedFiles.map(f => f.path || f.id || f.name));
 
@@ -186,12 +189,18 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
   const browsePlatformDataset = async (
     datasetId: string,
     path: string = '/',
-    opts: { history?: 'none' | 'push' | 'reset' } = {}
+    opts: { history?: 'none' | 'push' | 'reset'; append?: boolean; offset?: number } = {},
   ) => {
-    setLoading(true);
+    const append = opts.append ?? false;
+    if (append) setLoadingMore(true);
+    else setLoading(true);
     setError(null);
     try {
-      const resp = await apiService.platformBrowse(platform, datasetId, path);
+      const offset = append ? (opts.offset ?? 0) : 0;
+      const resp = await apiService.platformBrowse(platform, datasetId, path, {
+        limit: 100,
+        offset,
+      });
       const items: FileEntry[] = (resp.items || []).map((item: any) => ({
         name: item.name,
         path: item.path || item.id,
@@ -199,29 +208,49 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
         size: item.size,
         id: item.id,
       }));
-      setEntries(items);
+      setEntries((prev) => (append ? [...prev, ...items] : items));
+      setPlatformHasMore(Boolean(resp.has_more));
+      setPlatformNextOffset(
+        resp.next_offset ?? (resp.has_more ? offset + items.length : null),
+      );
       setPlatformDatasetId(datasetId);
       setPlatformView('files');
       setCurrentPath(path);
       setAddressBar(`${datasetId}:${path}`);
       const historyMode = opts.history ?? 'none';
-      if (historyMode === 'reset') {
-        setPlatformPathStack([path]);
-      } else if (historyMode === 'push') {
-        setPlatformPathStack(prev => {
-          if (prev.length > 0 && prev[prev.length - 1] === path) return prev;
-          return [...prev, path];
-        });
+      if (!append) {
+        if (historyMode === 'reset') {
+          setPlatformPathStack([path]);
+        } else if (historyMode === 'push') {
+          setPlatformPathStack(prev => {
+            if (prev.length > 0 && prev[prev.length - 1] === path) return prev;
+            return [...prev, path];
+          });
+        }
+        const token = path === '/'
+          ? datasetId
+          : `${datasetId}?path=${encodeURIComponent(path)}`;
+        onPathChange?.(token);
       }
-      const token = path === '/'
-        ? datasetId
-        : `${datasetId}?path=${encodeURIComponent(path)}`;
-      onPathChange?.(token);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to browse dataset');
+      if (err?.code === 'ECONNABORTED') {
+        setError('Browse timed out. Open a subfolder or use Load more for large datasets.');
+      } else {
+        setError(err.response?.data?.detail || 'Failed to browse dataset');
+      }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const loadMorePlatformEntries = () => {
+    if (!platformDatasetId || !platformHasMore || loadingMore || platformNextOffset == null) return;
+    browsePlatformDataset(platformDatasetId, currentPath, {
+      history: 'none',
+      append: true,
+      offset: platformNextOffset,
+    });
   };
 
   // ---- Navigation ----
@@ -544,6 +573,16 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
               </div>
             );
           })}
+          {!isBackend(platform) && platformHasMore && (
+            <button
+              type="button"
+              onClick={loadMorePlatformEntries}
+              disabled={loadingMore}
+              className="m-2 w-[calc(100%-1rem)] rounded border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {loadingMore ? 'Loading…' : 'Load more'}
+            </button>
+          )}
         </div>
       )}
 

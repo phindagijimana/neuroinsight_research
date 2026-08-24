@@ -32,6 +32,10 @@ interface DirectorySelectorProps {
   sshConnected?: boolean;
   /** BIDS App workflow — copy and submit path differ from flat NIfTI batch. */
   bidsAppMode?: boolean;
+  /** Prefill input directory (e.g. from Transfer → Jobs handoff). */
+  initialPath?: string | null;
+  /** Fired when the input directory field changes. */
+  onInputDirChange?: (path: string) => void;
 }
 
 interface BrowseEntry {
@@ -49,6 +53,8 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
   onBidsSubmit,
   sshConnected = true,
   bidsAppMode: _bidsAppMode = false,
+  initialPath = null,
+  onInputDirChange,
 }) => {
   const [inputDir, setInputDir] = useState('');
   const [directoryInfo, setDirectoryInfo] = useState<DirectoryInfo | null>(null);
@@ -66,6 +72,16 @@ export const DirectorySelector: React.FC<DirectorySelectorProps> = ({
   const [browserEntries, setBrowserEntries] = useState<BrowseEntry[]>([]);
   const [browserLoading, setBrowserLoading] = useState(false);
   const [browserError, setBrowserError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialPath) {
+      setInputDir(initialPath);
+    }
+  }, [initialPath]);
+
+  useEffect(() => {
+    onInputDirChange?.(inputDir);
+  }, [inputDir, onInputDirChange]);
 
   const loadBrowserDir = async (path: string) => {
     setBrowserLoading(true);
