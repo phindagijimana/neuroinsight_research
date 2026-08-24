@@ -6,7 +6,6 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ChevronDown } from 'lucide-react';
 import { FileUpload } from '../components/FileUpload';
 import { apiService } from '../services/api';
 import type { Job } from '../types';
@@ -25,7 +24,17 @@ import { LoadingState, Spinner } from '../components/LoadingState';
 import type { ViewerTab } from '../utils/viewerQuery';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
 import { useToast, useConfirm } from '../contexts/NotificationContext';
-import { deriveJobSubjectLabel, jobComputeLabel, jobNeedsStatusWatch } from '../lib/jobLabels';
+import PathLocationBar from '../components/PathLocationBar';
+import {
+  formatDisplayPath,
+  formatJobInput,
+  formatJobOutput,
+  resolveJobOutputPath,
+} from '../lib/jobPaths';
+import {
+  deriveJobSubjectLabel,
+  jobNeedsStatusWatch,
+} from '../lib/jobLabels';
 
 const SAMPLE_VIEWER_TABS: ViewerTab[] = ['eeg', 'imaging', 'eeg-brain'];
 
@@ -43,8 +52,11 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [deletingJobs, setDeletingJobs] = useState<Set<string>>(new Set());
-  const [expandedJobIds, setExpandedJobIds] = useState<Set<string>>(new Set());
-  const [hpcQueueVisible, setHpcQueueVisible] = useState(false);
+  const [pathContext, setPathContext] = useState<{
+    dataDir: string;
+    hostDataDir: string | null;
+    homeDir: string | null;
+  }>({ dataDir: './data', hostDataDir: null, homeDir: null });
   const [stats, setStats] = useState({
     total: 0,
     completed: 0,
@@ -123,58 +135,19 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
   // Initial load
   useEffect(() => {
     fetchJobs();
+    apiService
+      .getBrowseRoot()
+      .then(({ data_dir, host_data_dir, local_root }) => {
+        setPathContext({
+          dataDir: data_dir,
+          hostDataDir: host_data_dir ?? null,
+          homeDir: local_root ?? null,
+        });
+      })
+      .catch(() => {
+        /* browse root is optional */
+      });
   }, []);
-
-  // Show SLURM queue when HPC backend is active or slurm jobs are in flight.
-  useEffect(() => {
-    let cancelled = false;
-
-    const refreshHpcVisibility = async () => {
-      try {
-        const [backend, status] = await Promise.all([
-          apiService.getCurrentBackend(),
-          apiService.hpcStatus(),
-        ]);
-        if (cancelled) return;
-
-        const backendIsSlurm = backend.backend_type === 'slurm';
-        const hasSlurmActivity = jobs.some(
-          (j) =>
-            j.backend_type === 'slurm' &&
-            (j.status === 'pending' || j.status === 'running')
-        );
-        setHpcQueueVisible((backendIsSlurm && status.connected) || hasSlurmActivity);
-      } catch {
-        if (!cancelled) {
-          setHpcQueueVisible(
-            jobs.some(
-              (j) =>
-                j.backend_type === 'slurm' &&
-                (j.status === 'pending' || j.status === 'running')
-            )
-          );
-        }
-      }
-    };
-
-    refreshHpcVisibility();
-    const interval = setInterval(refreshHpcVisibility, 60000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [jobs]);
-
-  // Keep failed jobs expanded so errors stay visible.
-  useEffect(() => {
-    setExpandedJobIds((prev) => {
-      const next = new Set(prev);
-      jobs
-        .filter((j) => j.status === 'failed' && j.error_message)
-        .forEach((j) => next.add(j.id));
-      return next;
-    });
-  }, [jobs]);
 
   const jobsNeedingWatch = useMemo(
     () => jobs.some((j) => jobNeedsStatusWatch(j)),
@@ -279,6 +252,15 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
     [jobs, eegEnabled]
   );
 
+  const computeLabel = (job: Job) =>
+    job.backend_type === 'local_docker'
+      ? 'Local Docker'
+      : job.backend_type === 'slurm'
+        ? 'HPC (SLURM)'
+        : job.backend_type === 'remote_docker'
+          ? 'Remote Docker'
+          : job.backend_type;
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
@@ -327,33 +309,10 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
     return secs > 0 ? secs : undefined;
   };
 
-  const jobSummaryLine = (job: Job) => {
-    const subject = job.is_sample_job ? 'Sample' : deriveJobSubjectLabel(job);
-    const runtime = jobRuntimeSeconds(job);
-    const parts = [
-      subject,
-      runtime != null ? formatRuntime(runtime) : null,
-      jobComputeLabel(job),
-    ].filter(Boolean);
-    return parts.join(' · ');
-  };
-
-  const toggleJobExpanded = (jobId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setExpandedJobIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(jobId)) next.delete(jobId);
-      else next.add(jobId);
-      return next;
-    });
-  };
-
-  const showStatsStrip = stats.total >= 3;
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50/90 to-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-8">
-        {/* Submit jobs — single surface above metrics */}
+        {/* Submit — top */}
         <div className="relative z-10 mb-6 md:mb-8">
           <FileUpload
             onJobsSubmitted={handleJobsSubmitted}
@@ -361,8 +320,8 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
           />
         </div>
 
-        {/* Statistics — only when enough jobs to matter */}
-        {showStatsStrip && (
+        {/* Statistics — full width */}
+        {stats.total > 0 && (
           <div className="mb-6 rounded-2xl border border-gray-200/90 bg-white/90 px-4 py-3.5 shadow-sm backdrop-blur-sm sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-6">
               {[
@@ -373,19 +332,22 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
                 { label: 'Failed', value: stats.failed, valueClass: 'text-red-600' },
               ].map((s) => (
                 <div key={s.label} className="flex min-w-[4.5rem] items-baseline gap-2">
-                  <span className={`text-lg font-semibold tabular-nums ${s.valueClass}`}>{s.value}</span>
-                  <span className="text-xs font-medium tracking-wide text-gray-400">{s.label}</span>
+                  <span className={`text-lg font-semibold tabular-nums ${s.valueClass}`}>
+                    {s.value}
+                  </span>
+                  <span className="text-xs font-medium tracking-wide text-gray-400">
+                    {s.label}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {hpcQueueVisible && (
-          <div className="mb-6">
-            <SlurmQueueMonitor visible={true} />
-          </div>
-        )}
+        {/* SLURM queue — full width */}
+        <div className="mb-6">
+          <SlurmQueueMonitor visible={true} />
+        </div>
 
         {hasSampleJobs && (
           <p className="mb-6 px-1 text-xs text-emerald-800/90">
@@ -393,16 +355,18 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
           </p>
         )}
 
-        {/* Jobs List */}
+        {/* Jobs — full width */}
         <div className="rounded-2xl border border-gray-200/90 bg-white shadow-sm">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 tracking-tight">Jobs</h2>
-              {lastRefreshTime && (
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Updated {formatDate(lastRefreshTime.toISOString())}
-                </p>
-              )}
+              <p className="text-sm text-gray-500 mt-0.5">
+                {lastRefreshTime ? (
+                  <>Updated {formatDate(lastRefreshTime.toISOString())} · completed jobs open in Results</>
+                ) : (
+                  'Completed jobs open in Results'
+                )}
+              </p>
             </div>
             <Button onClick={() => fetchJobs(true)} disabled={isRefreshing} className="shrink-0">
               {isRefreshing ? 'Refreshing…' : 'Refresh'}
@@ -419,97 +383,124 @@ const JobsPage: React.FC<JobsPageProps> = ({ setActivePage, setSelectedJobId }) 
           ) : (
             <div className="divide-y divide-gray-100 nir-scroll-panel">
               {sortedJobs.map((job) => {
-                const expanded = expandedJobIds.has(job.id);
-                const isActive = job.status === 'running' || job.status === 'pending';
-                const summary = jobSummaryLine(job);
+                const subjectLabel = job.is_sample_job
+                  ? 'Sample EEG demo'
+                  : deriveJobSubjectLabel(job);
+                const pipelineLabel = job.display_name || job.pipeline_name;
+                const pathOpts = {
+                  containerDataDir: pathContext.dataDir,
+                  hostDataDir: pathContext.hostDataDir,
+                  homeDir: pathContext.homeDir,
+                };
+                const inputRaw = formatJobInput(job);
+                const outputRaw = resolveJobOutputPath(job, pathOpts);
+                const runtime = jobRuntimeSeconds(job);
 
                 return (
                 <div
                   key={job.id}
-                  className="px-4 sm:px-6 py-3 hover:bg-slate-50/80 transition cursor-pointer"
+                  className="px-4 sm:px-6 py-3.5 hover:bg-slate-50/80 transition cursor-pointer"
                   onClick={() => handleViewJob(job.id)}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 flex-1 items-start gap-2.5">
-                      <div className="mt-0.5 shrink-0">{getStatusIcon(job.status)}</div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-sm font-medium text-gray-900 truncate min-w-0">
-                            {job.display_name || job.pipeline_name}
-                          </span>
-                          {job.is_sample_job && (
-                            <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
-                              Sample
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-2">
+                        {getStatusIcon(job.status)}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                            <span className="text-sm font-semibold text-gray-900 truncate min-w-0">
+                              {subjectLabel || pipelineLabel}
                             </span>
-                          )}
-                          <StatusBadge status={job.status} className="shrink-0" />
-                        </div>
-                        {summary && (
-                          <p className="mt-0.5 text-xs text-gray-500 truncate" title={summary}>
-                            {summary}
-                          </p>
-                        )}
-                        {isActive && (
-                          <div className="mt-2">
-                            <JobProgressBar
-                              progress={job.progress ?? 0}
-                              currentPhase={job.current_phase}
-                              status={job.status}
-                            />
-                          </div>
-                        )}
-                        {expanded && (
-                          <div className="mt-2 space-y-1.5 text-xs text-gray-500">
-                            <p>
-                              <span className="text-gray-400">ID</span>{' '}
-                              <span className="font-mono text-gray-600" title={job.id}>
-                                {job.id.slice(0, 8)}
+                            {subjectLabel && (
+                              <span className="text-xs text-gray-500 truncate max-w-full">
+                                {pipelineLabel}
                               </span>
-                              {' · '}
-                              <span className="text-gray-400">Mode</span>{' '}
+                            )}
+                            {job.is_sample_job && (
+                              <span className="shrink-0 text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                Sample
+                              </span>
+                            )}
+                            <span className="shrink-0 text-xs px-2 py-0.5 rounded bg-navy-50 text-navy-600 border border-navy-200">
                               {job.execution_mode === 'workflow' ? 'Workflow' : 'Plugin'}
-                            </p>
-                            <p className="truncate" title={job.input_files[0] || undefined}>
-                              <span className="text-gray-400">Input</span>{' '}
-                              {job.is_sample_job ? 'Bundled sample data' : (job.input_files[0] || 'N/A')}
-                            </p>
-                            <p>
-                              <span className="text-gray-400">Submitted</span>{' '}
-                              {formatDate(job.submitted_at)}
-                            </p>
-                            {!isActive &&
-                              (job.status === 'completed' || job.status === 'failed') && (
-                              <JobProgressBar
-                                progress={job.status === 'completed' ? 100 : (job.progress ?? 0)}
-                                currentPhase={
-                                  job.status === 'completed' ? 'Completed' : job.current_phase
+                            </span>
+                            <StatusBadge status={job.status} className="shrink-0" />
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                            <span>ID: {job.id.slice(0, 8)}</span>
+                            <span>-</span>
+                            <span>Compute: {computeLabel(job)}</span>
+                            {runtime != null && (
+                              <>
+                                <span>-</span>
+                                <span>Runtime: {formatRuntime(runtime)}</span>
+                              </>
+                            )}
+                          </div>
+                          <div className="mt-1.5 space-y-1 text-xs text-gray-500">
+                            {!job.is_sample_job && job.input_files.length > 0 && (
+                              <PathLocationBar
+                                compact
+                                label="Input"
+                                pathKind="input"
+                                job={job}
+                                homeDir={pathContext.homeDir}
+                                hostPath={inputRaw}
+                                displayPath={
+                                  job.input_files.length === 1
+                                    ? formatDisplayPath(inputRaw, pathContext.homeDir)
+                                    : `${formatDisplayPath(job.input_files[0], pathContext.homeDir)} (+${job.input_files.length - 1} more)`
                                 }
-                                status={job.status}
+                                onNavigateToTransfer={() => setActivePage('transfer')}
                               />
                             )}
-                            {job.status === 'failed' && job.error_message && (
-                              <p className="text-red-800 font-mono whitespace-pre-wrap break-words bg-red-50/80 rounded px-2 py-1.5 border border-red-100">
-                                {job.error_message}
+                            {job.is_sample_job && (
+                              <p>
+                                <span className="font-medium text-gray-600">Input: </span>
+                                Bundled sample data
                               </p>
                             )}
+                            {outputRaw && (
+                              <PathLocationBar
+                                compact
+                                label="Output"
+                                pathKind="output"
+                                job={job}
+                                homeDir={pathContext.homeDir}
+                                hostPath={outputRaw}
+                                displayPath={formatJobOutput(job, pathOpts)}
+                                onNavigateToTransfer={() => setActivePage('transfer')}
+                              />
+                            )}
                           </div>
-                        )}
+                          <div className="text-xs text-gray-400 mt-1">
+                            Submitted: {formatDate(job.submitted_at)}
+                          </div>
+                          {(job.status === 'running' ||
+                            job.status === 'pending' ||
+                            job.status === 'completed' ||
+                            job.status === 'failed') && (
+                            <JobProgressBar
+                              progress={job.status === 'completed' ? 100 : (job.progress ?? 0)}
+                              currentPhase={
+                                job.status === 'completed' ? 'Completed' : job.current_phase
+                              }
+                              status={job.status}
+                            />
+                          )}
+                          {job.status === 'failed' && job.error_message && (
+                            <p
+                              className="mt-2 text-xs text-red-800 font-mono line-clamp-4"
+                              title={job.error_message}
+                            >
+                              {job.error_message}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => toggleJobExpanded(job.id, e)}
-                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition"
-                        title={expanded ? 'Hide details' : 'Show details'}
-                        aria-label={expanded ? 'Hide job details' : 'Show job details'}
-                        aria-expanded={expanded}
-                      >
-                        <ChevronDown
-                          className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
-                        />
-                      </button>
+                    <div className="flex items-center gap-2 ml-4 shrink-0">
                       {job.status === 'completed' && (
                         <button
                           onClick={(e) => {

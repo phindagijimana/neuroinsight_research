@@ -460,41 +460,31 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
   // ===========================================================================
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Process MRI Data</h2>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Process MRI Data</h2>
+          <p className="mt-0.5 text-sm text-gray-500">
+            Select execution backend, pipeline, and input data.
+          </p>
+        </div>
         {onBack && (
           <button
             onClick={onBack}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            className="shrink-0 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
           >
             &larr; Back
           </button>
         )}
       </div>
 
-      <div className="space-y-4">
-        {/* Row 1: Backend + resources (collapsed by default) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 lg:items-start">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5 lg:items-start">
+        {/* Left: data source + input */}
+        <div className="space-y-4 min-w-0">
           <BackendSelector {...backendProps} />
 
           {selectedPipeline && (
-            <ResourceSelector
-              plugin={selectedPipeline}
-              backendType={selectedBackend === 'local' ? 'local' : selectedBackend === 'remote_hpc' ? 'hpc' : 'remote'}
-              onResourcesChange={setCustomResources}
-            />
-          )}
-        </div>
-
-        {/* Row 2: Pipeline + input */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 lg:items-start">
-          <div className="space-y-3 min-w-0">
-            <PipelineSelector onPipelineSelect={setSelectedPipeline} selectedPipeline={selectedPipeline} onExecutionSelect={setSelectedExecution} />
-          </div>
-
-          {selectedPipeline && (
-            <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 space-y-4 flex flex-col h-full">
-              <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 self-start">
+            <div className="rounded-xl border border-gray-100 bg-slate-50/40 p-4 space-y-4">
+              <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
                 <button
                   type="button"
                   onClick={() => setMode('single')}
@@ -517,10 +507,18 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
                 </button>
               </div>
 
-              {error && <div className="p-3 bg-red-50 border border-red-200 rounded"><p className="text-xs text-red-700">{error}</p></div>}
-              {submitting && <div className="p-3 bg-navy-50 border border-navy-200 rounded"><p className="text-xs text-navy-700">Submitting jobs...</p></div>}
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded">
+                  <p className="text-xs text-red-700">{error}</p>
+                </div>
+              )}
+              {submitting && (
+                <div className="p-3 bg-navy-50 border border-navy-200 rounded">
+                  <p className="text-xs text-navy-700">Submitting jobs...</p>
+                </div>
+              )}
 
-              <div className="flex-1" style={submitting ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
+              <div style={submitting ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
                 {mode === 'directory' ? (
                   <DirectorySelector
                     mode={dataSource === 'hpc' ? 'hpc' : dataSource === 'remote' ? 'remote' : 'local'}
@@ -534,14 +532,24 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
                     <SingleFileUpload
                       browseMode={dataSource === 'hpc' ? 'hpc' : dataSource === 'remote' ? 'remote' : 'local'}
                       sshConnected={dataSource === 'local' ? true : sshConnected}
-                      onFileUploaded={(path) => { setUploadedFilePath(path); setError(null); }}
-                      executionContext={selectedExecution ? { type: selectedExecution.type, id: selectedExecution.id } : null}
+                      onFileUploaded={(path) => {
+                        setUploadedFilePath(path);
+                        setError(null);
+                      }}
+                      executionContext={
+                        selectedExecution
+                          ? { type: selectedExecution.type, id: selectedExecution.id }
+                          : null
+                      }
                       inputFormatName={selectedExecution?.inputFormatName}
                       bidsAppMode={bidsWorkflow}
                     />
                     {uploadedFilePath && (
                       <div className="mt-3">
-                        <button onClick={handleSingleFileSubmit} className="w-full py-2 px-4 bg-navy-600 text-white rounded-md hover:bg-navy-800 font-medium text-sm">
+                        <button
+                          onClick={handleSingleFileSubmit}
+                          className="w-full py-2 px-4 bg-navy-600 text-white rounded-md hover:bg-navy-800 font-medium text-sm"
+                        >
                           Submit Job
                         </button>
                       </div>
@@ -550,6 +558,29 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onJobsSubmitted, onBack 
                 )}
               </div>
             </div>
+          )}
+        </div>
+
+        {/* Right: pipeline + resources */}
+        <div className="space-y-4 min-w-0">
+          <PipelineSelector
+            onPipelineSelect={setSelectedPipeline}
+            selectedPipeline={selectedPipeline}
+            onExecutionSelect={setSelectedExecution}
+          />
+
+          {selectedPipeline && (
+            <ResourceSelector
+              plugin={selectedPipeline}
+              backendType={
+                selectedBackend === 'local'
+                  ? 'local'
+                  : selectedBackend === 'remote_hpc'
+                    ? 'hpc'
+                    : 'remote'
+              }
+              onResourcesChange={setCustomResources}
+            />
           )}
         </div>
       </div>

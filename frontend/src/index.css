@@ -27,8 +27,8 @@ code {
     @apply max-h-[min(24rem,55vh)] overflow-y-auto overscroll-y-contain;
   }
 
-  /* Tabular data with many rows */
+  /* Tabular data with many rows — same cap as panels for page-level consistency */
   .nir-scroll-table {
-    @apply max-h-48 overflow-x-auto overflow-y-auto overscroll-y-contain;
+    @apply max-h-[min(24rem,55vh)] overflow-x-auto overflow-y-auto overscroll-y-contain;
   }
 }
