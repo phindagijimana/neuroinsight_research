@@ -26,28 +26,28 @@ keeps the desktop/frontend `package.json` in sync.
 
 1. **Bump the version** (must be greater than the last tag):
    ```bash
-   python3 scripts/bump_version.py 0.1.16
-   git commit -am "chore: release v0.1.16"
+   python3 scripts/bump_version.py 0.1.25
+   git commit -am "chore: release v0.1.25"
    git push origin main
    ```
 
 2. **Publish the engine image FIRST** (so it exists when the app looks for it):
    ```bash
-   git tag nir-v0.1.16 && git push origin nir-v0.1.16
+   git tag nir-v0.1.25 && git push origin nir-v0.1.25
    ```
    Wait for the *All-in-One Image (GHCR)* workflow to finish (multi-arch
-   amd64+arm64). It tags `:v0.1.16` and `:latest`.
+   amd64+arm64). It tags `:v0.1.25` and `:latest`.
 
 3. **Confirm the image is pullable without auth** (simulates an end user) — from
    a machine that is **not** logged in to GHCR:
    ```bash
-   docker pull ghcr.io/phindagijimana/nir-allinone:v0.1.16
+   docker pull ghcr.io/phindagijimana/nir-allinone:v0.1.25
    ```
    If this fails with auth/denied, the package isn't public yet (see prereqs).
 
 4. **Build + publish the desktop installers:**
    ```bash
-   git tag desktop-v0.1.16 && git push origin desktop-v0.1.16
+   git tag desktop-v0.1.25 && git push origin desktop-v0.1.25
    ```
    The *Desktop Release (Multi-Platform)* workflow builds macOS/Windows/Linux
    installers, generates checksum files, and attaches everything to the GitHub

@@ -12,10 +12,11 @@
 
 | Doc | Purpose |
 |---|---|
-| [USER_GUIDE.md](USER_GUIDE.md) | HPC/SLURM, Remote Server, Pennsieve, XNAT, macOS notes |
+| [USER_GUIDE.md](USER_GUIDE.md) | Transfer + Jobs workflow, HPC/SLURM, Remote Server, Pennsieve, XNAT |
 | [TRANSFER.md](TRANSFER.md) | **Transfer page** — route matrix, large files (300GB+), resume, env vars |
 | [HPC_PIPELINE_SUBMISSION_GUIDE.md](HPC_PIPELINE_SUBMISSION_GUIDE.md) | Pipeline-specific input layouts on HPC |
 | [TOOL_LICENSES.md](TOOL_LICENSES.md) | FreeSurfer / MELD license files |
+| [RELEASE_NOTES_v0.1.24.md](RELEASE_NOTES_v0.1.24.md) | Latest release summary |
 
 ## Developers
 
@@ -32,8 +33,6 @@
 | [SIGNING_AND_TRUST.md](SIGNING_AND_TRUST.md) | Code signing, notarization, checksums |
 | [../CHANGELOG.md](../CHANGELOG.md) | Full version history |
 
-## Internal / planning
-
-Not linked for end users: `../EEG_future.md`, `../license_future.md`,
-`../desktop_NIR.md`, `../saas_nir.md`, `viewer_later.md`, `../desktop/ops/`,
-`../pennsieve/` registration runbooks.
+Pennsieve/XNAT connector setup is documented under **Transfer** and **Jobs → Compute**
+in [USER_GUIDE.md](USER_GUIDE.md). Platform registration runbooks live in
+`adapters/` source, not in end-user docs.

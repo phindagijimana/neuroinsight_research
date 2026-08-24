@@ -75,8 +75,9 @@ shasum -a 256 -c desktop-release-sha256-macos.txt    # or -linux.txt
 2. On the **first run only**, it downloads the engine image (~1.8 GB) — you'll see
    a progress message on the splash screen. This can take a few minutes depending
    on your connection.
-3. Once ready, the app opens into the **Workspace**. Start with **New job** or
-   **Open an imaging file**.
+3. Once ready, the app opens **Jobs** in the workspace. Use **Transfer** to move
+   data, then submit from Jobs. Open imaging files via **File → Open Data…** or
+   the **Viewer** tab.
 
 Subsequent launches are fast (the image is cached).
 

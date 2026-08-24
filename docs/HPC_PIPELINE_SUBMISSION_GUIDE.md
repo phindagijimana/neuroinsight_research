@@ -157,7 +157,7 @@ your_input_dir/
 
 1. **SSH to the HPC login node** (or another session where your lab NFS mounts are visible). BDSP/BIND paths such as `/mnt/nfs/Gugger_Lab/...` are only valid there—not on your laptop by default.
 2. **Optional — build one staging folder** from separate BIDS EEG + BIND MRI trees: from a checkout of this repo on the cluster, run `eeg/scripts/stage_bdsp_bind_multimodal.py` (see the script docstring). Write the output under something like `…/Documents/NeuroInsight_Research/multimodal_<id>/`.
-3. **Connect NIR to HPC** — follow [USER_GUIDE.md § Connecting to HPC](USER_GUIDE.md#connecting-to-hpc-slurm-cluster) (Jobs → **Data Source: HPC**, **Compute: HPC**, **Activate SLURM Backend**).
+3. **Connect NIR to HPC** — follow [USER_GUIDE.md § Connecting to HPC](USER_GUIDE.md#connecting-to-hpc-slurm-cluster) (Jobs → **Compute → HPC**, connect SSH, **Activate SLURM Backend**).
 4. **Submit** the workflow from the UI (steps below) so SLURM runs on the cluster.
 
 **Required layout — one folder** (EEG and T1 must not be split across unrelated parents):

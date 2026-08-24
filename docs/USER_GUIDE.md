@@ -9,7 +9,7 @@ Reference guide for deploying and using NeuroInsight. **New desktop users:** sta
 - [Local vs remote deployment](#local-vs-remote-deployment)
 - [Deployment from source](#deployment-from-source)
 - [Terminology](#terminology)
-- [Compute and data sources](#compute-and-data-sources)
+- [Transfer, Jobs, and compute](#transfer-jobs-and-compute)
 - [Remote Server vs HPC](#remote-server-vs-hpc)
 - [Large file transfers](#large-file-transfers) — full matrix in **[TRANSFER.md](TRANSFER.md)**
 - [Plugins and workflows](#plugins-and-workflows)
@@ -216,67 +216,60 @@ If you are new to research computing, here are the key terms used in this guide.
 
 ---
 
-## Compute and Data Sources
+## Transfer, Jobs, and compute
 
-NeuroInsight lets you choose **where to select input** and **where to run jobs** separately, but **processing always uses files on the compute side**. Jobs do not run directly against Pennsieve or XNAT in place — platform data is **downloaded or staged** to local disk, a remote server, or HPC scratch before the pipeline starts.
+NeuroInsight splits **data movement** and **pipeline execution**:
 
-### Data Sources
+| Page | Role |
+|------|------|
+| **Transfer** | Copy files between Local, Remote Server, HPC, Pennsieve, and XNAT (dual-pane UI, queue, history). See **[TRANSFER.md](TRANSFER.md)**. |
+| **Jobs** | Run pipelines on paths that **already exist** on the chosen compute backend (compute-only — no Pennsieve/XNAT wizard). |
 
-| Source | Description | What happens before the job runs |
-|--------|-------------|----------------------------------|
-| **Local** | Files on the machine running NeuroInsight | Job reads those paths directly (local compute) or paths must be reachable from remote/HPC compute |
-| **Remote Server** | Files on an SSH-accessible Linux machine (lab VM, cloud instance, workstation — see [Remote Server vs HPC](#remote-server-vs-hpc)) | Browse over SSH; job uses paths on that host when compute is Remote Server or HPC on the same host |
-| **HPC** | Files on an HPC cluster filesystem | Browse over SSH; job uses cluster paths (often scratch or project space) |
-| **Pennsieve** | Browse datasets on Pennsieve | Selected files are **downloaded** to the chosen compute backend (HPC download can bypass the NeuroInsight container via presigned URLs) |
-| **XNAT** | Browse projects on XNAT | Selected files are **downloaded** to the chosen compute backend |
+**Processing always uses files on the compute side.** Pipelines do not read Pennsieve or XNAT in place — use **Transfer** to stage data first, then submit from **Jobs**.
 
-### Compute Backends
+### Typical workflow
+
+1. **Transfer** — move data where you want to compute (e.g. Pennsieve → HPC scratch, XNAT → local disk).
+2. **Jobs** — choose **Compute** (Local / Remote / HPC), browse **Subject path** on that backend, pick pipeline, submit.
+3. **Transfer** (optional) — move results back (e.g. HPC outputs → Pennsieve).
+
+After a transfer completes, use **Open in Jobs** to prefill path and compute backend.
+
+### Where data can live (via Transfer)
+
+| Location | Access |
+|----------|--------|
+| **Local** | This machine's filesystem |
+| **Remote Server** | SSH-accessible Linux host (lab VM, cloud instance, workstation) |
+| **HPC** | Cluster filesystem (scratch, project space) |
+| **Pennsieve** | Cloud datasets — connect and browse in a Transfer pane |
+| **XNAT** | Institutional archive — connect and browse in a Transfer pane |
+
+### Compute backends (Jobs page)
 
 | Backend | Description | Requirements |
 |---------|-------------|--------------|
-| **Local Docker** | Process on the NeuroInsight host using Docker containers | Docker installed |
-| **Remote Server** | Process on a remote Linux machine via SSH + Docker | SSH access, Docker installed on the remote host |
-| **HPC/SLURM** | Submit jobs to an HPC cluster via SLURM | SSH access, SLURM, Singularity/Apptainer |
+| **Local Docker** | Process on the NeuroInsight host | Docker installed |
+| **Remote Server** | SSH + Docker on a remote Linux machine | SSH access, Docker on remote host |
+| **HPC/SLURM** | Submit to a SLURM cluster | SSH access, SLURM, Singularity/Apptainer |
 
 ### Remote Server vs HPC
 
-Both options use **SSH**, and on many setups they can point at the **same hostname** (NeuroInsight keeps one SSH session and switches mode when you change the Compute tab). The difference is **how jobs run**, not whether the machine is “in the cloud”:
+Both use **SSH**; on many setups the same hostname works — NeuroInsight switches mode when you change the **Compute** tab.
 
 | | **Remote Server** | **HPC / SLURM** |
 |---|-------------------|-----------------|
-| **Typical machine** | Lab workstation, department Linux server, single cloud VM (AWS/GCP/Azure) | University or institutional **cluster** with a job scheduler |
-| **How jobs run** | Docker containers on that host | SLURM submits to compute nodes; containers via Singularity/Apptainer |
+| **Typical machine** | Lab workstation, department Linux server, single cloud VM | University **cluster** with a job scheduler |
+| **How jobs run** | Docker on that host | SLURM + Singularity/Apptainer on compute nodes |
 | **UI when active** | Connected · **Remote Server (Docker)** | Connected · **HPC (SLURM)** |
-| **Requirements** | Docker for your SSH user | SLURM, modules, cluster filesystem (scratch/project space) |
-| **When to choose it** | One powerful Linux box you control; Docker is allowed | Shared cluster; Docker is usually **not** allowed on compute nodes |
+| **When to choose it** | One Linux box you control with Docker | Shared cluster; Docker usually **not** allowed on compute nodes |
 
-**Remote Server is not limited to AWS, GCP, or Azure** — those are common examples. Any Linux server you can SSH into with Docker works. If your institution gives you a **cluster login node** and expects you to use **SLURM**, choose **HPC** instead of Remote Server even if the hostname looks like a normal server.
+Common setups:
 
-You select a **data source** and a **compute backend** on the Jobs page. Common setups:
-
-- **Local + Local Docker** — data and compute on the same machine (simplest).
-- **HPC + HPC/SLURM** — data already on the cluster; jobs read cluster paths (no Pennsieve copy).
-- **Pennsieve + HPC/SLURM** — files are staged onto the cluster, then SLURM runs there.
-- **XNAT + Local Docker** — files are downloaded to the NeuroInsight host, then processed locally.
-
-**Not supported today:** leaving canonical data only on Pennsieve/XNAT while the pipeline reads/writes there without a local or HPC copy. Use the **Transfer** page to move results back to a platform after a job if needed.
-
-### Transfer page vs Jobs page (planned simplification)
-
-| Page | Role | Direction |
-|------|------|-----------|
-| **Transfer** | All data movement — copy files between Local, Remote, HPC, Pennsieve, and XNAT | **Both ways** (either pane can be source or destination) |
-| **Jobs** | Run pipelines on paths that already exist on the chosen compute backend | Compute only — no platform browse/download wizard |
-
-**Transfer stays as it is today:** dual-pane WinSCP-style UI, left ↔ right arrows, queue with progress, and history. Pennsieve → HPC, HPC → Pennsieve, local ↔ remote, and every other combination remain on **Transfer**, not Jobs.
-
-**Typical workflow after this split:**
-
-1. **Transfer** — move data to where you want to compute (e.g. Pennsieve → HPC scratch).
-2. **Jobs** — pick compute (Local / Remote / HPC), browse **that** filesystem, submit.
-3. **Transfer** (optional) — move results back (e.g. HPC outputs → Pennsieve).
-
-Jobs may offer **Open in Jobs** after a transfer completes (prefilled path); it does not replace Transfer.
+- **Local data, local compute** — files already on disk; Jobs → Compute **Local**, browse, submit.
+- **HPC data, HPC compute** — BIDS on scratch; Transfer optional; Jobs → Compute **HPC**, browse cluster path, submit.
+- **Pennsieve → HPC** — **Transfer** Pennsieve → HPC, then **Jobs** on HPC path.
+- **XNAT → local** — **Transfer** XNAT → Local, then **Jobs** with Local compute.
 
 ### Large file transfers
 
@@ -340,17 +333,18 @@ NeuroInsight can run neuroimaging jobs on any SSH-accessible Linux machine with 
 
 Dr. Reyes runs NeuroInsight on her laptop (8 GB RAM), but FreeSurfer and fMRIPrep need far more memory. Her lab has a shared Linux workstation (`brainlab-ws01.med.stanford.edu`) with 128 GB RAM, 32 CPU cores, and Docker installed. She wants to keep browsing and uploading files from her laptop while the heavy processing happens on the lab workstation.
 
-**What she enters in the UI:**
+**Workflow:**
+
+1. **Transfer** — Local → Remote Server: copy the T1 NIfTI to the workstation (or upload via Transfer browse).
+2. **Jobs** — Compute **Remote Server**, connect SSH:
 
 | Field | Value |
 |-------|-------|
-| Data Source | **Local** (files are on her laptop) |
-| Compute Source | **Remote Server** |
 | Host | `brainlab-ws01.med.stanford.edu` |
 | Username | `sreyes` |
 | Port | `22` |
 
-After clicking **Connect & Activate**, she uploads a T1 NIfTI file from her laptop. NeuroInsight transfers it to the workstation, runs FreeSurfer inside a Docker container there, and streams the results back.
+3. Browse the remote path, pick FreeSurfer, submit. Processing runs in Docker on the workstation.
 
 If she were working from home and the workstation were behind the university firewall, she would first connect her VPN, then enter the same hostname. Alternatively, she could set up a reverse SSH tunnel as described in the HPC section below and use `localhost` / port `2222` instead.
 
@@ -366,15 +360,14 @@ Follow the SSH key setup in the HPC section below (Step 1a-1c). The process is i
 
 ### Step 2: Connect in the NeuroInsight UI
 
-1. Open NeuroInsight in your browser
-2. Under **Data Source**, select **Local** (or **Remote Server** if your data is on the remote machine)
-3. Under **Compute Source**, select **Remote Server**
-4. Fill in the SSH connection fields:
+1. Open **Jobs**
+2. Under **Compute**, select **Remote Server**
+3. Fill in the SSH connection fields:
    - **Host** -- hostname or IP of the remote machine (or `localhost` if using a reverse tunnel)
    - **Username** -- your SSH username on the remote machine
-   - **Port** -- `22` (default) or `2222` if using a reverse tunnel
-5. Click **Connect & Activate**
-6. A green "Connected" badge confirms the connection
+   - **Port** — `22` (default) or `2222` if using a reverse tunnel
+4. Click **Connect & Activate**
+5. A green "Connected" badge confirms the connection
 
 If the remote server is behind a firewall, use a reverse SSH tunnel (same pattern as HPC Step 2 below).
 
@@ -382,7 +375,7 @@ If the remote server is behind a firewall, use a reverse SSH tunnel (same patter
 
 ## Connecting to Pennsieve
 
-NeuroInsight can browse, download, and process data stored on the [Pennsieve](https://app.pennsieve.io) data management platform. Pennsieve is a cloud-based research data management system used by NIH SPARC, RE-JOIN, and other programs to store, organize, and share biomedical datasets.
+NeuroInsight connects to [Pennsieve](https://app.pennsieve.io) from the **Transfer** page to browse and copy datasets. Pennsieve is a cloud-based research data management system used by NIH SPARC, RE-JOIN, and other programs.
 
 ### Prerequisites
 
@@ -409,17 +402,16 @@ The key is a permanent identifier; the secret acts as the password. If you lose 
 
 ### Step 2: Connect in the NeuroInsight UI
 
-1. Open NeuroInsight and click **Get Started**
-2. Under **Data Source**, click the **Pennsieve** tab (blue database icon)
-3. Paste the credentials you copied:
+1. Open the **Transfer** page
+2. In either pane, select **Pennsieve** and paste the credentials you copied:
    - **API Key** -- e.g., `a3f8e1d2-7b4c-49e1-8f6a-2d9c0e5b1a73`
-   - **API Secret** -- e.g., `b91d4f7e-3a28-41c5-9e0b-8c6f2d5a4e17`
-4. Click **Connect**
-5. A green "Connected" badge confirms the connection, showing your email and workspace (e.g., "james.wright@upenn.edu -- Penn Epilepsy Center")
+   - **API Secret** — e.g., `b91d4f7e-3a28-41c5-9e0b-8c6f2d5a4e17`
+3. Click **Connect**
+4. A green "Connected" badge confirms the connection, showing your email and workspace (e.g., "james.wright@upenn.edu -- Penn Epilepsy Center")
 
-### Step 3: Browse Data
+### Step 3: Browse and transfer data
 
-After connecting, click **Browse** in the input section to open the Pennsieve Data Browser. The Pennsieve hierarchy is:
+Use **Browse** in the Pennsieve pane to open the data browser. The Pennsieve hierarchy is:
 
 ```
 Workspace (Organization)
@@ -430,11 +422,11 @@ Workspace (Organization)
 
 1. **Datasets** -- listed automatically after connecting; select the dataset containing your data
 2. **Packages** -- navigate through folder structure within the dataset
-3. **Files** -- select the files you want to process, then click **Select for Processing**
+3. **Files** — select files/folders, then use the transfer arrows to copy to your destination pane (Local, Remote, or HPC).
 
-### Step 4: Process Data
+### Step 4: Submit a job
 
-After selecting files from Pennsieve, NeuroInsight **downloads a copy** to your chosen compute backend (local disk, remote server, or HPC scratch), then submits the job against those paths. Your Pennsieve dataset is unchanged; results stay on compute unless you upload them back via **Transfer**.
+After data is on the compute backend, open **Jobs**, choose matching **Compute**, browse **Subject path**, pick a pipeline, and submit. Or click **Open in Jobs** when a transfer completes to prefill the path. Your Pennsieve dataset is unchanged; upload results back via **Transfer** if needed.
 
 ### Troubleshooting Pennsieve Connection
 
@@ -458,20 +450,18 @@ Priya is a PhD student in neuroscience at Boston University. She has 50 subjects
 
 NeuroInsight is deployed on an AWS EC2 instance so Priya can access it from anywhere. The SCC is behind BU's campus firewall, so she sets up a reverse SSH tunnel from her laptop (see Step 2 below for the exact command).
 
-**What she enters in the NeuroInsight UI:**
+**Workflow:** Her BIDS data is already on `/projectnb/epilepsy/priya/` on the SCC. On **Jobs**, she connects HPC compute:
 
 | Field | Value |
 |-------|-------|
-| Data Source | **HPC** (her BIDS data is on `/projectnb/epilepsy/priya/`) |
-| Compute Source | **HPC/SLURM** |
-| Host | `localhost` (because of the reverse tunnel) |
+| Host | `localhost` (reverse tunnel) |
 | Username | `priya` |
-| Port | `2222` (the tunnel port) |
+| Port | `2222` |
 | Work Directory | `/scratch/priya/neuroinsight` |
-| Partition | `general` (auto-populated after connecting) |
+| Partition | `general` |
 | Modules | `singularity/3.10` |
 
-After connecting, she browses her BIDS directory on the SCC through the file browser, selects all 50 subjects, chooses "Diffusion Full Pipeline", and clicks Submit. SLURM queues the jobs and processes multiple subjects in parallel across cluster nodes. She monitors everything from the SLURM Queue Monitor panel in her browser.
+She browses the BIDS directory in **Subject path**, selects the diffusion workflow, and submits. SLURM queues jobs across cluster nodes; she monitors from the SLURM Queue Monitor on Jobs.
 
 If Priya were on campus (connected to BU's network directly), she would skip the tunnel and enter the real hostname (`scc-login.bu.edu`, port `22`) instead of `localhost:2222`.
 
@@ -595,8 +585,8 @@ The app will use these as defaults whenever you connect.
 
 ### Step 3: Connect in the NeuroInsight UI
 
-1. Open NeuroInsight in your browser
-2. In the top toolbar, click the **HPC** tab (purple server icon)
+1. Open **Jobs**
+2. Under **Compute**, select **HPC**
 3. Fill in the SSH connection fields:
 
 | Field | Direct access (on campus) | Via reverse tunnel (off campus) |
@@ -658,7 +648,7 @@ You can also browse remote files on the HPC using the **File Browser** panel in 
 
 ## Connecting to XNAT
 
-NeuroInsight can browse, download, and process data directly from any XNAT instance (CIDUR, CNDA, NITRC, Central, or your own). XNAT is an open-source imaging informatics platform used by hospitals and research centers to archive and share neuroimaging data.
+NeuroInsight connects to XNAT from the **Transfer** page to browse and copy imaging data. XNAT is an open-source imaging informatics platform used by hospitals and research centers.
 
 ### Example Scenario
 
@@ -674,20 +664,16 @@ ssh -L 8443:xnat.urmc.rochester.edu:443 dnakamura@smdodlogin01.urmc.rochester.ed
 
 This forwards port 8443 on the NeuroInsight server through the HPC login node to the XNAT server. The HPC login node can reach XNAT because both are on the hospital network.
 
-**What she enters in the NeuroInsight UI:**
+**Transfer setup** (XNAT pane):
 
 | Field | Value |
 |-------|-------|
-| Data Source | **XNAT** |
-| Compute Source | **HPC/SLURM** (already connected) |
 | XNAT URL | `https://localhost:8443` |
-| Skip SSL verification | **checked** (required because the certificate is for `xnat.urmc.rochester.edu`, not `localhost`) |
+| Skip SSL verification | **checked** |
 | Username | `dnakamura` |
 | Password | (her XNAT password) |
 
-**Browsing data:** After connecting, she clicks Browse and sees the project list. She selects "Focal Epilepsy MRI Study", clicks into the first subject, opens their MR Session, selects Scan 1 (T1 MPRAGE), opens the NIFTI resource, and selects the `.nii.gz` file. She repeats for all five subjects.
-
-**Processing:** She selects "Cortical Lesion Detection" as the pipeline and clicks Submit. NeuroInsight downloads the five NIfTI files from XNAT (via the tunnel), then submits them to the HPC for processing via SLURM.
+**Workflow:** On **Transfer**, connect XNAT in one pane and HPC in the other. Browse projects, select NIfTI files, transfer XNAT → HPC. On **Jobs**, compute **HPC** (already connected), browse the staged path, choose "Cortical Lesion Detection", submit.
 
 If the XNAT server were publicly accessible (e.g., `https://central.xnat.org`), no tunnel would be needed. She would enter the real URL directly and leave SSL verification enabled.
 
@@ -698,8 +684,8 @@ If the XNAT server were publicly accessible (e.g., `https://central.xnat.org`), 
 
 ### Step 1: Connect to XNAT
 
-1. Open NeuroInsight and click **Get Started**
-2. Under **Data Source**, click the **XNAT** tab
+1. Open the **Transfer** page
+2. In either pane, select **XNAT**
 3. Fill in:
 
 | Field | Direct access | Via SSH tunnel |
@@ -712,9 +698,9 @@ If the XNAT server were publicly accessible (e.g., `https://central.xnat.org`), 
 4. Click **Connect**
 5. A green "Connected" badge confirms the connection
 
-### Step 2: Browse Data
+### Step 2: Browse and transfer data
 
-After connecting, click **Browse** in the input section to open the XNAT Data Browser. The XNAT hierarchy is:
+After connecting, click **Browse** in the XNAT pane. The XNAT hierarchy is:
 
 ```
 Project
@@ -730,13 +716,13 @@ Project
 3. **Experiments** -- click a session to view scans
 4. **Scans** -- click a scan to view available resources (NIFTI, DICOM, etc.)
 5. **Resources** -- click a resource to see individual files
-6. **Files** -- select the files you want to process, then click **Select for Processing**
+6. **Files** — select files, then transfer to your destination pane (Local, Remote, or HPC).
 
 Use the breadcrumb navigation at the top to go back to any level.
 
-### Step 3: Process Data
+### Step 3: Submit a job
 
-After selecting files from XNAT, NeuroInsight **downloads a copy** to your chosen compute backend, then submits the job against those paths. Your XNAT archive is unchanged; results stay on compute unless you upload them back via **Transfer**.
+Open **Jobs**, choose matching **Compute**, browse **Subject path** where files were staged, pick a pipeline, and submit. Use **Open in Jobs** after a transfer to prefill the path. Your XNAT archive is unchanged.
 
 ### XNAT Behind a Firewall (SSH Tunnel)
 

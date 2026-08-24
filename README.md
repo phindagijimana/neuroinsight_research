@@ -88,9 +88,10 @@ For connectors (HPC, Pennsieve, XNAT), Transfer (large files), and deployment op
 
 ## Key Features
 
-- **Multiple data sources** -- Local files, Remote Server (SSH), HPC filesystem, Pennsieve, or XNAT
-- **Multiple compute backends** -- Local Docker, **Remote Server** (SSH + Docker on any Linux host — lab VM, cloud instance, or workstation; not cloud-only), or HPC/SLURM (SSH + Singularity on a cluster). See [Remote Server vs HPC](docs/USER_GUIDE.md#remote-server-vs-hpc) in the user guide.
-- **Flexible pairing** -- e.g. stage Pennsieve data onto HPC and run SLURM there, or download XNAT scans and process locally (platform data is copied to compute before the job runs)
+- **Transfer-first data movement** — dual-pane UI to copy files between Local, Remote Server, HPC, Pennsieve, and XNAT (see [docs/TRANSFER.md](docs/TRANSFER.md))
+- **Compute-only Jobs** — pick Local / Remote / HPC compute, browse paths on that backend, submit pipelines (no platform wizard on Jobs)
+- **Multiple compute backends** — Local Docker, **Remote Server** (SSH + Docker on any Linux host), or HPC/SLURM (SSH + Singularity). See [Remote Server vs HPC](docs/USER_GUIDE.md#remote-server-vs-hpc)
+- **Typical flow** — Transfer data to compute → Jobs submit → Transfer results back (optional)
 - **Real-time monitoring** -- SLURM queue monitor, job progress tracking, and log streaming
 - **Plugins** -- Each tool is a single YAML file; drop a new one in `plugins/` to add support for a new tool
 - **Workflows** -- Chain multiple plugins into one job with automatic data passing between steps
@@ -138,7 +139,7 @@ If you use NeuroInsight in your work, please cite:
   title        = {NeuroInsight: Neuroimaging Processing Platform},
   year         = {2026},
   url          = {https://github.com/phindagijimana/neuroinsight_research},
-  version      = {0.1.22}
+  version      = {0.1.24}
 }
 ```
 
