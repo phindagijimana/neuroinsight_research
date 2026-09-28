@@ -10,7 +10,6 @@ import logging
 import os
 import re
 import shutil
-import socket
 import subprocess
 import time
 import urllib.parse
@@ -27,11 +26,30 @@ from backend.connectors.base import (
     PlatformDataset,
     PlatformItem,
 )
+from backend.core import ports
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_API_URL = "https://api.pennsieve.io"
 _TOKEN_EXPIRY_BUFFER = 300  # refresh 5 min before expiry
+
+# Preferred local port for the Pennsieve Agent. The agent's historical default
+# of 9000 collides with MinIO (also 9000), which made NeuroInsight mistake
+# MinIO for the agent. We prefer 11235 and step by +50 on a conflict.
+PENNSIEVE_AGENT_DEFAULT_PORT = 11235
+PENNSIEVE_AGENT_DEFAULT_TARGET = f"127.0.0.1:{PENNSIEVE_AGENT_DEFAULT_PORT}"
+
+
+def _default_agent_target() -> str:
+    """Env override, else the preferred 127.0.0.1:11235 default."""
+    return os.getenv("PENNSIEVE_AGENT_TARGET", PENNSIEVE_AGENT_DEFAULT_TARGET)
+
+
+def _agent_owned(host: str, port: int) -> bool:
+    """True if a listener at host:port is a real Pennsieve Agent (not MinIO)."""
+    if not ports.is_tcp_reachable(host, port):
+        return False
+    return not ports.looks_like_minio(host, port)
 
 
 class PennsieveConnector(BasePlatformConnector):
@@ -52,7 +70,7 @@ class PennsieveConnector(BasePlatformConnector):
         self._dataset_int_ids: Dict[str, int] = {}  # node_id -> intId mapping
         self._dataset_packages_cache: Dict[str, Tuple[float, List[Any]]] = {}
         self._dataset_packages_cache_ttl_sec: int = 20
-        self._agent_target: str = os.getenv("PENNSIEVE_AGENT_TARGET", "localhost:9000")
+        self._agent_target: str = _default_agent_target()
 
     # ------------------------------------------------------------------ auth
 
@@ -104,7 +122,7 @@ class PennsieveConnector(BasePlatformConnector):
         self._org_id = None
         self._dataset_int_ids.clear()
         self._dataset_packages_cache.clear()
-        self._agent_target = os.getenv("PENNSIEVE_AGENT_TARGET", "localhost:9000")
+        self._agent_target = _default_agent_target()
 
     def is_connected(self) -> bool:
         return self._token is not None and time.time() < self._token_expires
@@ -693,27 +711,16 @@ class PennsieveConnector(BasePlatformConnector):
     @staticmethod
     def _assert_agent_target_not_minio(agent_target: str) -> None:
         """Detect common local port conflict where MinIO occupies agent port."""
-        host, sep, port_str = agent_target.partition(":")
-        if not sep:
-            host = "localhost"
-            port_str = agent_target
         try:
-            port = int(port_str)
+            host, port = PennsieveConnector._parse_agent_target(agent_target)
         except Exception:
             return
 
-        try:
-            with socket.create_connection((host, port), timeout=1.0) as sock:
-                sock.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
-                banner = sock.recv(256).decode("latin-1", errors="ignore")
-        except Exception:
-            return
-
-        if "MinIO" in banner:
+        if ports.looks_like_minio(host, port):
             raise RuntimeError(
                 f"PENNSIEVE_AGENT_TARGET points to MinIO at {agent_target}. "
                 "Run Pennsieve Agent on another port and set PENNSIEVE_AGENT_TARGET "
-                "(for example: 127.0.0.1:11235)."
+                f"(for example: {PENNSIEVE_AGENT_DEFAULT_TARGET})."
             )
 
     @staticmethod
@@ -752,12 +759,17 @@ class PennsieveConnector(BasePlatformConnector):
             )
 
         candidate_target = f"127.0.0.1:{port}"
-        if not PennsieveConnector._is_local_port_available(port):
-            free_port = PennsieveConnector._find_free_local_port(9000, 9100)
+        if not ports.is_bindable(port):
+            free_port, _status = ports.resolve_port(
+                PENNSIEVE_AGENT_DEFAULT_PORT,
+                verify_owner=_agent_owned,
+            )
             if free_port is None:
                 return (
                     agent_target,
-                    "No free local port found for Pennsieve Agent in range 9000-9100.",
+                    "No free local port found for Pennsieve Agent "
+                    f"(tried {PENNSIEVE_AGENT_DEFAULT_PORT} stepping by "
+                    f"{ports.DEFAULT_STEP}).",
                 )
             candidate_target = f"127.0.0.1:{free_port}"
             port = free_port
@@ -777,11 +789,9 @@ class PennsieveConnector(BasePlatformConnector):
 
         deadline = time.time() + 10.0
         while time.time() < deadline:
-            try:
-                with socket.create_connection(("127.0.0.1", port), timeout=1.0):
-                    return (candidate_target, None)
-            except Exception:
-                time.sleep(0.4)
+            if ports.is_tcp_reachable("127.0.0.1", port, timeout=1.0):
+                return (candidate_target, None)
+            time.sleep(0.4)
 
         return (
             candidate_target,
@@ -792,40 +802,28 @@ class PennsieveConnector(BasePlatformConnector):
     def _parse_agent_target(agent_target: str) -> Tuple[str, int]:
         host, sep, port_str = (agent_target or "").partition(":")
         if not sep:
-            host = "localhost"
-            port_str = (agent_target or "").strip()
-        host = host or "localhost"
+            # Bare value with no ":" is a host-only target; use the default port.
+            host = (agent_target or "").strip()
+            port_str = ""
+        host = host.strip() or "localhost"
+        port_str = port_str.strip()
         if not port_str:
-            port_str = "9000"
+            port_str = str(PENNSIEVE_AGENT_DEFAULT_PORT)
         return host, int(port_str)
 
     @staticmethod
     def _is_local_port_available(port: int) -> bool:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            sock.bind(("127.0.0.1", port))
-            return True
-        except OSError:
-            return False
-        finally:
-            sock.close()
-
-    @staticmethod
-    def _find_free_local_port(start: int, end: int) -> Optional[int]:
-        for port in range(start, end + 1):
-            if PennsieveConnector._is_local_port_available(port):
-                return port
-        return None
+        return ports.is_bindable(port)
 
     @staticmethod
     def _find_reachable_agent_target(pennsieve_cls) -> Optional[str]:
-        """Find an already running local agent between ports 9000-9100."""
-        for port in range(9000, 9101):
+        """Find an already running local agent from the preferred port, +50 steps."""
+        for i in range(ports.DEFAULT_ATTEMPTS):
+            port = PENNSIEVE_AGENT_DEFAULT_PORT + i * ports.DEFAULT_STEP
             target = f"127.0.0.1:{port}"
             try:
-                if not PennsieveConnector._is_tcp_reachable("127.0.0.1", port):
+                if not _agent_owned("127.0.0.1", port):
                     continue
-                PennsieveConnector._assert_agent_target_not_minio(target)
                 pennsieve_cls(connect=True, target=target)
                 return target
             except Exception:
@@ -834,17 +832,11 @@ class PennsieveConnector(BasePlatformConnector):
 
     @staticmethod
     def _is_tcp_reachable(host: str, port: int, timeout: float = 0.75) -> bool:
-        try:
-            with socket.create_connection((host, port), timeout=timeout):
-                return True
-        except Exception:
-            return False
+        return ports.is_tcp_reachable(host, port, timeout=timeout)
 
     def _prepare_agent_target(self, current_target: str) -> Tuple[str, Optional[str]]:
         """Normalize agent target and switch away from MinIO/invalid defaults."""
-        target = (current_target or "").strip() or os.getenv(
-            "PENNSIEVE_AGENT_TARGET", "localhost:9000"
-        )
+        target = (current_target or "").strip() or _default_agent_target()
         try:
             host, port = self._parse_agent_target(target)
         except Exception:
@@ -854,21 +846,29 @@ class PennsieveConnector(BasePlatformConnector):
             self._set_agent_target(target)
             return target, None
 
+        # If a real agent is already listening on the requested port, keep it.
         local_target = f"127.0.0.1:{port}"
-        try:
-            self._assert_agent_target_not_minio(local_target)
+        if _agent_owned("127.0.0.1", port):
             self._set_agent_target(local_target)
             return local_target, None
-        except Exception:
-            free_port = self._find_free_local_port(9000, 9100)
-            if free_port is None:
-                return (
-                    local_target,
-                    "Could not find free agent port in range 9000-9100.",
-                )
-            chosen = f"127.0.0.1:{free_port}"
-            self._set_agent_target(chosen)
-            return chosen, None
+
+        # The port is free or held by a foreign service (e.g. MinIO on 9000).
+        # Resolve from our preferred port, stepping by +50, preferring an
+        # already-running agent and falling back to the first free port.
+        chosen_port, _status = ports.resolve_port(
+            PENNSIEVE_AGENT_DEFAULT_PORT,
+            verify_owner=_agent_owned,
+        )
+        if chosen_port is None:
+            return (
+                local_target,
+                "Could not find a free Pennsieve Agent port "
+                f"(tried {PENNSIEVE_AGENT_DEFAULT_PORT} stepping by "
+                f"{ports.DEFAULT_STEP}).",
+            )
+        chosen = f"127.0.0.1:{chosen_port}"
+        self._set_agent_target(chosen)
+        return chosen, None
 
     def _set_agent_target(self, target: str) -> None:
         self._agent_target = target
