@@ -97,6 +97,10 @@ class PennsieveConnector(BasePlatformConnector):
         # need a separate manual step.
         prepared_target, _prep_err = self._prepare_agent_target(self._agent_target)
         self._set_agent_target(prepared_target)
+        # In a fresh environment (e.g. the all-in-one container) there is no
+        # ~/.pennsieve/config.ini for the CLI/agent. Provision one from the API
+        # credentials so uploads work; never clobber an existing profile.
+        self._ensure_agent_profile(prepared_target)
         _chosen, _auto_err = self._maybe_autostart_agent(prepared_target)
         if _chosen:
             self._set_agent_target(_chosen)
@@ -873,6 +877,46 @@ class PennsieveConnector(BasePlatformConnector):
     def _set_agent_target(self, target: str) -> None:
         self._agent_target = target
         os.environ["PENNSIEVE_AGENT_TARGET"] = target
+
+    def _ensure_agent_profile(self, target: str) -> None:
+        """Create ~/.pennsieve/config.ini from API creds if it does not exist.
+
+        The Pennsieve CLI/Agent authenticates from a profile in this file. On a
+        machine where the user already ran the config wizard (e.g. a source
+        install) the file exists and we leave it untouched. In a fresh
+        environment such as the all-in-one container it is absent, so we write a
+        minimal ``neuroinsight`` profile from the connected API key/secret and
+        point the ``[agent]`` port at the resolved target. Best-effort: any
+        failure is swallowed so it never blocks connect.
+        """
+        cfg = Path.home() / ".pennsieve" / "config.ini"
+        try:
+            if cfg.exists() and cfg.stat().st_size > 0:
+                return  # respect an existing profile; never clobber user config
+            if not (self._api_key and self._api_secret):
+                return
+            try:
+                _host, port = self._parse_agent_target(target)
+            except Exception:
+                port = PENNSIEVE_AGENT_DEFAULT_PORT
+            profile = "neuroinsight"
+            content = (
+                "[global]\n"
+                f"default_profile={profile}\n\n"
+                f"[{profile}]\n"
+                f"api_token={self._api_key}\n"
+                f"api_secret={self._api_secret}\n\n"
+                "[agent]\n"
+                f"port={port}\n"
+            )
+            cfg.parent.mkdir(parents=True, exist_ok=True)
+            cfg.write_text(content)
+            try:
+                os.chmod(cfg, 0o600)
+            except OSError:
+                pass
+        except Exception as e:  # pragma: no cover - best effort
+            logger.debug("Could not provision Pennsieve profile: %s", e)
 
     # ----------------------------------------------------------- internals
 

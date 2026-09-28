@@ -58,6 +58,22 @@ RUN set -eux; \
     tar -xzf /tmp/d.tgz -C /tmp; mv /tmp/docker/docker /usr/local/bin/docker; \
     rm -rf /tmp/docker /tmp/d.tgz
 
+# Pennsieve Agent/CLI — required for Pennsieve UPLOADS (manifest upload runs
+# through this binary). Upstream ships a Linux binary for amd64 only (inside the
+# .deb); there is no Linux arm64 build. On arm64 the image still builds and
+# Pennsieve *downloads* (REST/presigned) work, but uploads are unavailable.
+ARG TARGETARCH
+RUN set -eux; \
+    if [ "${TARGETARCH:-amd64}" = "amd64" ]; then \
+      ver=2.1.1; \
+      curl -fsSL "https://github.com/Pennsieve/pennsieve-agent/releases/download/v${ver}/pennsieve_${ver}_amd64.deb" -o /tmp/penn.deb; \
+      dpkg-deb -x /tmp/penn.deb /tmp/penn; \
+      install -m 0755 /tmp/penn/opt/pennsieve/pennsieve /usr/local/bin/pennsieve; \
+      rm -rf /tmp/penn /tmp/penn.deb; \
+    else \
+      echo "WARNING: no Pennsieve Agent binary for ${TARGETARCH}; Pennsieve uploads unavailable on this arch (downloads still work)."; \
+    fi
+
 # Python deps from the build stage (no compilers in this image)
 COPY --from=pybuild /opt/venv /opt/venv
 

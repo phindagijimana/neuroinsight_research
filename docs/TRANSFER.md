@@ -22,6 +22,15 @@ Each cell is **Source (row) → Destination (column)**. Every combination is sup
 †Direct presigned `curl` on the remote/HPC host (data bypasses NeuroInsight).  
 ‡Download via NeuroInsight (XNAT session/tunnel), then SFTP to remote/HPC.
 
+> **Pennsieve uploads** (any *→ Pennsieve cell) run through the Pennsieve
+> Agent/CLI, which must be present on the machine running the backend. The
+> desktop **all-in-one image ships it on x86-64 (amd64) only** — upstream has no
+> Linux arm64 build — so on Apple Silicon, uploads require running the amd64
+> image (Rosetta/emulation) or a source install where the CLI is on your `PATH`.
+> Pennsieve **downloads** (Pennsieve → * cells) use the REST API and work on
+> every architecture. NeuroInsight provisions the agent profile automatically
+> from your connected API key/secret on first connect.
+
 **Typical workflow:** Transfer data to compute (e.g. Pennsieve → HPC) → **Jobs** runs on that path → Transfer results back if needed.
 
 ---
