@@ -7,6 +7,22 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+## [0.1.25] - 2026-09-28
+
+### Fixed
+- **Pennsieve uploads** — the Agent's default port (`9000`) collided with MinIO,
+  so NeuroInsight mistook MinIO for the Agent and uploads failed. The default is
+  now `127.0.0.1:11235`, and a shared, MinIO-aware port resolver
+  (`backend/core/ports.py`) steps by `+50` on a conflict.
+
+### Added
+- **Pennsieve uploads in the all-in-one image** — the container now bundles the
+  Pennsieve Agent/CLI (x86-64/amd64; upstream has no Linux arm64 build) and
+  auto-provisions `~/.pennsieve/config.ini` from the connected API key/secret on
+  first connect, without clobbering an existing profile. HPC/Local/Remote →
+  Pennsieve uploads now work in the desktop app on amd64; downloads work on all
+  architectures.
+
 ## [0.1.24] - 2026-08-24
 
 ### Changed
