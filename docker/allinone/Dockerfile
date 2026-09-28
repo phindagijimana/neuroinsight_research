@@ -30,6 +30,14 @@ RUN python -m venv /opt/venv
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt gunicorn uvicorn
 
+# ---- MinIO server binary ----------------------------------------------------
+# MinIO archived its open-source project in 2025 and removed all community
+# downloads: dl.min.io returns HTTP 410 Gone and docker.io/minio/minio is no
+# longer pullable. The Chainguard image still ships a current, multi-arch
+# `minio` binary at /usr/bin/minio (AGPLv3, same license as before). buildx
+# selects the matching arch automatically for each target platform.
+FROM cgr.dev/chainguard/minio:latest AS minio-src
+
 # ---- Stage 3: slim runtime (no build tools) ---------------------------------
 FROM python:3.10-slim AS allinone
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -45,10 +53,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# MinIO server binary (arch-aware)
-RUN set -eux; arch="$(dpkg --print-architecture)"; \
-    curl -fsSL "https://dl.min.io/server/minio/release/linux-${arch}/minio" -o /usr/local/bin/minio; \
-    chmod +x /usr/local/bin/minio
+# MinIO server binary — copied from the Chainguard image (see minio-src stage).
+COPY --from=minio-src /usr/bin/minio /usr/local/bin/minio
+RUN chmod +x /usr/local/bin/minio
 
 # Docker CLI only (static binary) — to launch sibling job containers via the
 # mounted host socket. Avoids pulling the full Docker engine.
