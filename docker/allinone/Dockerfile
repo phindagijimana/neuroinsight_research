@@ -13,7 +13,11 @@
 # ==============================================================================
 
 # ---- Stage 1: build the React SPA -------------------------------------------
-FROM node:20-alpine AS frontend-build
+# Pinned to the native builder platform ($BUILDPLATFORM): the SPA output is
+# static and architecture-independent, so building it under QEMU emulation for
+# each target arch is both wasteful and fragile (esbuild resolves the wrong
+# native binary under arm64 emulation). Build once natively, COPY dist into all.
+FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend-build
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci --ignore-scripts

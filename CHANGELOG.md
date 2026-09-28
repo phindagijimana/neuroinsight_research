@@ -13,7 +13,10 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 - **All-in-one image build** — MinIO archived its open-source project and removed
   all community downloads (`dl.min.io` now returns HTTP 410; `docker.io/minio/minio`
   is unpullable), which broke the engine image build. MinIO is now sourced from the
-  Chainguard image (`cgr.dev/chainguard/minio`, multi-arch, AGPLv3 as before).
+  Chainguard image (`cgr.dev/chainguard/minio`, multi-arch, AGPLv3 as before). The
+  frontend build stage is also pinned to the native builder platform (`$BUILDPLATFORM`)
+  so the static SPA no longer builds under arm64 QEMU emulation, where esbuild
+  resolved the wrong native binary.
 - **Pennsieve uploads** — the Agent's default port (`9000`) collided with MinIO,
   so NeuroInsight mistook MinIO for the Agent and uploads failed. The default is
   now `127.0.0.1:11235`, and a shared, MinIO-aware port resolver
