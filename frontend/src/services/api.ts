@@ -85,6 +85,18 @@ api.interceptors.response.use(
   }
 );
 
+export interface ConnectionInfo {
+  id: string;
+  name: string;
+  kind: string;            // "hpc" | "remote"
+  host?: string | null;
+  username?: string | null;
+  port?: number | null;
+  connected: boolean;
+  work_dir?: string | null;
+  is_active: boolean;
+}
+
 export interface LicenseInfo {
   id: string;
   name: string;
@@ -549,9 +561,18 @@ export const apiService = {
    * // Browse HPC directory (Phase 2)
    * const hpcDir = await apiService.browseDirectory("/scratch/user/data", "hpc");
    */
-  async browseDirectory(path: string, backendType: 'local' | 'remote' | 'hpc' = 'local'): Promise<DirectoryInfo> {
+  async browseDirectory(
+    path: string,
+    backendType: 'local' | 'remote' | 'hpc' = 'local',
+    connectionId?: string | null,
+  ): Promise<DirectoryInfo> {
     if (backendType === 'hpc' || backendType === 'remote') {
-      // Route to HPC browse endpoint (remote filesystem via SSH/SFTP)
+      // A specific extra connection routes through the connection registry;
+      // the active connection keeps using the original HPC browse endpoint.
+      if (connectionId && connectionId !== 'active') {
+        const r = await api.get(`/api/connections/${connectionId}/browse`, { params: { path } });
+        return r.data;
+      }
       const response = await api.get('/api/hpc/browse', {
         params: { path },
       });
@@ -981,7 +1002,9 @@ export const apiService = {
     sourcePath: string,
     sourceFileIds: string[] | null,
     destType: string,
-    destPath: string
+    destPath: string,
+    sourceConn?: string | null,
+    destConn?: string | null,
   ): Promise<{ transfer_id: string; status: string }> {
     const resp = await api.post('/api/transfer/move', {
       source_type: sourceType,
@@ -989,8 +1012,32 @@ export const apiService = {
       source_file_ids: sourceFileIds,
       dest_type: destType,
       dest_path: destPath,
+      source_conn: sourceConn ?? null,
+      dest_conn: destConn ?? null,
     });
     return resp.data;
+  },
+
+  // ---- Named SSH connections (multi-host Transfer) ----
+
+  /** List live SSH connections (the active one plus any extras). */
+  async listConnections(): Promise<{ connections: ConnectionInfo[] }> {
+    const resp = await api.get('/api/connections');
+    return resp.data;
+  },
+
+  /** Connect to a host and register it as an additional live connection. */
+  async addConnection(body: {
+    name: string; host: string; username: string; port?: number;
+    key_path?: string | null; password?: string | null; kind?: string; work_dir?: string | null;
+  }): Promise<ConnectionInfo> {
+    const resp = await api.post('/api/connections', body);
+    return resp.data;
+  },
+
+  /** Disconnect and drop an extra connection. */
+  async removeConnection(id: string): Promise<void> {
+    await api.delete(`/api/connections/${id}`);
   },
 
   /** Get transfer progress. */

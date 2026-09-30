@@ -43,6 +43,8 @@ interface FileBrowserPaneProps {
   onPathChange?: (path: string) => void;
   /** When set, the pane opens at this path instead of the platform default. */
   initialPath?: string | null;
+  /** For hpc/remote panes: which live SSH connection to browse (registry id). */
+  connectionId?: string | null;
 }
 
 const PLATFORM_META: Record<PlatformType, { label: string; icon: React.ReactNode; defaultPath: string }> = {
@@ -72,6 +74,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
   onSelectionChange,
   onPathChange,
   initialPath = null,
+  connectionId = null,
 }) => {
   const meta = PLATFORM_META[platform];
 
@@ -104,7 +107,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
       if (platform === 'local') {
         data = await apiService.browseDirectory(path, 'local');
       } else {
-        data = await apiService.browseDirectory(path, platform as 'remote' | 'hpc');
+        data = await apiService.browseDirectory(path, platform as 'remote' | 'hpc', connectionId);
       }
       const dirs: FileEntry[] = (data.directories || []).map((d: any) => ({
         name: d.name, path: d.path, type: 'directory' as const, size: d.size,
@@ -123,7 +126,7 @@ const FileBrowserPane: React.FC<FileBrowserPaneProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [platform, onPathChange]);
+  }, [platform, onPathChange, connectionId]);
 
   const loadPlatformDatasets = useCallback(async () => {
     setLoading(true);

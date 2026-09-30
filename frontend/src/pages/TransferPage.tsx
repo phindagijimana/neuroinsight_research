@@ -19,9 +19,10 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   ArrowRight, ArrowLeft, RefreshCw, AlertCircle,
   Monitor, Cloud, Server, Database, Globe,
-  ChevronDown,
+  ChevronDown, Plus, X,
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import type { ConnectionInfo } from '../services/api';
 import FileBrowserPane from '../components/FileBrowserPane';
 import ConnectionPanel from '../components/ConnectionPanel';
 import { TransferProgress } from '../components/TransferProgress';
@@ -72,6 +73,11 @@ function isPlatformType(value: string): value is PlatformType {
   return ['local', 'remote', 'hpc', 'pennsieve', 'xnat'].includes(value);
 }
 
+/** SSH-backed panes that can carry a specific connection id. */
+function isBackendHost(p: PlatformType): boolean {
+  return p === 'hpc' || p === 'remote';
+}
+
 function TransferPage({ setActivePage }: TransferPageProps) {
   const { sessions, hydrating, getSession } = usePlatformSession();
   // Pane platforms
@@ -96,12 +102,45 @@ function TransferPage({ setActivePage }: TransferPageProps) {
   const [leftUploadError, setLeftUploadError] = useState<string | null>(null);
   const [rightUploadError, setRightUploadError] = useState<string | null>(null);
 
+  // Multi-host connections (extras beside the single active session)
+  const [connections, setConnections] = useState<ConnectionInfo[]>([]);
+  const [leftConnId, setLeftConnId] = useState<string>('active');
+  const [rightConnId, setRightConnId] = useState<string>('active');
+  const [showAddConn, setShowAddConn] = useState(false);
+  const [addConnBusy, setAddConnBusy] = useState(false);
+  const [addConnError, setAddConnError] = useState<string | null>(null);
+  const [newConn, setNewConn] = useState({
+    name: '', host: '', username: '', port: '22', password: '', work_dir: '',
+  });
+
   // Transfer state
   const [activeTransfers, setActiveTransfers] = useState<ActiveTransfer[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [recentTransfers, setRecentTransfers] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [jobsHandoff, setJobsHandoff] = useState<JobsHandoff | null>(null);
+
+  const refreshConnections = useCallback(async () => {
+    try {
+      const data = await apiService.listConnections();
+      setConnections(data.connections || []);
+    } catch {
+      // Non-fatal: leave the current list in place.
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshConnections();
+    const t = setInterval(refreshConnections, 8000);
+    return () => clearInterval(t);
+  }, [refreshConnections]);
+
+  // If a pane points at an extra connection that went away, fall back to active.
+  useEffect(() => {
+    const ids = new Set(['active', ...connections.map((c) => c.id)]);
+    if (!ids.has(leftConnId)) setLeftConnId('active');
+    if (!ids.has(rightConnId)) setRightConnId('active');
+  }, [connections, leftConnId, rightConnId]);
 
   const persistActiveTransfers = useCallback((items: ActiveTransfer[]) => {
     try {
@@ -252,8 +291,9 @@ function TransferPage({ setActivePage }: TransferPageProps) {
   // Start transfer left -> right
   const transferLeftToRight = useCallback(async () => {
     if (leftSelected.length === 0) return;
-    if (leftPlatform === rightPlatform) {
-      setError('Source and destination cannot be the same platform');
+    const bothBackendHosts = isBackendHost(leftPlatform) && isBackendHost(rightPlatform);
+    if (leftPlatform === rightPlatform && !(bothBackendHosts && leftConnId !== rightConnId)) {
+      setError('Source and destination are the same. Pick a different connection on one side to copy between two hosts.');
       return;
     }
     setError(null);
@@ -272,6 +312,8 @@ function TransferPage({ setActivePage }: TransferPageProps) {
         fileIds,
         rightPlatform,
         rightPath,
+        isBackendHost(leftPlatform) ? leftConnId : null,
+        isBackendHost(rightPlatform) ? rightConnId : null,
       );
       enqueueTransfers([{
         id: result.transfer_id,
@@ -290,6 +332,8 @@ function TransferPage({ setActivePage }: TransferPageProps) {
     rightPlatform,
     leftPath,
     rightPath,
+    leftConnId,
+    rightConnId,
     rightUploadReady,
     rightUploadError,
     enqueueTransfers,
@@ -298,8 +342,9 @@ function TransferPage({ setActivePage }: TransferPageProps) {
   // Start transfer right -> left
   const transferRightToLeft = useCallback(async () => {
     if (rightSelected.length === 0) return;
-    if (leftPlatform === rightPlatform) {
-      setError('Source and destination cannot be the same platform');
+    const bothBackendHosts = isBackendHost(leftPlatform) && isBackendHost(rightPlatform);
+    if (leftPlatform === rightPlatform && !(bothBackendHosts && leftConnId !== rightConnId)) {
+      setError('Source and destination are the same. Pick a different connection on one side to copy between two hosts.');
       return;
     }
     setError(null);
@@ -318,6 +363,8 @@ function TransferPage({ setActivePage }: TransferPageProps) {
         fileIds,
         leftPlatform,
         leftPath,
+        isBackendHost(rightPlatform) ? rightConnId : null,
+        isBackendHost(leftPlatform) ? leftConnId : null,
       );
       enqueueTransfers([{
         id: result.transfer_id,
@@ -336,6 +383,8 @@ function TransferPage({ setActivePage }: TransferPageProps) {
     rightPlatform,
     leftPath,
     rightPath,
+    leftConnId,
+    rightConnId,
     leftUploadReady,
     leftUploadError,
     enqueueTransfers,
@@ -378,11 +427,60 @@ function TransferPage({ setActivePage }: TransferPageProps) {
     setRightSelected(tmpS);
   };
 
-  const leftCanBrowse = canBrowsePlatform(leftPlatform, leftConnected);
-  const rightCanBrowse = canBrowsePlatform(rightPlatform, rightConnected);
+  // A pane pointed at an extra connection is "connected" when that connection
+  // is live, independent of the single active session the ConnectionPanel tracks.
+  const leftExtra = leftConnId !== 'active' ? connections.find(c => c.id === leftConnId) : null;
+  const rightExtra = rightConnId !== 'active' ? connections.find(c => c.id === rightConnId) : null;
+  const leftEffConnected = leftExtra ? !!leftExtra.connected : leftConnected;
+  const rightEffConnected = rightExtra ? !!rightExtra.connected : rightConnected;
+
+  const leftCanBrowse = canBrowsePlatform(leftPlatform, leftEffConnected);
+  const rightCanBrowse = canBrowsePlatform(rightPlatform, rightEffConnected);
+
+  // Same endpoint = same platform AND (not SSH-backed, or same connection).
+  const sameEndpoint =
+    leftPlatform === rightPlatform &&
+    (!isBackendHost(leftPlatform) || leftConnId === rightConnId);
+
+  // Connection options a pane can pick (active + extras), for the per-pane picker.
+  const connOptions = [
+    { id: 'active', label: (connections.find(c => c.is_active)?.host) || 'Active session', is_active: true },
+    ...connections.filter(c => !c.is_active).map(c => ({ id: c.id, label: c.name || c.host || c.id, is_active: false })),
+  ];
+  const showConnPicker = connections.length > 1 || connections.some(c => !c.is_active);
 
   const leftTab = PLATFORM_TABS.find(t => t.id === leftPlatform)!;
   const rightTab = PLATFORM_TABS.find(t => t.id === rightPlatform)!;
+
+  const submitAddConnection = async () => {
+    setAddConnError(null);
+    if (!newConn.host || !newConn.username) {
+      setAddConnError('Host and username are required.');
+      return;
+    }
+    setAddConnBusy(true);
+    try {
+      const created = await apiService.addConnection({
+        name: newConn.name || newConn.host,
+        host: newConn.host,
+        username: newConn.username,
+        port: parseInt(newConn.port || '22', 10) || 22,
+        password: newConn.password || null,
+        work_dir: newConn.work_dir || null,
+        kind: 'hpc',
+      });
+      await refreshConnections();
+      setShowAddConn(false);
+      setNewConn({ name: '', host: '', username: '', port: '22', password: '', work_dir: '' });
+      // Point the destination pane at the new connection for immediate use.
+      setRightPlatform('hpc');
+      setRightConnId(created.id);
+    } catch (err: any) {
+      setAddConnError(err.response?.data?.detail || err.message || 'Could not connect.');
+    } finally {
+      setAddConnBusy(false);
+    }
+  };
 
   return (
     <div className={WORKSPACE_PAGE_OUTER}>
@@ -433,6 +531,55 @@ function TransferPage({ setActivePage }: TransferPageProps) {
         </div>
       )}
 
+      {/* Connections rail */}
+      <div className="mb-3 rounded-2xl border border-gray-200/90 bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-gray-100">
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight text-gray-900">Connections</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {connections.filter(c => !c.is_active).length > 0
+                ? 'Multiple hosts connected — pick a connection per pane to copy between them.'
+                : 'Add a second HPC to copy directly between two clusters.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setAddConnError(null); setShowAddConn(true); }}
+            className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-navy-200 bg-navy-50 px-3 py-1.5 text-xs font-medium text-navy-600 hover:bg-navy-100"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add connection
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 px-4 sm:px-5 py-3">
+          {connections.length === 0 && (
+            <span className="text-xs text-gray-400">No SSH connections yet — connect an HPC in a pane below, or add one.</span>
+          )}
+          {connections.map(c => (
+            <span
+              key={c.id}
+              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs shadow-sm"
+            >
+              <span className={`h-2 w-2 rounded-full ${c.connected ? 'bg-emerald-500 ring-2 ring-emerald-100' : 'bg-gray-300'}`} />
+              <span className="rounded border border-navy-200 bg-navy-50 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-navy-600">
+                {c.kind}
+              </span>
+              <span className="font-medium text-gray-900">{c.is_active ? (c.host || 'Active') : (c.name || c.host)}</span>
+              {c.host && <span className="font-mono text-[11px] text-gray-400">{c.host}</span>}
+              {!c.is_active && (
+                <button
+                  type="button"
+                  title={`Disconnect ${c.name || c.host}`}
+                  onClick={async () => { await apiService.removeConnection(c.id); await refreshConnections(); }}
+                  className="text-gray-400 hover:text-red-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* Main dual-pane area */}
       <div className="flex-1 flex gap-2 min-h-0">
         {/* Left pane */}
@@ -452,28 +599,46 @@ function TransferPage({ setActivePage }: TransferPageProps) {
               </button>
             ))}
           </div>
-          {/* Connection panel */}
-          <div className="mb-2">
-            <ConnectionPanel
-              key={`left-${leftPlatform}`}
-              platform={leftPlatform}
-              onConnectionChange={setLeftConnected}
-              onPlatformStatusChange={(status) => {
-                setLeftUploadReady(status.uploadReady ?? status.connected);
-                setLeftUploadError(status.uploadError ?? null);
-              }}
-            />
-          </div>
+          {/* Per-pane connection picker (SSH-backed panes with >1 connection) */}
+          {isBackendHost(leftPlatform) && showConnPicker && (
+            <div className="mb-2 flex items-center gap-2">
+              <span className="text-[11px] font-medium text-gray-400">Connection</span>
+              <select
+                value={leftConnId}
+                onChange={(e) => { setLeftConnId(e.target.value); setLeftSelected([]); }}
+                className="flex-1 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-800 focus:border-navy-600 focus:outline-none focus:ring-1 focus:ring-navy-600/40"
+              >
+                {connOptions.map(o => (
+                  <option key={o.id} value={o.id}>{o.label}{o.is_active ? ' (active)' : ''}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {/* Connection panel (only for the active session) */}
+          {leftConnId === 'active' && (
+            <div className="mb-2">
+              <ConnectionPanel
+                key={`left-${leftPlatform}`}
+                platform={leftPlatform}
+                onConnectionChange={setLeftConnected}
+                onPlatformStatusChange={(status) => {
+                  setLeftUploadReady(status.uploadReady ?? status.connected);
+                  setLeftUploadError(status.uploadError ?? null);
+                }}
+              />
+            </div>
+          )}
           <div className="flex-1 min-h-0">
             {leftCanBrowse ? (
               <FileBrowserPane
-                key={`left-${leftPlatform}-${leftInitialPath || ''}`}
+                key={`left-${leftPlatform}-${leftConnId}-${leftInitialPath || ''}`}
                 platform={leftPlatform}
                 side="source"
                 selectedFiles={leftSelected}
                 onSelectionChange={setLeftSelected}
                 onPathChange={setLeftPath}
                 initialPath={leftInitialPath}
+                connectionId={isBackendHost(leftPlatform) ? leftConnId : null}
               />
             ) : (
               <div className="flex h-full min-h-[12rem] items-stretch rounded-lg border border-gray-200 bg-white">
@@ -493,18 +658,20 @@ function TransferPage({ setActivePage }: TransferPageProps) {
             onClick={transferLeftToRight}
             disabled={
               leftSelected.length === 0 ||
-              leftPlatform === rightPlatform ||
-              !leftConnected ||
-              !rightConnected ||
+              sameEndpoint ||
+              !leftEffConnected ||
+              !rightEffConnected ||
               (rightPlatform === 'pennsieve' && !rightUploadReady)
             }
             className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-white hover:bg-navy-600 hover:border-navy-600 transition disabled:opacity-30 disabled:cursor-not-allowed"
             title={
-              !leftConnected || !rightConnected
-                ? 'Connect both platforms first'
-                : rightPlatform === 'pennsieve' && !rightUploadReady
-                  ? (rightUploadError || 'Pennsieve Agent is not ready for upload')
-                  : `Transfer ${leftSelected.length} file(s) to ${rightTab.label}`
+              !leftEffConnected || !rightEffConnected
+                ? 'Connect both sides first'
+                : sameEndpoint
+                  ? 'Pick a different connection on one side'
+                  : rightPlatform === 'pennsieve' && !rightUploadReady
+                    ? (rightUploadError || 'Pennsieve Agent is not ready for upload')
+                    : `Transfer ${leftSelected.length} file(s) to ${rightTab.label}`
             }
             aria-label={`Transfer selected files to ${rightTab.label}`}
           >
@@ -524,18 +691,20 @@ function TransferPage({ setActivePage }: TransferPageProps) {
             onClick={transferRightToLeft}
             disabled={
               rightSelected.length === 0 ||
-              leftPlatform === rightPlatform ||
-              !leftConnected ||
-              !rightConnected ||
+              sameEndpoint ||
+              !leftEffConnected ||
+              !rightEffConnected ||
               (leftPlatform === 'pennsieve' && !leftUploadReady)
             }
             className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-white hover:bg-navy-600 hover:border-navy-600 transition disabled:opacity-30 disabled:cursor-not-allowed"
             title={
-              !leftConnected || !rightConnected
-                ? 'Connect both platforms first'
-                : leftPlatform === 'pennsieve' && !leftUploadReady
-                  ? (leftUploadError || 'Pennsieve Agent is not ready for upload')
-                  : `Transfer ${rightSelected.length} file(s) to ${leftTab.label}`
+              !leftEffConnected || !rightEffConnected
+                ? 'Connect both sides first'
+                : sameEndpoint
+                  ? 'Pick a different connection on one side'
+                  : leftPlatform === 'pennsieve' && !leftUploadReady
+                    ? (leftUploadError || 'Pennsieve Agent is not ready for upload')
+                    : `Transfer ${rightSelected.length} file(s) to ${leftTab.label}`
             }
             aria-label={`Transfer selected files to ${leftTab.label}`}
           >
@@ -567,28 +736,46 @@ function TransferPage({ setActivePage }: TransferPageProps) {
               </button>
             ))}
           </div>
-          {/* Connection panel */}
-          <div className="mb-2">
-            <ConnectionPanel
-              key={`right-${rightPlatform}`}
-              platform={rightPlatform}
-              onConnectionChange={setRightConnected}
-              onPlatformStatusChange={(status) => {
-                setRightUploadReady(status.uploadReady ?? status.connected);
-                setRightUploadError(status.uploadError ?? null);
-              }}
-            />
-          </div>
+          {/* Per-pane connection picker (SSH-backed panes with >1 connection) */}
+          {isBackendHost(rightPlatform) && showConnPicker && (
+            <div className="mb-2 flex items-center gap-2">
+              <span className="text-[11px] font-medium text-gray-400">Connection</span>
+              <select
+                value={rightConnId}
+                onChange={(e) => { setRightConnId(e.target.value); setRightSelected([]); }}
+                className="flex-1 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-800 focus:border-navy-600 focus:outline-none focus:ring-1 focus:ring-navy-600/40"
+              >
+                {connOptions.map(o => (
+                  <option key={o.id} value={o.id}>{o.label}{o.is_active ? ' (active)' : ''}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {/* Connection panel (only for the active session) */}
+          {rightConnId === 'active' && (
+            <div className="mb-2">
+              <ConnectionPanel
+                key={`right-${rightPlatform}`}
+                platform={rightPlatform}
+                onConnectionChange={setRightConnected}
+                onPlatformStatusChange={(status) => {
+                  setRightUploadReady(status.uploadReady ?? status.connected);
+                  setRightUploadError(status.uploadError ?? null);
+                }}
+              />
+            </div>
+          )}
           <div className="flex-1 min-h-0">
             {rightCanBrowse ? (
               <FileBrowserPane
-                key={`right-${rightPlatform}-${rightInitialPath || ''}`}
+                key={`right-${rightPlatform}-${rightConnId}-${rightInitialPath || ''}`}
                 platform={rightPlatform}
                 side="destination"
                 selectedFiles={rightSelected}
                 onSelectionChange={setRightSelected}
                 onPathChange={setRightPath}
                 initialPath={rightInitialPath}
+                connectionId={isBackendHost(rightPlatform) ? rightConnId : null}
               />
             ) : (
               <div className="flex h-full min-h-[12rem] items-stretch rounded-lg border border-gray-200 bg-white">
@@ -653,6 +840,104 @@ function TransferPage({ setActivePage }: TransferPageProps) {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Add-connection modal */}
+      {showAddConn && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-gray-900/50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAddConn(false); }}
+        >
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-gray-900">Add HPC / remote connection</h3>
+              <button onClick={() => setShowAddConn(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid gap-3.5 px-5 py-4">
+              <div className="grid gap-1.5">
+                <label className="text-xs font-medium text-gray-700">Display name</label>
+                <input
+                  value={newConn.name}
+                  onChange={(e) => setNewConn({ ...newConn, name: e.target.value })}
+                  placeholder="e.g. BlueHive3"
+                  className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-navy-600 focus:outline-none focus:ring-1 focus:ring-navy-600/40"
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2 grid gap-1.5">
+                  <label className="text-xs font-medium text-gray-700">Host</label>
+                  <input
+                    value={newConn.host}
+                    onChange={(e) => setNewConn({ ...newConn, host: e.target.value })}
+                    placeholder="login.hpc.edu"
+                    className="rounded-md border border-gray-200 bg-white px-3 py-2 font-mono text-sm focus:border-navy-600 focus:outline-none focus:ring-1 focus:ring-navy-600/40"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <label className="text-xs font-medium text-gray-700">Port</label>
+                  <input
+                    value={newConn.port}
+                    onChange={(e) => setNewConn({ ...newConn, port: e.target.value })}
+                    className="rounded-md border border-gray-200 bg-white px-3 py-2 font-mono text-sm focus:border-navy-600 focus:outline-none focus:ring-1 focus:ring-navy-600/40"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <label className="text-xs font-medium text-gray-700">Username</label>
+                  <input
+                    value={newConn.username}
+                    onChange={(e) => setNewConn({ ...newConn, username: e.target.value })}
+                    placeholder="netid"
+                    className="rounded-md border border-gray-200 bg-white px-3 py-2 font-mono text-sm focus:border-navy-600 focus:outline-none focus:ring-1 focus:ring-navy-600/40"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <label className="text-xs font-medium text-gray-700">Password (if no key)</label>
+                  <input
+                    type="password"
+                    value={newConn.password}
+                    onChange={(e) => setNewConn({ ...newConn, password: e.target.value })}
+                    placeholder="optional"
+                    className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-navy-600 focus:outline-none focus:ring-1 focus:ring-navy-600/40"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-1.5">
+                <label className="text-xs font-medium text-gray-700">Default working directory</label>
+                <input
+                  value={newConn.work_dir}
+                  onChange={(e) => setNewConn({ ...newConn, work_dir: e.target.value })}
+                  placeholder="~"
+                  className="rounded-md border border-gray-200 bg-white px-3 py-2 font-mono text-sm focus:border-navy-600 focus:outline-none focus:ring-1 focus:ring-navy-600/40"
+                />
+              </div>
+              <p className="text-xs text-gray-400">
+                Saved connections stay live alongside your others — no disconnect needed to switch clusters.
+              </p>
+              {addConnError && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{addConnError}</div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3.5">
+              <button
+                onClick={() => setShowAddConn(false)}
+                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitAddConnection}
+                disabled={addConnBusy}
+                className="rounded-md bg-navy-600 px-4 py-2 text-sm font-medium text-white hover:bg-navy-800 disabled:opacity-50"
+              >
+                {addConnBusy ? 'Connecting…' : 'Save & connect'}
+              </button>
+            </div>
           </div>
         </div>
       )}
