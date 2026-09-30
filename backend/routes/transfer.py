@@ -45,6 +45,10 @@ class MoveRequest(BaseModel):
     source_file_ids: Optional[List[str]] = None  # platform file IDs
     dest_type: str         # "local", "remote", "hpc", "pennsieve", "xnat"
     dest_path: str         # path on destination (or dataset_id[?path=/subdir] for platforms)
+    # Named SSH connections (from /api/connections). Let a backend->backend move
+    # span two different hosts. Omit to use the single active connection.
+    source_conn: Optional[str] = None
+    dest_conn: Optional[str] = None
 
 
 def _parse_pennsieve_dest_path(dest_path: str) -> tuple[str, str]:
@@ -131,8 +135,16 @@ def start_move(request: MoveRequest):
         raise HTTPException(400, f"Invalid source_type: {request.source_type}")
     if request.dest_type not in ALL_PLATFORMS:
         raise HTTPException(400, f"Invalid dest_type: {request.dest_type}")
+    # Same type is allowed only when it names two different connections
+    # (e.g. hpc -> hpc across two clusters). Otherwise it's a no-op.
     if request.source_type == request.dest_type:
-        raise HTTPException(400, "Source and destination cannot be the same")
+        same_conn = (request.source_conn or "active") == (request.dest_conn or "active")
+        if request.source_type not in BACKEND_PLATFORMS or same_conn:
+            raise HTTPException(
+                400,
+                "Source and destination are the same. To copy between two hosts, "
+                "pick a different connection for each side.",
+            )
     if request.dest_type == "pennsieve":
         dataset_id, _remote_path = _parse_pennsieve_dest_path(request.dest_path)
         if not dataset_id.startswith("N:dataset:"):
@@ -166,6 +178,8 @@ def start_move(request: MoveRequest):
             source_file_ids=request.source_file_ids or [],
             dest_type=request.dest_type,
             dest_path=request.dest_path,
+            source_conn=request.source_conn,
+            dest_conn=request.dest_conn,
         )
         return {"transfer_id": transfer_id, "status": "pending"}
     except Exception as e:

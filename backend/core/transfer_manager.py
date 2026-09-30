@@ -213,8 +213,16 @@ class TransferManager:
         source_file_ids: List[str],
         dest_type: str,
         dest_path: str,
+        source_conn: Optional[str] = None,
+        dest_conn: Optional[str] = None,
     ) -> str:
-        """Generic move: any source -> any destination."""
+        """Generic move: any source -> any destination.
+
+        ``source_conn`` / ``dest_conn`` name specific SSH connections from the
+        connection registry, so a backend->backend move can span two *different*
+        hosts (e.g. cluster A -> cluster B). When omitted, the single active
+        connection is used, preserving the original same-host behavior.
+        """
         transfer_id = str(uuid.uuid4())
         record = TransferRecord(
             transfer_id=transfer_id,
@@ -228,6 +236,8 @@ class TransferManager:
         )
         record._source_type = source_type  # type: ignore[attr-defined]
         record._dest_type = dest_type  # type: ignore[attr-defined]
+        record._source_conn = source_conn  # type: ignore[attr-defined]
+        record._dest_conn = dest_conn  # type: ignore[attr-defined]
 
         with self._lock:
             self._transfers[transfer_id] = record
@@ -991,15 +1001,30 @@ class TransferManager:
     def _move_backend_to_backend(
         self, record: TransferRecord, src_backend: str, dst_backend: str
     ) -> None:
-        """Backend -> Backend: local copy, scp, or remote cp (same host)."""
-        from backend.core.ssh_manager import get_ssh_manager
+        """Backend -> Backend: local copy, scp, same-host cp, or two-host relay.
 
-        ssh = get_ssh_manager()
+        Resolves the source and destination to specific SSH connections (from the
+        connection registry). When the two remote endpoints are different hosts,
+        every file is relayed src -> orchestrator temp -> dst; when they resolve
+        to the same connection, the fast same-host ``cp`` path is used.
+        """
+        from backend.core.connection_registry import get_registry
+
+        registry = get_registry()
+        src_conn = getattr(record, "_source_conn", None)
+        dst_conn = getattr(record, "_dest_conn", None)
+
+        src_ssh = None if src_backend == "local" else registry.manager_for(src_conn)
+        dst_ssh = None if dst_backend == "local" else registry.manager_for(dst_conn)
+        if src_backend != "local" and src_ssh is None:
+            raise RuntimeError("Source connection is not available (reconnect and retry).")
+        if dst_backend != "local" and dst_ssh is None:
+            raise RuntimeError("Destination connection is not available (reconnect and retry).")
 
         if src_backend == "local":
             file_items = self._collect_local_file_items(record.source_path)
         else:
-            file_items = self._collect_remote_file_items(ssh, record.source_path)
+            file_items = self._collect_remote_file_items(src_ssh, record.source_path)
 
         record.total_files = len(file_items)
         total = record.total_files or 1
@@ -1009,6 +1034,9 @@ class TransferManager:
             )
 
         both_remote = src_backend != "local" and dst_backend != "local"
+        # Same underlying connection -> same host, cp is safe. Different managers
+        # (two clusters) must relay through the orchestrator.
+        same_host = both_remote and (src_ssh is dst_ssh)
 
         with tempfile.TemporaryDirectory(prefix="neuroinsight_b2b_") as tmpdir:
             for i, (src_path, rel) in enumerate(file_items):
@@ -1019,22 +1047,21 @@ class TransferManager:
                     if src_backend == "local" and dst_backend == "local":
                         copy_local_file(src_path, dest_path)
                     elif src_backend == "local" and dst_backend != "local":
-                        scp_put_file(ssh, src_path, dest_path)
+                        scp_put_file(dst_ssh, src_path, dest_path)
                     elif src_backend != "local" and dst_backend == "local":
-                        scp_get_file(ssh, src_path, dest_path)
-                    elif both_remote:
+                        scp_get_file(src_ssh, src_path, dest_path)
+                    elif both_remote and same_host:
                         try:
-                            remote_copy_file(ssh, src_path, dest_path)
+                            remote_copy_file(src_ssh, src_path, dest_path)
                         except Exception:
-                            local_tmp = os.path.join(
-                                tmpdir, f"{i}_{os.path.basename(rel)}"
-                            )
-                            scp_get_file(ssh, src_path, local_tmp)
-                            scp_put_file(ssh, local_tmp, dest_path)
+                            local_tmp = os.path.join(tmpdir, f"{i}_{os.path.basename(rel)}")
+                            scp_get_file(src_ssh, src_path, local_tmp)
+                            scp_put_file(src_ssh, local_tmp, dest_path)
                     else:
+                        # Two different remote hosts: relay via orchestrator temp.
                         local_tmp = os.path.join(tmpdir, f"{i}_{os.path.basename(rel)}")
-                        scp_get_file(ssh, src_path, local_tmp)
-                        scp_put_file(ssh, local_tmp, dest_path)
+                        scp_get_file(src_ssh, src_path, local_tmp)
+                        scp_put_file(dst_ssh, local_tmp, dest_path)
                 except Exception as e:
                     logger.warning("B2B transfer %s: %s", src_path, e)
 

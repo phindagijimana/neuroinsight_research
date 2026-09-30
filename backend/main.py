@@ -35,6 +35,7 @@ from backend.routes import audit
 from backend.routes import platform as platform_routes
 from backend.routes import transfer as transfer_routes
 from backend.routes import licenses as licenses_routes
+from backend.routes import connections as connections_routes
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -214,6 +215,7 @@ app.include_router(audit.router)
 app.include_router(platform_routes.router)
 app.include_router(transfer_routes.router)
 app.include_router(licenses_routes.router)
+app.include_router(connections_routes.router)
 
 
 @app.exception_handler(Exception)
@@ -777,7 +779,7 @@ def _resolve_job_resources(
     return ResourceSpec(
         memory_gb=int(memory_gb),
         cpus=int(cpus),
-        time_hours=float(time_hours),
+        time_hours=max(1, int(round(float(time_hours)))),
         gpu=gpu,
     )
 

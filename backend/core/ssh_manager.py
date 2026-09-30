@@ -607,6 +607,22 @@ _ssh_manager: Optional[SSHManager] = None
 _ssh_lock = threading.Lock()
 
 
+def new_ssh_manager():
+    """Create a NEW, independent SSH manager instance (not the singleton).
+
+    Used by the connection registry so several HPC/remote hosts can stay
+    connected at once (e.g. to transfer directly between two clusters). Honors
+    the same host-broker selection as :func:`get_ssh_manager`.
+    """
+    if os.getenv("NIR_SSH_BROKER_URL"):
+        try:
+            from backend.core.host_ssh_broker_client import BrokerSSHManager
+            return BrokerSSHManager()
+        except Exception as e:  # noqa: BLE001 - fall back to paramiko
+            logger.warning("Host SSH broker unavailable (%s); using in-process SSH", e)
+    return SSHManager()
+
+
 def get_ssh_manager():
     """Get the global SSH manager (singleton).
 
@@ -614,18 +630,15 @@ def get_ssh_manager():
     SSH broker), return a broker-backed manager so HPC connections use the
     host's working auth (agent key, ~/.ssh/config, Kerberos). Otherwise fall
     back to the in-process paramiko manager — nothing that works today changes.
+
+    This is the single "active" connection used by Jobs, monitoring, and legacy
+    transfer paths. Additional simultaneous connections live in the connection
+    registry (see ``backend/core/connection_registry.py``).
     """
     global _ssh_manager
     with _ssh_lock:
         if _ssh_manager is None:
+            _ssh_manager = new_ssh_manager()
             if os.getenv("NIR_SSH_BROKER_URL"):
-                try:
-                    from backend.core.host_ssh_broker_client import BrokerSSHManager
-                    _ssh_manager = BrokerSSHManager()
-                    logger.info("SSH via host broker at %s", os.getenv("NIR_SSH_BROKER_URL"))
-                except Exception as e:  # noqa: BLE001 - fall back to paramiko
-                    logger.warning("Host SSH broker unavailable (%s); using in-process SSH", e)
-                    _ssh_manager = SSHManager()
-            else:
-                _ssh_manager = SSHManager()
+                logger.info("SSH via host broker at %s", os.getenv("NIR_SSH_BROKER_URL"))
         return _ssh_manager
