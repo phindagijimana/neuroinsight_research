@@ -877,6 +877,15 @@ class PennsieveConnector(BasePlatformConnector):
     def _set_agent_target(self, target: str) -> None:
         self._agent_target = target
         os.environ["PENNSIEVE_AGENT_TARGET"] = target
+        # The Pennsieve CLI/agent read PENNSIEVE_AGENT_PORT (not _TARGET), and the
+        # env var overrides ~/.pennsieve/config.ini's [agent] port. Keep it in sync
+        # so every `pennsieve` subprocess (client and daemon) agrees on the port,
+        # even when a stale config points elsewhere (e.g. a port MinIO occupies).
+        try:
+            _host, port = self._parse_agent_target(target)
+            os.environ["PENNSIEVE_AGENT_PORT"] = str(port)
+        except Exception:
+            pass
 
     def _ensure_agent_profile(self, target: str) -> None:
         """Create ~/.pennsieve/config.ini from API creds if it does not exist.

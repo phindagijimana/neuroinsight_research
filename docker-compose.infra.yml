@@ -55,7 +55,9 @@ services:
 
   # -- MinIO (S3-compatible object storage) --
   minio:
-    image: minio/minio:RELEASE.2024-06-13T22-53-53Z
+    # MinIO archived its OSS project and removed docker.io/minio/minio (2025).
+    # Sourced from Chainguard instead (multi-arch, ships minio + mc + sh).
+    image: cgr.dev/chainguard/minio:latest
     container_name: neuroinsight-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
