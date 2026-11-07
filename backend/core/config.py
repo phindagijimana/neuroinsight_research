@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     # When false, EEG and multimodal (EEG+imaging) plugins/workflows are excluded
     # from the registry and the EEG UI is hidden — the platform focuses on imaging.
     eeg_enabled: bool = Field(default=False, description="Enable EEG and multimodal (eeg_imaging) plugins, workflows, and UI")
+    # The assistant drafts jobs and runs read-only checks. It never submits;
+    # only a human Approve does. Every page works with it turned off.
+    assistant_enabled: bool = Field(default=True, description="Show the job-drafting assistant panel")
+    assistant_gates_bin: str = Field(default="", description="Directory holding the scicap/sciguard CLIs (empty: search PATH and ~/.venvs/nir-gates/bin)")
 
     # -- API Server --
     api_host: str = Field(default="0.0.0.0", description="API server bind address")

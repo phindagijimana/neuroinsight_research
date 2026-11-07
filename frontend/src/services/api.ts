@@ -85,6 +85,55 @@ api.interceptors.response.use(
   }
 );
 
+export interface AssistantDraft {
+  target_type: 'plugin' | 'workflow';
+  target_id: string;
+  input_files: string[];
+  parameters: Record<string, unknown>;
+  instance: Record<string, string>;
+  filled_by: Record<string, string>;
+  rationale: string[];
+  alternatives: string[];
+  request: string;
+}
+
+export interface AssistantCheck {
+  gate: 'inputs' | 'scicap' | 'sciguard' | string;
+  status: string;
+  blocking: boolean;
+  reason: string;
+  missing?: string[];
+  capability?: string;
+  interpretation_limits?: string[];
+}
+
+export interface AssistantResult {
+  draft: AssistantDraft;
+  checks: AssistantCheck[];
+  blocked: boolean;
+}
+
+export interface AssistantStatus {
+  enabled: boolean;
+  mode: string;
+  model_api: string | null;
+  gates: { scicap: string | null; sciguard: string | null };
+  can_submit: boolean;
+  note: string;
+}
+
+export interface AssistantExplanation {
+  name: string;
+  what_it_does: string;
+  inputs_required: { key: string; type: string; description: string }[];
+  input_notes: string[];
+  parameters: { name: string; type: string; default: unknown; description: string }[];
+  steps: { id: string; uses: string; label: string }[];
+  resources: Record<string, unknown>;
+  needs_freesurfer_license: boolean;
+  glossary: Record<string, string>;
+}
+
 export interface LicenseInfo {
   id: string;
   name: string;
@@ -141,9 +190,42 @@ export const apiService = {
     app_name: string;
     app_version: string;
     environment: string;
-    features: { eeg_enabled: boolean };
+    features: { eeg_enabled: boolean; assistant_enabled?: boolean };
   }> {
     const response = await api.get('/api/config');
+    return response.data;
+  },
+
+  // ================================================================================
+  // JOB ASSISTANT (drafts and checks only; Approve is the human submit)
+  // ================================================================================
+
+  async assistantStatus(): Promise<AssistantStatus> {
+    const response = await api.get('/api/assistant/status');
+    return response.data;
+  },
+
+  async assistantDraft(request: string, inputPath: string, instanceOverrides?: Record<string, string>): Promise<AssistantResult> {
+    const response = await api.post('/api/assistant/draft', {
+      request,
+      input_path: inputPath,
+      instance_overrides: instanceOverrides || null,
+    });
+    return response.data;
+  },
+
+  async assistantRecheck(draft: AssistantDraft): Promise<AssistantResult> {
+    const response = await api.post('/api/assistant/recheck', { draft });
+    return response.data;
+  },
+
+  async assistantApprove(draft: AssistantDraft, approvedBy = 'local-user'): Promise<{ job_id: string; status: string; proposer: string; approved_by: string; checks: AssistantCheck[] }> {
+    const response = await api.post('/api/assistant/approve', { draft, approved_by: approvedBy }, { timeout: 120000 });
+    return response.data;
+  },
+
+  async assistantExplain(targetType: string, targetId: string): Promise<AssistantExplanation> {
+    const response = await api.get(`/api/assistant/explain/${targetType}/${targetId}`);
     return response.data;
   },
 

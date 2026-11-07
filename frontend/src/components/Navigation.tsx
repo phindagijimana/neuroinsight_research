@@ -3,12 +3,14 @@
  */
 
 import React, { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, Sparkles, X } from 'lucide-react';
 import Brain from './icons/Brain';
 
 interface NavigationProps {
   activePage: string;
   setActivePage: (page: string) => void;
+  /** Present only when the job assistant is enabled. */
+  assistant?: { open: boolean; onToggle: () => void };
 }
 
 const NAV_ITEMS: { id: string; label: string; desktopOnly?: boolean }[] = [
@@ -21,7 +23,7 @@ const NAV_ITEMS: { id: string; label: string; desktopOnly?: boolean }[] = [
   { id: 'settings', label: 'Settings', desktopOnly: true },
 ];
 
-const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) => {
+const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage, assistant }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const isDesktop = typeof window !== 'undefined' && !!(window as { nir?: unknown }).nir;
 
@@ -69,6 +71,23 @@ const Navigation: React.FC<NavigationProps> = ({ activePage, setActivePage }) =>
               </button>
             ))}
           </nav>
+
+          {assistant && (
+            <button
+              type="button"
+              onClick={assistant.onToggle}
+              aria-pressed={assistant.open}
+              data-testid="assistant-toggle"
+              className={`ml-auto flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm md:ml-0 ${
+                assistant.open
+                  ? 'border-navy-600 bg-navy-600 text-white'
+                  : 'border-navy-200 bg-white text-navy-700 hover:bg-navy-50'
+              }`}
+            >
+              <Sparkles className="h-4 w-4" />
+              Assistant
+            </button>
+          )}
 
           <button
             type="button"

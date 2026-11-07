@@ -35,6 +35,7 @@ from backend.routes import audit
 from backend.routes import platform as platform_routes
 from backend.routes import transfer as transfer_routes
 from backend.routes import licenses as licenses_routes
+from backend.routes import assistant as assistant_routes
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -214,6 +215,7 @@ app.include_router(audit.router)
 app.include_router(platform_routes.router)
 app.include_router(transfer_routes.router)
 app.include_router(licenses_routes.router)
+app.include_router(assistant_routes.router)
 
 
 @app.exception_handler(Exception)
@@ -309,6 +311,7 @@ def get_app_config():
         "environment": settings.environment,
         "features": {
             "eeg_enabled": settings.eeg_enabled,
+            "assistant_enabled": settings.assistant_enabled,
         },
     }
 

@@ -9,6 +9,30 @@ import { useEffect, useState } from 'react';
 import { apiService, type LicenseInfo } from '../services/api';
 import WorkspacePageHeader from '../components/WorkspacePageHeader';
 import { LoadingState } from '../components/LoadingState';
+import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
+import { assistantHidden, setAssistantHidden } from '../lib/assistant';
+
+const AssistantSetting: React.FC = () => {
+  const [hidden, setHidden] = useState(assistantHidden);
+  const toggle = (show: boolean) => {
+    setAssistantHidden(!show);
+    setHidden(!show);
+  };
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 mb-8 shadow-sm">
+      <label className="flex items-start gap-3">
+        <input type="checkbox" checked={!hidden} onChange={(e) => toggle(e.target.checked)} className="mt-1" />
+        <span>
+          <span className="font-bold text-gray-900">Show the job assistant</span>
+          <span className="block text-sm text-gray-500 mt-1 leading-relaxed">
+            A side panel that drafts jobs, explains pipelines, and runs read-only checks. It never submits; you approve
+            every job. Everything works the same with it turned off.
+          </span>
+        </span>
+      </label>
+    </div>
+  );
+};
 
 const LicenseCard: React.FC<{ lic: LicenseInfo; onChange: () => void }> = ({ lic, onChange }) => {
   const [text, setText] = useState('');
@@ -113,6 +137,7 @@ const LicenseCard: React.FC<{ lic: LicenseInfo; onChange: () => void }> = ({ lic
 const SettingsPage: React.FC = () => {
   const [licenses, setLicenses] = useState<LicenseInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const { assistantEnabled } = useFeatureFlags();
 
   const load = () => {
     apiService.getLicenses().then(setLicenses).catch(() => {}).finally(() => setLoading(false));
@@ -125,6 +150,13 @@ const SettingsPage: React.FC = () => {
         title="Settings"
         subtitle="Manage tool licenses for the web workspace. In the desktop app, use Control Center for engine and licenses."
       />
+
+      {assistantEnabled && (
+        <>
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Assistant</h2>
+          <AssistantSetting />
+        </>
+      )}
 
       <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Licenses</h2>
       <p className="text-sm text-gray-500 mb-4 leading-relaxed">

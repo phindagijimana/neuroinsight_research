@@ -1,0 +1,38 @@
+# SciGuard edge annotation for the diffusion_full workflow (QSIPrep -> QSIRecon).
+# QSIPrep writes preprocessed DWI aligned to the subject T1w, plus the
+# T1w->DWI registration. QSIRecon maps anatomical labels onto that DWI.
+# "{subject}" is replaced with the draft's subject before validation.
+schema_version: "0.1"
+workflow_id: neuroinsight-diffusion_full
+operations:
+  - id: qsirecon_labels
+    contract: map_labels_to_diffusion
+    interpolation: nearest_neighbor
+edges:
+  - id: labels→qsirecon_labels
+    from: anatomical_labels
+    to: qsirecon_labels.labels
+    artifact:
+      kind: parcellation
+      modality: T1w
+      space: subject_T1w
+      value_type: discrete_labels
+      subject: "{subject}"
+  - id: dwi→qsirecon_labels
+    from: qsiprep_dwi
+    to: qsirecon_labels.reference
+    artifact:
+      kind: diffusion_reference
+      modality: dwi
+      space: subject_DWI
+      subject: "{subject}"
+  - id: xfm→qsirecon_labels
+    from: qsiprep_t1w_to_dwi
+    to: qsirecon_labels.transform
+    artifact:
+      kind: spatial_transform
+      from_space: subject_T1w
+      to_space: subject_DWI
+      same_subject: true
+      verified: false
+      subject: "{subject}"

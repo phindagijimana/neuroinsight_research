@@ -195,6 +195,14 @@
 import { useState, useEffect, lazy, Suspense, type DragEvent } from 'react';
 import Navigation from './components/Navigation';
 import LoadingState from './components/LoadingState';
+import AssistantPanel from './components/AssistantPanel';
+import { useFeatureFlags } from './contexts/FeatureFlagsContext';
+import {
+  ASSISTANT_PREF_EVENT,
+  assistantHidden,
+  assistantOpenOnStart,
+  rememberAssistantOpen,
+} from './lib/assistant';
 import { isDesktopApp } from './lib/desktopBridge';
 import {
   clearViewerQueryParam,
@@ -232,6 +240,25 @@ function App() {
   /** A locally-opened imaging volume (drag-and-drop / file picker), viewed without upload. */
   const [localVolume, setLocalVolume] = useState<{ url: string; name: string } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const { assistantEnabled } = useFeatureFlags();
+  const [assistantOpen, setAssistantOpen] = useState(assistantOpenOnStart);
+  const [assistantOff, setAssistantOff] = useState(assistantHidden);
+  const showAssistantToggle = assistantEnabled && !assistantOff;
+  const assistantVisible = showAssistantToggle && assistantOpen;
+
+  useEffect(() => {
+    const sync = () => {
+      setAssistantOff(assistantHidden());
+      setAssistantOpen(assistantOpenOnStart());
+    };
+    window.addEventListener(ASSISTANT_PREF_EVENT, sync);
+    return () => window.removeEventListener(ASSISTANT_PREF_EVENT, sync);
+  }, []);
+
+  const toggleAssistant = (open: boolean) => {
+    setAssistantOpen(open);
+    rememberAssistantOpen(open);
+  };
 
   /** Updates URL `?viewer=` when entering/leaving the Viewer page (deep links). */
   const navigateTo = (page: string, opts?: NavigateOptions) => {
@@ -310,8 +337,20 @@ function App() {
         </div>
       )}
 
-      <Navigation activePage={activePage} setActivePage={navigateTo} />
+      <Navigation
+        activePage={activePage}
+        setActivePage={navigateTo}
+        assistant={showAssistantToggle ? { open: assistantOpen, onToggle: () => toggleAssistant(!assistantOpen) } : undefined}
+      />
 
+      {assistantVisible && (
+        <AssistantPanel
+          onClose={() => toggleAssistant(false)}
+          onJobSubmitted={(jobId) => setSelectedJobId(jobId)}
+        />
+      )}
+
+      <div className={assistantVisible ? 'lg:pr-[24rem]' : undefined}>
       <Suspense fallback={<LoadingState message="Loading workspace…" className="min-h-[50vh]" />}>
         {activePage === 'home' && (
           <HomePage
@@ -348,6 +387,7 @@ function App() {
 
         {activePage === 'settings' && <SettingsPage />}
       </Suspense>
+      </div>
     </div>
   );
 }

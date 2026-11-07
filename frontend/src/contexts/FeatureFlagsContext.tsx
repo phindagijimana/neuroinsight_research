@@ -2,20 +2,23 @@
  * FeatureFlagsContext
  *
  * Fetches public feature flags from /api/config once on load and exposes them
- * to the app. EEG/multimodal UI is gated on `eegEnabled`.
+ * to the app. EEG/multimodal UI is gated on `eegEnabled`; the job assistant
+ * panel on `assistantEnabled`.
  *
- * Default is `eegEnabled = false` (imaging-only) so the EEG UI stays hidden
- * while config is loading or if the backend is unreachable.
+ * Defaults are off so optional UI stays hidden while config is loading or if
+ * the backend is unreachable.
  */
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { apiService } from '../services/api';
 
 interface FeatureFlags {
   eegEnabled: boolean;
+  assistantEnabled: boolean;
 }
 
 const DEFAULT_FLAGS: FeatureFlags = {
   eegEnabled: false,
+  assistantEnabled: false,
 };
 
 const FeatureFlagsContext = createContext<FeatureFlags>(DEFAULT_FLAGS);
@@ -29,11 +32,13 @@ export const FeatureFlagsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       .getConfig()
       .then((cfg) => {
         if (!cancelled) {
-          setFlags({ eegEnabled: !!cfg?.features?.eeg_enabled });
+          setFlags({
+            eegEnabled: !!cfg?.features?.eeg_enabled,
+            assistantEnabled: !!cfg?.features?.assistant_enabled,
+          });
         }
       })
       .catch(() => {
-        // Keep imaging-only defaults when config is unavailable.
         if (!cancelled) setFlags(DEFAULT_FLAGS);
       });
     return () => {
