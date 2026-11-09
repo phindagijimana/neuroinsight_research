@@ -9,7 +9,7 @@ import json
 import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # (target_type, target_id, keywords). First match wins, so specific intents
 # come before generic ones.
@@ -45,6 +45,10 @@ class Draft:
     rationale: List[str] = field(default_factory=list)
     alternatives: List[str] = field(default_factory=list)
     request: str = ""
+    drafted_by: str = "rules"
+    fallback_reason: str = ""
+    # What each drafter proposed for this request, kept for later comparison.
+    proposals: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -55,11 +59,16 @@ class Draft:
         return cls(**{k: v for k, v in data.items() if k in known})
 
 
+_NO_SURFACES = ("no surface", "without surface", "skip surface")
+
+
 def _pick_target(text: str, available: Dict[str, set]) -> Tuple[str, str, Optional[str], List[str]]:
     lowered = text.lower()
     matches: List[Tuple[str, str, str]] = []
     for ttype, tid, words in _INTENTS:
         if tid not in available.get(ttype, set()):
+            continue
+        if tid == "freesurfer_recon" and any(n in lowered for n in _NO_SURFACES):
             continue
         hit = next((w for w in words if w in lowered), None)
         if hit:
@@ -156,8 +165,15 @@ def draft_job(
     input_path: str,
     available: Dict[str, set],
     instance_overrides: Optional[Dict[str, Any]] = None,
+    proposer: Optional[Callable[[str, List[Dict[str, Any]]], Dict[str, Any]]] = None,
+    catalog: Optional[List[Dict[str, Any]]] = None,
 ) -> Draft:
-    """Draft a job form. ``available`` maps "plugin"/"workflow" to registry ids."""
+    """Draft a job form. ``available`` maps "plugin"/"workflow" to registry ids.
+
+    With a ``proposer`` (the optional local model) and its ``catalog``, the
+    model's validated pick replaces the keyword pick; on any model failure
+    the keyword pick is used and ``fallback_reason`` says why.
+    """
     ttype, tid, hit, others = _pick_target(request or "", available)
     rationale: List[str] = []
     if hit:
@@ -167,6 +183,26 @@ def draft_job(
 
     params, param_notes = _parameters_from_text(tid, request or "")
     rationale.extend(param_notes)
+    proposals: Dict[str, Any] = {"rules": {"target_id": tid, "parameters": dict(params)}}
+    drafted_by, fallback_reason, source = "rules", "", "request keywords"
+
+    if proposer is not None and (request or "").strip():
+        try:
+            suggestion = proposer(request, catalog or [])
+        except Exception as exc:  # any model failure falls back to rules
+            fallback_reason = str(exc) or exc.__class__.__name__
+            rationale.append(f"Local model not used ({fallback_reason}); used keyword rules.")
+        else:
+            proposals["model"] = {"target_id": suggestion["target_id"], "parameters": dict(suggestion["parameters"])}
+            ttype, tid = suggestion["target_type"], suggestion["target_id"]
+            params = dict(suggestion["parameters"])
+            others = [o for o in others if o != tid]
+            drafted_by, source, hit = "model", "local model", hit or "model"
+            rationale = [f"Local model picked {tid}" + (f": {suggestion['reason']}" if suggestion["reason"] else ".")]
+            if suggestion.get("dropped_parameters"):
+                rationale.append("Ignored settings the pipeline does not have: " + ", ".join(suggestion["dropped_parameters"]))
+            if proposals["rules"]["target_id"] != tid:
+                rationale.append(f"Keyword rules would have picked {proposals['rules']['target_id']}.")
 
     instance, filled, notes = infer_instance(input_path)
     if tid in _PIPELINE_OUTPUT_LABELS:
@@ -177,9 +213,9 @@ def draft_job(
         instance[key] = value
         filled.pop(f"instance.{key}", None)
 
-    filled["target_id"] = "request keywords" if hit else "default"
+    filled["target_id"] = source if hit else "default"
     for key in params:
-        filled[f"parameters.{key}"] = "request keywords"
+        filled[f"parameters.{key}"] = source
 
     if ttype == "workflow" and "subject" in instance:
         params.setdefault("subject_id", instance["subject"].removeprefix("sub-"))
@@ -195,4 +231,7 @@ def draft_job(
         rationale=rationale,
         alternatives=others,
         request=request or "",
+        drafted_by=drafted_by,
+        fallback_reason=fallback_reason,
+        proposals=proposals,
     )

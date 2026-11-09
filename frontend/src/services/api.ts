@@ -95,6 +95,9 @@ export interface AssistantDraft {
   rationale: string[];
   alternatives: string[];
   request: string;
+  drafted_by?: 'rules' | 'model';
+  fallback_reason?: string;
+  proposals?: Record<string, { target_id: string; parameters: Record<string, unknown> }>;
 }
 
 export interface AssistantCheck {
@@ -115,7 +118,8 @@ export interface AssistantResult {
 
 export interface AssistantStatus {
   enabled: boolean;
-  mode: string;
+  mode: 'rules' | 'local_model' | string;
+  model?: { backend: string | null; name: string | null; local: boolean; reachable: boolean | null };
   model_api: string | null;
   gates: { scicap: string | null; sciguard: string | null };
   can_submit: boolean;
@@ -219,8 +223,16 @@ export const apiService = {
     return response.data;
   },
 
-  async assistantApprove(draft: AssistantDraft, approvedBy = 'local-user'): Promise<{ job_id: string; status: string; proposer: string; approved_by: string; checks: AssistantCheck[] }> {
-    const response = await api.post('/api/assistant/approve', { draft, approved_by: approvedBy }, { timeout: 120000 });
+  async assistantApprove(
+    draft: AssistantDraft,
+    opts: { originalDraft?: AssistantDraft; saveFeedback?: boolean; approvedBy?: string } = {},
+  ): Promise<{ job_id: string; status: string; proposer: string; approved_by: string; checks: AssistantCheck[] }> {
+    const response = await api.post('/api/assistant/approve', {
+      draft,
+      approved_by: opts.approvedBy || 'local-user',
+      original_draft: opts.originalDraft || null,
+      save_feedback: !!opts.saveFeedback,
+    }, { timeout: 120000 });
     return response.data;
   },
 

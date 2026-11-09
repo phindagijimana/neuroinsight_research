@@ -62,6 +62,14 @@ class Settings(BaseSettings):
     # only a human Approve does. Every page works with it turned off.
     assistant_enabled: bool = Field(default=True, description="Show the job-drafting assistant panel")
     assistant_gates_bin: str = Field(default="", description="Directory holding the scicap/sciguard CLIs (empty: search PATH and ~/.venvs/nir-gates/bin)")
+    # Optional local language model for drafting. Off by default; rules are used
+    # when it is off, unreachable, or returns an invalid draft. It only sees the
+    # request text and the pipeline catalog, never file paths or image bytes.
+    assistant_model_backend: str = Field(default="", description="'' (rules only), 'ollama', or 'openai' (any OpenAI-compatible local server)")
+    assistant_model_url: str = Field(default="http://127.0.0.1:11434", description="Base URL of the local model server")
+    assistant_model_name: str = Field(default="", description="Model name, e.g. qwen2.5:3b-instruct")
+    assistant_model_timeout_s: float = Field(default=60.0, description="Per-request timeout for the model server")
+    assistant_model_allow_remote: bool = Field(default=False, description="Allow a non-loopback model URL (sends request text off this machine)")
 
     # -- API Server --
     api_host: str = Field(default="0.0.0.0", description="API server bind address")

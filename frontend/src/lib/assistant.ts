@@ -44,6 +44,24 @@ export function setAssistantHidden(hidden: boolean, store: KV | null = storage()
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(ASSISTANT_PREF_EVENT));
 }
 
+const FEEDBACK_KEY = 'nir.assistant.saveEdits';
+
+/** Opt-in, off by default: keep a local record of edits made before Approve. */
+export function saveEditsEnabled(store: KV | null = storage()): boolean {
+  return store?.getItem(FEEDBACK_KEY) === '1';
+}
+
+export function setSaveEdits(on: boolean, store: KV | null = storage()): void {
+  if (!store) return;
+  if (on) store.setItem(FEEDBACK_KEY, '1');
+  else store.removeItem(FEEDBACK_KEY);
+}
+
+export function draftedByLabel(draft: AssistantDraft, modelName?: string | null): string {
+  if (draft.drafted_by === 'model') return `Drafted by local model${modelName ? ` (${modelName})` : ''}`;
+  return 'Drafted by keyword rules';
+}
+
 export type CheckTone = 'pass' | 'block' | 'warn' | 'idle';
 
 export function checkTone(check: AssistantCheck): CheckTone {

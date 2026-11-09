@@ -14,7 +14,16 @@ import {
   type AssistantExplanation,
   type AssistantStatus,
 } from '../services/api';
-import { GATE_LABEL, assistantFilled, checkTone, editDraft, isBlocked, type CheckTone } from '../lib/assistant';
+import {
+  GATE_LABEL,
+  assistantFilled,
+  checkTone,
+  draftedByLabel,
+  editDraft,
+  isBlocked,
+  saveEditsEnabled,
+  type CheckTone,
+} from '../lib/assistant';
 
 interface AssistantPanelProps {
   onClose: () => void;
@@ -68,6 +77,7 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({ onClose, onJobSubmitted
   const [request, setRequest] = useState('');
   const [inputPath, setInputPath] = useState('');
   const [draft, setDraft] = useState<AssistantDraft | null>(null);
+  const [originalDraft, setOriginalDraft] = useState<AssistantDraft | null>(null);
   const [checks, setChecks] = useState<AssistantCheck[]>([]);
   const [stale, setStale] = useState(false);
   const [busy, setBusy] = useState<'' | 'draft' | 'check' | 'approve'>('');
@@ -99,7 +109,7 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({ onClose, onJobSubmitted
     setBusy('draft'); setError(''); setSubmitted(null);
     try {
       const res = await apiService.assistantDraft(request, inputPath.trim());
-      setDraft(res.draft); setChecks(res.checks); setStale(false);
+      setDraft(res.draft); setOriginalDraft(res.draft); setChecks(res.checks); setStale(false);
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -124,7 +134,10 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({ onClose, onJobSubmitted
     if (!draft) return;
     setBusy('approve'); setError('');
     try {
-      const res = await apiService.assistantApprove(draft);
+      const res = await apiService.assistantApprove(draft, {
+        originalDraft: originalDraft || undefined,
+        saveFeedback: saveEditsEnabled(),
+      });
       setChecks(res.checks);
       setSubmitted(res.job_id);
       onJobSubmitted(res.job_id);
@@ -189,6 +202,12 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({ onClose, onJobSubmitted
 
         {draft && (
           <div className="space-y-3 rounded-lg border border-gray-200 p-3" data-testid="assistant-draft">
+            <p className="text-[11px] text-gray-500" data-testid="assistant-drafted-by">
+              {draftedByLabel(draft, status?.model?.name)}
+              {draft.fallback_reason && (
+                <span className="block text-amber-700">Local model not used: {draft.fallback_reason}</span>
+              )}
+            </p>
             <div>
               <label className="block text-xs font-semibold text-gray-700">
                 Pipeline <FilledTag source={assistantFilled(draft, 'target_id')} />

@@ -15,8 +15,11 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.assistant import draft_job, explain_target, gate_status, run_checks
+from backend.assistant import feedback
+from backend.assistant.catalog import available_targets, registry_catalog
 from backend.assistant.drafting import Draft
 from backend.assistant.gates import is_blocked
+from backend.assistant.model import make_proposer, model_status
 from backend.core.config import get_settings
 from backend.core.database import get_db
 from backend.core.plugin_registry import get_plugin_workflow_registry
@@ -40,6 +43,10 @@ class ApproveBody(BaseModel):
     draft: Dict[str, Any]
     approved_by: str = "local-user"
     custom_resources: Optional[Dict[str, Any]] = None
+    # The draft as the assistant first proposed it, and the user's opt-in to
+    # keep a local record of what they changed.
+    original_draft: Optional[Dict[str, Any]] = None
+    save_feedback: bool = False
 
 
 def _require_enabled() -> None:
@@ -48,11 +55,7 @@ def _require_enabled() -> None:
 
 
 def _available() -> Dict[str, set]:
-    registry = get_plugin_workflow_registry()
-    return {
-        "plugin": {p.id for p in registry.list_plugins()},
-        "workflow": {w.id for w in registry.list_workflows()},
-    }
+    return available_targets(get_plugin_workflow_registry())
 
 
 def _parse_draft(data: Dict[str, Any]) -> Draft:
@@ -72,9 +75,11 @@ def _response(draft: Draft) -> Dict[str, Any]:
 @router.get("/status")
 def assistant_status() -> Dict[str, Any]:
     settings = get_settings()
+    model = model_status()
     return {
         "enabled": settings.assistant_enabled,
-        "mode": "rules",
+        "mode": "local_model" if model["backend"] and model["name"] else "rules",
+        "model": model,
         "model_api": None,
         "gates": gate_status(),
         "can_submit": False,
@@ -85,7 +90,12 @@ def assistant_status() -> Dict[str, Any]:
 @router.post("/draft")
 def assistant_draft(body: DraftRequest) -> Dict[str, Any]:
     _require_enabled()
-    draft = draft_job(body.request, body.input_path, _available(), body.instance_overrides)
+    proposer = make_proposer()
+    catalog = registry_catalog(get_plugin_workflow_registry()) if proposer else None
+    draft = draft_job(
+        body.request, body.input_path, _available(), body.instance_overrides,
+        proposer=proposer, catalog=catalog,
+    )
     return _response(draft)
 
 
@@ -151,6 +161,8 @@ def assistant_approve(body: ApproveBody, db: Session = Depends(get_db)) -> Dict[
 
     params = dict(draft.parameters)
     params["_proposer"] = "assistant"
+    params["_drafted_by"] = draft.drafted_by
+    params["_drafted_by"] = draft.drafted_by
     params["_approved_by"] = body.approved_by
     params["_assistant_checks"] = summary
 
@@ -180,7 +192,18 @@ def assistant_approve(body: ApproveBody, db: Session = Depends(get_db)) -> Dict[
         job_id=result.get("job_id"),
         target_id=draft.target_id,
         proposer="assistant",
+        drafted_by=draft.drafted_by,
         approved_by=body.approved_by,
         checks=summary,
     )
+
+    if body.save_feedback:
+        try:
+            original = Draft.from_dict(body.original_draft) if body.original_draft else None
+            feedback.append(
+                feedback.build_record(original, draft, result.get("job_id")),
+                feedback.feedback_path(get_settings().data_dir),
+            )
+        except Exception as exc:
+            logger.warning("Could not save assistant feedback: %s", exc)
     return {**result, "proposer": "assistant", "approved_by": body.approved_by, "checks": checks}

@@ -10,13 +10,18 @@ import { apiService, type LicenseInfo } from '../services/api';
 import WorkspacePageHeader from '../components/WorkspacePageHeader';
 import { LoadingState } from '../components/LoadingState';
 import { useFeatureFlags } from '../contexts/FeatureFlagsContext';
-import { assistantHidden, setAssistantHidden } from '../lib/assistant';
+import { assistantHidden, saveEditsEnabled, setAssistantHidden, setSaveEdits } from '../lib/assistant';
 
 const AssistantSetting: React.FC = () => {
   const [hidden, setHidden] = useState(assistantHidden);
+  const [saveEdits, setSaveEditsState] = useState(saveEditsEnabled);
   const toggle = (show: boolean) => {
     setAssistantHidden(!show);
     setHidden(!show);
+  };
+  const toggleSaveEdits = (on: boolean) => {
+    setSaveEdits(on);
+    setSaveEditsState(on);
   };
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 mb-8 shadow-sm">
@@ -27,6 +32,16 @@ const AssistantSetting: React.FC = () => {
           <span className="block text-sm text-gray-500 mt-1 leading-relaxed">
             A side panel that drafts jobs, explains pipelines, and runs read-only checks. It never submits; you approve
             every job. Everything works the same with it turned off.
+          </span>
+        </span>
+      </label>
+      <label className="flex items-start gap-3 mt-4">
+        <input type="checkbox" checked={saveEdits} disabled={hidden} onChange={(e) => toggleSaveEdits(e.target.checked)} className="mt-1" />
+        <span>
+          <span className="font-bold text-gray-900">Save my edits to improve drafting</span>
+          <span className="block text-sm text-gray-500 mt-1 leading-relaxed">
+            When you approve a draft, keep a note of your request and what you changed, in your local data folder only.
+            File paths and subject IDs are left out; avoid typing identifiers into the request. Off by default.
           </span>
         </span>
       </label>

@@ -5,8 +5,11 @@ import {
   checkTone,
   editDraft,
   isBlocked,
+  draftedByLabel,
   rememberAssistantOpen,
+  saveEditsEnabled,
   setAssistantHidden,
+  setSaveEdits,
 } from './assistant';
 
 function memoryStore() {
@@ -48,6 +51,24 @@ describe('assistant panel preference', () => {
     expect(assistantOpenOnStart(store)).toBe(false);
     setAssistantHidden(false, store);
     expect(assistantOpenOnStart(store)).toBe(true);
+  });
+});
+
+describe('saving edits', () => {
+  it('is off until the user opts in', () => {
+    const store = memoryStore();
+    expect(saveEditsEnabled(store)).toBe(false);
+    setSaveEdits(true, store);
+    expect(saveEditsEnabled(store)).toBe(true);
+    setSaveEdits(false, store);
+    expect(saveEditsEnabled(store)).toBe(false);
+  });
+});
+
+describe('drafted-by label', () => {
+  it('names the drafter', () => {
+    expect(draftedByLabel(draft)).toBe('Drafted by keyword rules');
+    expect(draftedByLabel({ ...draft, drafted_by: 'model' }, 'qwen')).toBe('Drafted by local model (qwen)');
   });
 });
 

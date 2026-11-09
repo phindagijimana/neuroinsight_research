@@ -1,0 +1,37 @@
+# Authored smoke set for drafting: written by the developers, not user data.
+# Use it to check the evaluator and to sanity-check a model setup. Real
+# comparisons should use the opt-in feedback log (data/assistant/feedback.jsonl),
+# where final.target_id is what a user actually approved.
+cases:
+  - request: segment this T1
+    final: {target_id: fastsurfer}
+  - request: run fastsurfer on CPU
+    final: {target_id: fastsurfer, parameters: {use_cpu: true}}
+  - request: quick segmentation without surfaces
+    final: {target_id: fastsurfer, parameters: {seg_only: true}}
+  - request: I need the brain parcellated into DKT regions, no GPU on this machine
+    final: {target_id: fastsurfer, parameters: {use_cpu: true}}
+  - request: cortical thickness for this subject
+    final: {target_id: freesurfer_recon}
+  - request: full recon-all please
+    final: {target_id: freesurfer_recon}
+  - request: pial and white surfaces for this subject
+    final: {target_id: freesurfer_recon}
+  - request: hippocampal subfields from the T1
+    final: {target_id: hippo_subfields_t1}
+  - request: preprocess my DWI and build a connectome
+    final: {target_id: diffusion_full}
+  - request: estimate white matter tracts
+    final: {target_id: diffusion_full}
+  - request: resting-state fMRI preprocessing
+    final: {target_id: fmri_full}
+  - request: BOLD task data, clean it up
+    final: {target_id: fmri_full}
+  - request: convert DICOMs to NIfTI
+    final: {target_id: dcm2niix}
+  - request: my scanner gave me a folder of .dcm files
+    final: {target_id: dcm2niix}
+  - request: look for focal cortical dysplasia lesions
+    final: {target_id: cortical_lesion_detection}
+  - request: check for hippocampal sclerosis
+    final: {target_id: wf_hs_detection_v1}
