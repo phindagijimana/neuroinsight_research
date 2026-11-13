@@ -21,7 +21,7 @@ deployed at URMC as **clinical support for Radiology**.
 | Understand the product | [Product overview](PRODUCT.md) |
 | Check OS / HPC / Pennsieve limits | [Compatibility](COMPATIBILITY.md) |
 | Move data (Pennsieve, XNAT, HPC) | [Transfer guide](TRANSFER.md) |
-| Submit pipelines on HPC | [HPC pipeline layouts](HPC_PIPELINE_SUBMISSION_GUIDE.md) + [User guide](USER_GUIDE.md) |
+| Submit pipelines on HPC | [HPC pipeline layouts](HPC_PIPELINE_SUBMISSION_GUIDE.md) · [Full user guide](USER_GUIDE.md) (repo) |
 | URMC / clinical context | [Clinical support](CLINICAL_SUPPORT.md) |
 | Cite methods | [References](REFERENCES.md) |
 | Extend the codebase | [Engineering overview](ENGINEERING.md) |

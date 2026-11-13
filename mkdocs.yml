@@ -62,7 +62,9 @@ exclude_docs: |
   README.md
   RELEASING.md
   SIGNING_AND_TRUST.md
-  RELEASE_NOTES_v0.1.23.md
+  BUILDING_DOCS.md
+  MAINTAINER.md
+  RELEASE_NOTES_v0.1.24.md
 
 nav:
   - Home: index.md
@@ -77,17 +79,14 @@ nav:
       - Product overview: PRODUCT.md
       - Transfer: TRANSFER.md
       - HPC pipeline inputs: HPC_PIPELINE_SUBMISSION_GUIDE.md
-      - User guide (full): USER_GUIDE.md
   - Clinical & methods:
       - URMC clinical support: CLINICAL_SUPPORT.md
       - References & citations: REFERENCES.md
       - Tool licenses: TOOL_LICENSES.md
   - Release notes:
       - v0.1.25: RELEASE_NOTES_v0.1.25.md
-      - v0.1.24: RELEASE_NOTES_v0.1.24.md
   - Developers:
       - Engineering overview: ENGINEERING.md
-      - Building docs: BUILDING_DOCS.md
 
 extra:
   social:

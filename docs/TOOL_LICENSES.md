@@ -1,8 +1,10 @@
 # Tool licenses (FreeSurfer, MELD, and others)
 
 Some neuroimaging **plugins** require a free license file before jobs can run.
-This is separate from a commercial **NeuroInsight app license** (`nir_license.txt`)
-— see [license_future.md](../license_future.md).
+
+Optional **commercial NeuroInsight desktop** license tokens (`nir_license.txt`) are
+described in maintainer docs (`desktop/ops/LICENSING_OPERATIONS.md`) — not required
+for open-source / community builds.
 
 ## Setup
 

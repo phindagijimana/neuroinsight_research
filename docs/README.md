@@ -49,6 +49,8 @@ Build: [BUILDING_DOCS.md](BUILDING_DOCS.md).
 
 | Doc | Purpose |
 |-----|---------|
+| [MAINTAINER.md](MAINTAINER.md) | What is public site vs repo-only vs `local/` |
+| [BUILDING_DOCS.md](BUILDING_DOCS.md) | MkDocs / Read the Docs |
 | [RELEASING.md](RELEASING.md) | Version tags, GHCR image, desktop release |
 | [SIGNING_AND_TRUST.md](SIGNING_AND_TRUST.md) | Code signing, checksums |
 | [../CHANGELOG.md](../CHANGELOG.md) | Version history |

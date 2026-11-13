@@ -7,9 +7,11 @@ Packaged **NeuroInsight** app — Electron shell (`desktop/app/`) plus release o
 | Path | Purpose |
 |---|---|
 | `app/` | Electron main process, control center, packaging config |
-| `ops/` | Install helpers, release metadata, pilot checklists |
-| `architecture/` | Baseline notes (internal) |
-| `PHASE_PLAN.md` | Implementation history (internal) |
+| `ops/` | Packaging scripts, **maintainer-only** runbooks (not on public docs site) |
+| `architecture/` | Phase-0 notes (maintainer-only) |
+
+**Public documentation:** [docs/index.md](../docs/index.md) (MkDocs / Read the Docs).  
+**Doc tiers:** [docs/MAINTAINER.md](../docs/MAINTAINER.md).
 
 ## User & maintainer docs
 

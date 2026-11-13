@@ -1,5 +1,7 @@
 # Phase 0 Architecture Baseline
 
+> Maintainer-only (not on public docs site). See [docs/MAINTAINER.md](../../docs/MAINTAINER.md).
+
 This document locks the baseline architecture for NIR Desktop Phase 0.
 
 Scope target: single-user, single-machine desktop mode, reusing existing NIR code paths without changing current CLI-hosted behavior.

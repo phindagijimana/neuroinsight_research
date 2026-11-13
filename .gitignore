@@ -1,6 +1,10 @@
 # MkDocs output
 /site/
 
+# Private local notes (copy from local.example/)
+/local/
+/clear
+
 # Python
 __pycache__/
 *.py[cod]

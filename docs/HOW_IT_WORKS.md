@@ -135,6 +135,6 @@ detection, HS, multimodal epilepsy). It **does not** replace reads.
 
 ## Next steps
 
-- [10-minute path](USER_GUIDE.md#10-minute-path)  
+- [10-minute path](USER_GUIDE.md#10-minute-path) — same file continues with full HPC/connector sections below  
 - [HPC pipeline input layouts](HPC_PIPELINE_SUBMISSION_GUIDE.md)  
 - [Product scope & support](PRODUCT.md)

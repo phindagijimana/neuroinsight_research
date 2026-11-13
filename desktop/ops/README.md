@@ -1,6 +1,9 @@
 # Desktop Packaging Ops
 
-This directory contains packaging/release utilities for NIR Desktop.
+> **Maintainer-only** — not published on the public NeuroInsight docs site.
+> End users: [docs/INSTALL.md](../../docs/INSTALL.md). Map: [docs/MAINTAINER.md](../../docs/MAINTAINER.md).
+
+Packaging and release utilities for NIR Desktop.
 
 ## Phase 5 Operations Kit
 

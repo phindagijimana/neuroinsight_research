@@ -54,8 +54,8 @@ Release process: [RELEASING.md](RELEASING.md). Latest notes: [RELEASE_NOTES_v0.1
 | **Institutional (URMC-style)** | Site-specific HPC partitions, XNAT URLs, and license files are configured by your team; NeuroInsight does not operate your cluster |
 
 There is **no commercial SLA** in the open-source distribution. Optional desktop
-license tiers are documented in `desktop/ops/LICENSING_OPERATIONS.md` for pilot
-partners.
+optional commercial license tiers are maintained in `desktop/ops/LICENSING_OPERATIONS.md`
+(maintainer-only, not on the public docs site).
 
 ## Supported vs experimental
 
