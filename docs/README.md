@@ -1,16 +1,22 @@
 # NeuroInsight documentation
 
 **Developed by Philbert Ndagijimana** with **URMC researchers and neurologists**.
-NeuroInsight orchestrates neuroimaging pipelines; at URMC it supports **Radiology**
-workflows — see [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md).
+
+**Web site (MkDocs):** run `pip install -r requirements-docs.txt && mkdocs serve`,
+or host on [Read the Docs](https://readthedocs.org) — see [BUILDING_DOCS.md](BUILDING_DOCS.md).
+Landing page: [index.md](index.md) · How it works: [HOW_IT_WORKS.md](HOW_IT_WORKS.md) ·
+Build: [BUILDING_DOCS.md](BUILDING_DOCS.md).
 
 ## Start here
 
 | You are… | Read |
 |----------|------|
+| **Documentation website** | **[index.md](index.md)** · **[HOW_IT_WORKS.md](HOW_IT_WORKS.md)** (`mkdocs serve`) |
+| **What the product is** | **[PRODUCT.md](PRODUCT.md)** |
+| **Supported platforms / limits** | **[COMPATIBILITY.md](COMPATIBILITY.md)** |
 | **Engineer / technical reviewer** | **[ENGINEERING.md](ENGINEERING.md)** |
 | **Installing the desktop app** | [INSTALL.md](INSTALL.md) |
-| **Using HPC, Pennsieve, XNAT** | [USER_GUIDE.md](USER_GUIDE.md) |
+| **Using HPC, Pennsieve, XNAT** | [USER_GUIDE.md](USER_GUIDE.md) — start with **10-minute path** |
 | **Clinical deployment context (URMC)** | [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md) |
 
 ## All guides
@@ -30,6 +36,9 @@ workflows — see [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md).
 
 | Doc | Purpose |
 |-----|---------|
+| [PRODUCT.md](PRODUCT.md) | Scope, support model, supported vs experimental |
+| [COMPATIBILITY.md](COMPATIBILITY.md) | OS, SLURM, Pennsieve/arch matrix |
+| [RELEASE_NOTES_v0.1.25.md](RELEASE_NOTES_v0.1.25.md) | Latest release summary |
 | [INSTALL.md](INSTALL.md) | Download, verify, first launch |
 | [DESKTOP_UPDATES.md](DESKTOP_UPDATES.md) | Auto-update, engine refresh |
 | [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md) | URMC Radiology support workflows |

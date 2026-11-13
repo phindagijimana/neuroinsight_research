@@ -1,0 +1,95 @@
+# NeuroInsight documentation site (MkDocs Material).
+# Local: pip install -r requirements-docs.txt && mkdocs serve
+# Hosted: Read the Docs (.readthedocs.yaml) or mkdocs gh-deploy
+
+site_name: NeuroInsight
+site_description: Neuroimaging orchestration — Transfer, Jobs, HPC, connectors
+site_author: Philbert Ndagijimana
+
+repo_name: neuroinsight_research
+repo_url: https://github.com/phindagijimana/neuroinsight_research
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; Philbert Ndagijimana; MIT License
+
+theme:
+  name: material
+  language: en
+  logo: null
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Dark mode
+    - scheme: slate
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Light mode
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+# Maintainer-only / duplicate index — not published as standalone pages
+exclude_docs: |
+  README.md
+  RELEASING.md
+  SIGNING_AND_TRUST.md
+  RELEASE_NOTES_v0.1.23.md
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Install: INSTALL.md
+      - How it works: HOW_IT_WORKS.md
+      - Ten-minute tour: USER_GUIDE.md
+      - Desktop updates: DESKTOP_UPDATES.md
+      - Compatibility: COMPATIBILITY.md
+      - Troubleshooting: TROUBLESHOOTING.md
+  - Using NeuroInsight:
+      - Product overview: PRODUCT.md
+      - Transfer: TRANSFER.md
+      - HPC pipeline inputs: HPC_PIPELINE_SUBMISSION_GUIDE.md
+      - User guide (full): USER_GUIDE.md
+  - Clinical & methods:
+      - URMC clinical support: CLINICAL_SUPPORT.md
+      - References & citations: REFERENCES.md
+      - Tool licenses: TOOL_LICENSES.md
+  - Release notes:
+      - v0.1.25: RELEASE_NOTES_v0.1.25.md
+      - v0.1.24: RELEASE_NOTES_v0.1.24.md
+  - Developers:
+      - Engineering overview: ENGINEERING.md
+      - Building docs: BUILDING_DOCS.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/phindagijimana/neuroinsight_research

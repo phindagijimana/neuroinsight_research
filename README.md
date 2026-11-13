@@ -12,9 +12,12 @@ detection, hippocampal sclerosis, multimodal epilepsy pipelines). Details:
 
 | Reader | Start here |
 |--------|------------|
-| **Experienced engineer** | **[docs/ENGINEERING.md](docs/ENGINEERING.md)** — architecture, repo map, run, test |
+| **What it is (product)** | **[docs/PRODUCT.md](docs/PRODUCT.md)** |
+| **Supported platforms** | **[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)** |
+| **Experienced engineer** | **[docs/ENGINEERING.md](docs/ENGINEERING.md)** |
 | **Desktop end user** | **[docs/INSTALL.md](docs/INSTALL.md)** |
 | **Full doc index** | **[docs/README.md](docs/README.md)** |
+| **Documentation site** | `mkdocs serve` or [BUILDING_DOCS.md](docs/BUILDING_DOCS.md) (Read the Docs) |
 
 Extensions are **YAML**: one file per tool in `plugins/`, chains in `workflows/`.
 

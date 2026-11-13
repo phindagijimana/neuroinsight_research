@@ -1,0 +1,15 @@
+# https://docs.readthedocs.io/en/stable/config-file/v2.html
+# Connect this repo at https://readthedocs.org — project name e.g. neuroinsight
+version: 2
+
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.11"
+
+mkdocs:
+  configuration: mkdocs.yml
+
+python:
+  install:
+    - requirements: requirements-docs.txt

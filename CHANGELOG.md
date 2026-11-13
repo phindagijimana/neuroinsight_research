@@ -7,6 +7,10 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+### Added
+- **Product docs** — `docs/PRODUCT.md`, `docs/COMPATIBILITY.md`, `docs/RELEASE_NOTES_v0.1.25.md`; USER_GUIDE 10-minute path.
+- **Documentation site** — MkDocs Material (`mkdocs.yml`), [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md), [index.md](docs/index.md), `.readthedocs.yaml`, CI `docs.yml`.
+
 ## [0.1.25] - 2026-09-28
 
 ### Fixed

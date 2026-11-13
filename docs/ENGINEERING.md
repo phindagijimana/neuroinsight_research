@@ -105,10 +105,12 @@ Full command list: [../QUICK_START.md](../QUICK_START.md).
 
 ## Documentation index
 
-All docs: **[docs/README.md](README.md)**.
+All docs: **[docs/README.md](README.md)**. **MkDocs site:** [BUILDING_DOCS.md](BUILDING_DOCS.md) (`mkdocs serve`).
 
 | Audience | Start here |
 |----------|------------|
+| **Product scope & support** | [PRODUCT.md](PRODUCT.md) |
+| **Compatibility matrix** | [COMPATIBILITY.md](COMPATIBILITY.md) |
 | **Engineers (this doc)** | [ENGINEERING.md](ENGINEERING.md) |
 | **Clinical / URMC context** | [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md) |
 | **End-user install** | [INSTALL.md](INSTALL.md) |

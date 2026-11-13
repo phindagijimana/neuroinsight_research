@@ -1,16 +1,29 @@
 # NeuroInsight — User Guide
 
-Reference guide for deploying and using NeuroInsight. **New desktop users:** start with **[INSTALL.md](INSTALL.md)** (short, step-by-step). Use this guide for advanced setup, connectors, and HPC.
+Deep reference for connectors, HPC, and source deployment. **Product scope:**
+[PRODUCT.md](PRODUCT.md) · **Compatibility:** [COMPATIBILITY.md](COMPATIBILITY.md).
+
+## 10-minute path
+
+| Step | Action | Doc |
+|------|--------|-----|
+| 1 | Install desktop + Docker Desktop | [INSTALL.md](INSTALL.md) |
+| 2 | Start app → engine downloads once | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) if Docker/engine fails |
+| 3 | **Transfer** — move data to where you will compute | [TRANSFER.md](TRANSFER.md) |
+| 4 | **Jobs** — pick compute (Local / Remote / HPC), browse **that** path, choose plugin/workflow, Submit | [Transfer, Jobs, and compute](#transfer-jobs-and-compute) below |
+| 5 | Optional: connect Pennsieve, XNAT, or SLURM first | Sections below or jump to [Connecting to HPC](#connecting-to-hpc-slurm-cluster) |
+
+**Typical URMC-style flow:** Pennsieve or XNAT → **Transfer to HPC scratch** → **Jobs on SLURM** → Transfer results back. Pipeline folder layouts: [HPC_PIPELINE_SUBMISSION_GUIDE.md](HPC_PIPELINE_SUBMISSION_GUIDE.md).
 
 ## Background
 
-NeuroInsight was **developed by Philbert Ndagijimana** with **URMC researchers and
-neurologists** and is in production at URMC as **clinical support for Radiology**
-(orchestration only — not a substitute for reads). **[CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md)** · **[ENGINEERING.md](ENGINEERING.md)** (technical overview).
+Developed by **Philbert Ndagijimana** with **URMC researchers and neurologists**;
+production use supports **Radiology** ([CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md)). Engineers: [ENGINEERING.md](ENGINEERING.md).
 
 ## Contents
 
-- [Background](#background) — URMC collaboration; [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md)
+- [10-minute path](#10-minute-path)
+- [Background](#background)
 - [Docker (source / Linux servers)](#docker-source--linux-servers)
 - [macOS notes](#macos-notes)
 - [Local vs remote deployment](#local-vs-remote-deployment)
@@ -28,22 +41,9 @@ neurologists** and is in production at URMC as **clinical support for Radiology*
 
 ## Prerequisites
 
-**Desktop app:** Docker Desktop (running), ~20 GB disk, 8 GB+ RAM — see [INSTALL.md](INSTALL.md).
+**Desktop:** Docker Desktop, ~20 GB disk, 8 GB+ RAM — [INSTALL.md](INSTALL.md) · matrix — [COMPATIBILITY.md](COMPATIBILITY.md).
 
-**From source / development:**
-
-- Docker and Docker Compose
-- Python 3.10+
-- Node.js 18+
-- 16 GB+ RAM (32 GB recommended for local processing)
-- SSH key-based authentication (for remote/HPC connections)
-
-## Desktop app
-
-Install, verify, and first launch: **[INSTALL.md](INSTALL.md)**. Problems:
-**[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**.
-
-To run the web UI without the desktop installer, use [Deployment from source](#deployment-from-source) below.
+**From source:** Python 3.9+, Node 18+, Docker Compose; 16 GB+ RAM for local MRI — [QUICK_START.md](../QUICK_START.md), [Deployment from source](#deployment-from-source).
 
 ## Docker (source / Linux servers)
 

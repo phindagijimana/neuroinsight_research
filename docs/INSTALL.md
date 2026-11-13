@@ -6,7 +6,7 @@ machine**.
 
 **About:** developed by **Philbert Ndagijimana** with **URMC researchers and
 neurologists**; at URMC it supports **Radiology** workflows — [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md).
-Engineers: [ENGINEERING.md](ENGINEERING.md). Doc index: [README.md](README.md).
+Product scope: [PRODUCT.md](PRODUCT.md) · compatibility: [COMPATIBILITY.md](COMPATIBILITY.md) · engineers: [ENGINEERING.md](ENGINEERING.md) · index: [README.md](README.md).
 
 ## System requirements
 
