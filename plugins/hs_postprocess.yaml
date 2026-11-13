@@ -16,6 +16,10 @@ description: >
 authors:
   - "NeuroInsight Research Team"
 
+references:
+  - "Fischl, B. (2012). FreeSurfer. Neuroimage, 62(2), 774-781."
+  - "Iglesias, J.E. et al. (2015). A computational atlas of the hippocampal formation using ex vivo, ultra-high resolution MRI. Neuroimage, 115, 117-137."
+
 container:
   runtime: docker
   image: "phindagijimana321/hs-postprocess:1.0.0"

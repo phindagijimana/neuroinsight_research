@@ -1,38 +1,48 @@
-# Documentation index
+# NeuroInsight documentation
 
-## End users (desktop app)
+**Developed by Philbert Ndagijimana** with **URMC researchers and neurologists**.
+NeuroInsight orchestrates neuroimaging pipelines; at URMC it supports **Radiology**
+workflows — see [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md).
+
+## Start here
+
+| You are… | Read |
+|----------|------|
+| **Engineer / technical reviewer** | **[ENGINEERING.md](ENGINEERING.md)** |
+| **Installing the desktop app** | [INSTALL.md](INSTALL.md) |
+| **Using HPC, Pennsieve, XNAT** | [USER_GUIDE.md](USER_GUIDE.md) |
+| **Clinical deployment context (URMC)** | [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md) |
+
+## All guides
+
+### Engineering & operations
 
 | Doc | Purpose |
-|---|---|
+|-----|---------|
+| [ENGINEERING.md](ENGINEERING.md) | Architecture, repo map, run, test — **primary engineer onboarding** |
+| [../QUICK_START.md](../QUICK_START.md) | `./research` command cheat sheet |
+| [TRANSFER.md](TRANSFER.md) | Transfer matrix, large files, env vars |
+| [USER_GUIDE.md](USER_GUIDE.md) | Connectors, SLURM, remote server, source deploy |
+| [HPC_PIPELINE_SUBMISSION_GUIDE.md](HPC_PIPELINE_SUBMISSION_GUIDE.md) | Input layouts per workflow |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common failures |
+
+### Product & trust
+
+| Doc | Purpose |
+|-----|---------|
 | [INSTALL.md](INSTALL.md) | Download, verify, first launch |
-| [DESKTOP_UPDATES.md](DESKTOP_UPDATES.md) | In-app updates, Help menu, engine refresh |
-| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common problems |
+| [DESKTOP_UPDATES.md](DESKTOP_UPDATES.md) | Auto-update, engine refresh |
+| [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md) | URMC Radiology support workflows |
+| [REFERENCES.md](REFERENCES.md) | Citations (regenerate via `scripts/generate_references_doc.py`) |
+| [TOOL_LICENSES.md](TOOL_LICENSES.md) | FreeSurfer / MELD files |
 
-## Advanced usage
-
-| Doc | Purpose |
-|---|---|
-| [USER_GUIDE.md](USER_GUIDE.md) | Transfer + Jobs workflow, HPC/SLURM, Remote Server, Pennsieve, XNAT |
-| [TRANSFER.md](TRANSFER.md) | **Transfer page** — route matrix, large files (300GB+), resume, env vars |
-| [HPC_PIPELINE_SUBMISSION_GUIDE.md](HPC_PIPELINE_SUBMISSION_GUIDE.md) | Pipeline-specific input layouts on HPC |
-| [TOOL_LICENSES.md](TOOL_LICENSES.md) | FreeSurfer / MELD license files |
-| [RELEASE_NOTES_v0.1.24.md](RELEASE_NOTES_v0.1.24.md) | Latest release summary |
-
-## Developers
+### Maintainers
 
 | Doc | Purpose |
-|---|---|
-| [../QUICK_START.md](../QUICK_START.md) | Run from source (`./research`) |
-| [../README.md](../README.md) | Project overview and contributor sections |
+|-----|---------|
+| [RELEASING.md](RELEASING.md) | Version tags, GHCR image, desktop release |
+| [SIGNING_AND_TRUST.md](SIGNING_AND_TRUST.md) | Code signing, checksums |
+| [../CHANGELOG.md](../CHANGELOG.md) | Version history |
+| [../desktop/README.md](../desktop/README.md) | Electron build |
 
-## Maintainers
-
-| Doc | Purpose |
-|---|---|
-| [RELEASING.md](RELEASING.md) | Version bump, tags, GitHub Release |
-| [SIGNING_AND_TRUST.md](SIGNING_AND_TRUST.md) | Code signing, notarization, checksums |
-| [../CHANGELOG.md](../CHANGELOG.md) | Full version history |
-
-Pennsieve/XNAT connector setup is documented under **Transfer** and **Jobs → Compute**
-in [USER_GUIDE.md](USER_GUIDE.md). Platform registration runbooks live in
-`adapters/` source, not in end-user docs.
+Connector registration scripts: `adapters/scripts/` (not end-user facing).

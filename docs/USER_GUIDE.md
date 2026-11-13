@@ -2,8 +2,15 @@
 
 Reference guide for deploying and using NeuroInsight. **New desktop users:** start with **[INSTALL.md](INSTALL.md)** (short, step-by-step). Use this guide for advanced setup, connectors, and HPC.
 
+## Background
+
+NeuroInsight was **developed by Philbert Ndagijimana** with **URMC researchers and
+neurologists** and is in production at URMC as **clinical support for Radiology**
+(orchestration only — not a substitute for reads). **[CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md)** · **[ENGINEERING.md](ENGINEERING.md)** (technical overview).
+
 ## Contents
 
+- [Background](#background) — URMC collaboration; [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md)
 - [Docker (source / Linux servers)](#docker-source--linux-servers)
 - [macOS notes](#macos-notes)
 - [Local vs remote deployment](#local-vs-remote-deployment)

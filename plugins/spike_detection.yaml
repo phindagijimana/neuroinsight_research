@@ -16,6 +16,9 @@ description: >
 authors:
   - "NeuroInsight Research Team"
 
+references:
+  - "Gramfort, A., et al. (2013). MEG and EEG data analysis with MNE-Python. Frontiers in Neuroscience, 7, 267."
+
 container:
   runtime: docker
   image: "phindagijimana321/eeg-spike-detection-mne:1.0.1"

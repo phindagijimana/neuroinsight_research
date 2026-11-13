@@ -57,6 +57,37 @@ class TestBackendFactory:
             create_backend(backend_type="invalid_type")
 
 
+class TestSlurmTimelimit:
+    """SLURM --time formatting for sbatch scripts."""
+
+    def test_whole_hours_under_one_day(self):
+        from backend.execution.slurm_backend import format_slurm_timelimit
+
+        assert format_slurm_timelimit(6) == "06:00:00"
+        assert format_slurm_timelimit(6.0) == "06:00:00"
+        assert format_slurm_timelimit("8") == "08:00:00"
+
+    def test_multi_day_hours(self):
+        from backend.execution.slurm_backend import format_slurm_timelimit
+
+        assert format_slurm_timelimit(24) == "1-00:00:00"
+        assert format_slurm_timelimit(48) == "2-00:00:00"
+        assert format_slurm_timelimit(28) == "1-04:00:00"
+
+    def test_invalid_or_zero_defaults(self):
+        from backend.execution.slurm_backend import format_slurm_timelimit
+
+        assert format_slurm_timelimit(0) == "06:00:00"
+        assert format_slurm_timelimit(None) == "06:00:00"
+        assert format_slurm_timelimit(-1) == "06:00:00"
+
+    def test_gpu_directive_uses_gres(self):
+        from backend.execution.slurm_backend import slurm_gpu_directive
+
+        assert slurm_gpu_directive() == "#SBATCH --gres=gpu:1"
+        assert slurm_gpu_directive(2) == "#SBATCH --gres=gpu:2"
+
+
 class TestLocalBackend:
     """Test LocalDockerBackend methods."""
 

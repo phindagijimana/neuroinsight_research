@@ -1,154 +1,88 @@
 # NeuroInsight
 
-An open-source platform for running neuroimaging tools from a web interface. Select your data, pick a plugin or workflow, choose where to process, and click Submit — no terminal commands or container expertise required.
+Neuroimaging **orchestration platform**: Transfer data, submit containerized
+**plugins** and **workflows**, monitor jobs on local Docker, remote SSH, or HPC/SLURM
+— from a browser or desktop app.
 
-A **plugin** wraps a single neuroimaging tool (e.g., FreeSurfer, fMRIPrep) so it can run in a container with one click. A **workflow** chains multiple plugins into a single job with automatic data passing between steps (e.g., fMRIPrep then XCP-D). Both are defined as YAML files -- drop a new one in `plugins/` or `workflows/` to extend the platform.
+**Developed by Philbert Ndagijimana** in **collaboration with researchers and
+neurologists at the University of Rochester Medical Center (URMC)**. At URMC,
+NeuroInsight runs workflows that **support Radiology** (structural MRI, lesion
+detection, hippocampal sclerosis, multimodal epilepsy pipelines). Details:
+**[docs/CLINICAL_SUPPORT.md](docs/CLINICAL_SUPPORT.md)**.
 
-## Desktop app (end users)
+| Reader | Start here |
+|--------|------------|
+| **Experienced engineer** | **[docs/ENGINEERING.md](docs/ENGINEERING.md)** — architecture, repo map, run, test |
+| **Desktop end user** | **[docs/INSTALL.md](docs/INSTALL.md)** |
+| **Full doc index** | **[docs/README.md](docs/README.md)** |
 
-Most users want the **desktop app** — a one-click installer for macOS, Windows,
-or Linux. The only prerequisite is **Docker Desktop** (running). On first launch
-the app downloads its engine image (~1.8 GB) once, then everything runs locally.
-
-**Install guide:** **[docs/INSTALL.md](docs/INSTALL.md)** — download from
-[Releases](https://github.com/phindagijimana/neuroinsight_research/releases),
-verify the checksum, drag **`NeuroInsight.app`** to **`/Applications`** (macOS),
-start Docker, and launch.
-
-**Stuck?** [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — Docker detection,
-SmartScreen, App Translocation, and engine startup.
-
-### Updating
-
-NeuroInsight has two parts: the **desktop app** (Electron shell) and the **engine**
-(Docker container with the workspace UI). Both should match the same version.
-
-**Check for updates (macOS):** click the NeuroInsight window, then use the **menu
-bar at the top of the screen** → **Help → Check for Updates…** (Help is not inside
-the app window). The app also checks silently on startup; if you are already on the
-latest version, no dialog appears.
-
-**In-app flow:** confirm download → **Restart Now** (usually **~30 sec – 2 min** to
-relaunch; longer if a new engine image must download).
-
-**Manual install:** use the **`.dmg`** from
-[Releases](https://github.com/phindagijimana/neuroinsight_research/releases) and drag
-**NeuroInsight.app** to **`/Applications`**. Do **not** use the `-arm64-mac.zip` for
-manual install — that file is for auto-update only.
-
-**After updating the desktop app**, refresh the workspace UI:
-**NeuroInsight → Settings** → **Stop engine** → **Start engine** → **Open Workspace**.
-
-Full guide: **[docs/DESKTOP_UPDATES.md](docs/DESKTOP_UPDATES.md)** (timing, engine
-refresh, troubleshooting).
-
-**Advanced:** remote servers, HPC/SLURM, Pennsieve, and XNAT — see
-[docs/USER_GUIDE.md](docs/USER_GUIDE.md).
+Extensions are **YAML**: one file per tool in `plugins/`, chains in `workflows/`.
 
 ---
 
-The sections below are for **developers/contributors** running from source.
+## Run from source
 
-## Requirements
-
-Install these before running `./research install` (the installer handles all Python/Node packages automatically):
-
-| Requirement | Minimum | Notes |
-|---|---|---|
-| Python | 3.9+ | If missing, the installer detects your OS and offers to install it for you. |
-| Node.js | 18+ | If missing, the installer offers to install it via nvm (no sudo needed). |
-| Docker | Compose v2 | Runs infrastructure (PostgreSQL, Redis, MinIO) and all neuroimaging containers. |
-| OS | Linux, macOS, or Windows (WSL2) | **Linux or WSL2 recommended.** macOS works but local processing is slower due to Docker's VM layer and Rosetta emulation on Apple Silicon. See [macOS Notes](docs/USER_GUIDE.md#macos-notes). Windows users need WSL2 with Docker Desktop. |
-| License files | -- | See [docs/TOOL_LICENSES.md](docs/TOOL_LICENSES.md). Run `./research license` to set up from source. |
-
-**RAM and storage:**
-
-| | App only (orchestration + remote/HPC jobs) | Local processing (Docker) |
-|---|---|---|
-| RAM | 4 GB | 16 GB+ (FreeSurfer, fMRIPrep); 8 GB for lighter plugins |
-| Storage | 2 GB (app + dependencies) | 10-50 GB per plugin image + space for input/output data |
-
-If you only submit jobs to a remote server or HPC, the app itself is lightweight. Local processing requires more resources because the neuroimaging containers run on your machine.
-
-## Quick Start
-
-See **[QUICK_START.md](QUICK_START.md)** for a minimal command reference, or run:
+Python 3.9+, Node 18+, Docker Compose v2. See **[QUICK_START.md](QUICK_START.md)**.
 
 ```bash
 git clone https://github.com/phindagijimana/neuroinsight_research.git
 cd neuroinsight_research
-./research install        # install deps, start infra, init DB
-./research license        # set up FreeSurfer / MELD license files
-./research start          # launch the app
+./research install && ./research license && ./research start
 ```
 
-Open **http://localhost:3000**.
+Open **http://localhost:3000**. Dev mode: `./research-dev start`.
 
-For connectors (HPC, Pennsieve, XNAT), Transfer (large files), and deployment options, see **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** and **[docs/TRANSFER.md](docs/TRANSFER.md)**. Plugin and workflow catalog: in-app **Docs** tab (generated from `plugins/` and `workflows/`).
+---
 
-## Key Features
+## Desktop app
 
-- **Transfer-first data movement** — dual-pane UI to copy files between Local, Remote Server, HPC, Pennsieve, and XNAT (see [docs/TRANSFER.md](docs/TRANSFER.md))
-- **Compute-only Jobs** — pick Local / Remote / HPC compute, browse paths on that backend, submit pipelines (no platform wizard on Jobs)
-- **Multiple compute backends** — Local Docker, **Remote Server** (SSH + Docker on any Linux host), or HPC/SLURM (SSH + Singularity). See [Remote Server vs HPC](docs/USER_GUIDE.md#remote-server-vs-hpc)
-- **Typical flow** — Transfer data to compute → Jobs submit → Transfer results back (optional)
-- **Real-time monitoring** -- SLURM queue monitor, job progress tracking, and log streaming
-- **Plugins** -- Each tool is a single YAML file; drop a new one in `plugins/` to add support for a new tool
-- **Workflows** -- Chain multiple plugins into one job with automatic data passing between steps
-- **Built-in NIfTI viewer** -- View results with segmentation overlays powered by Niivue
+Installers: [Releases](https://github.com/phindagijimana/neuroinsight_research/releases).
+Requires **Docker Desktop** (running). First launch pulls the engine image (~1.8 GB).
+Updates: **[docs/DESKTOP_UPDATES.md](docs/DESKTOP_UPDATES.md)** ·
+Issues: **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**.
 
-## Security & data
+---
 
-NeuroInsight is designed as a **local, single-user desktop application**. Processing
-runs on your machine or on infrastructure you connect (remote server, HPC). The
-engine and its internal services bind to `127.0.0.1` by default.
+## Features
 
-When you use Pennsieve or XNAT, selected files are **downloaded or staged to
-compute** for the job — pipelines do not read those platforms in place. Connector
-credentials are stored in your OS keychain (desktop) or local config, not in the repo.
+- **Transfer** — Local, Remote, HPC, Pennsieve, XNAT ([TRANSFER.md](docs/TRANSFER.md))
+- **Jobs** — compute-only submission; browse paths on the selected backend
+- **Backends** — local Docker, remote Docker (SSH), SLURM + Apptainer
+- **Monitoring** — logs, progress, SLURM queue
+- **Viewer** — NIfTI + overlays (Niivue)
 
-> **Do not expose the backend to the internet.** The local API has no built-in
-> authentication because it is meant to listen only on localhost. If you change
-> the bind host (e.g. `0.0.0.0`) to reach it from another machine, put it behind
-> your own authenticating reverse proxy / VPN — otherwise anyone on the network
-> could submit jobs or read results.
+Connectors and HPC setup: **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**.
 
-For installer
-trust (code signing / notarization), see [docs/SIGNING_AND_TRUST.md](docs/SIGNING_AND_TRUST.md).
+---
 
-## Documentation
+## Security
 
-See **[docs/README.md](docs/README.md)** for the full index. Quick links:
+Single-user, **localhost-first** (`127.0.0.1`). No built-in API auth — do not
+expose the backend to the internet without your own proxy/VPN. Credentials use OS
+keychain (desktop) or local config. **[docs/SIGNING_AND_TRUST.md](docs/SIGNING_AND_TRUST.md)** (installers).
 
-- [Install (desktop)](docs/INSTALL.md) — start here for end users
-- [Desktop updates](docs/DESKTOP_UPDATES.md) — Help menu, auto-update, engine refresh
-- [User Guide](docs/USER_GUIDE.md) — HPC/SLURM, Pennsieve, XNAT, source deployment
-- [Transfer guide](docs/TRANSFER.md) — route matrix, large-file resume, env vars
-- [Tool licenses](docs/TOOL_LICENSES.md) — FreeSurfer / MELD setup
-- [Quick Start (developers)](QUICK_START.md) — `./research` from source
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Releasing](docs/RELEASING.md) · [Signing & trust](docs/SIGNING_AND_TRUST.md) — maintainers
+---
 
-## Citing This Software
-
-If you use NeuroInsight in your work, please cite:
+## Citation
 
 ```bibtex
-@software{neuroinsight_research,
-  author       = {Phindagijimana},
-  title        = {NeuroInsight: Neuroimaging Processing Platform},
+@software{neuroinsight,
+  author       = {Ndagijimana, Philbert and URMC collaborators},
+  title        = {NeuroInsight: Neuroimaging Pipeline Platform},
   year         = {2026},
   url          = {https://github.com/phindagijimana/neuroinsight_research},
-  version      = {0.1.24}
+  version      = {0.1.25},
+  note         = {Developed in collaboration with URMC researchers and neurologists}
 }
 ```
 
-Please also cite the individual tools you use (FreeSurfer, fMRIPrep, QSIPrep, etc.) as required by their respective licenses.
+Pipeline literature: **[docs/REFERENCES.md](docs/REFERENCES.md)** ·
+[CITATION.cff](CITATION.cff).
 
-## Contact
+---
 
-For questions, comments, or contributions, reach out to **phindagijimana@gmail.com**.
+## Contact & license
 
-## License
+**Philbert Ndagijimana** — phindagijimana@gmail.com
 
-MIT License. Tool-specific licenses: [docs/TOOL_LICENSES.md](docs/TOOL_LICENSES.md).
+MIT License. Tool licenses (FreeSurfer, MELD, …): **[docs/TOOL_LICENSES.md](docs/TOOL_LICENSES.md)**.

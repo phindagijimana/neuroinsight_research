@@ -44,6 +44,36 @@ from backend.execution.workflow_nir_env import apply_workflow_nir_input_root_com
 logger = logging.getLogger(__name__)
 
 
+def format_slurm_timelimit(hours) -> str:
+    """Format walltime for ``#SBATCH --time=`` (SLURM-compatible).
+
+    Accepts int/float/str hours from the UI. SLURM rejects values like ``6.0:00:00``
+    and ``48:00:00`` (hours > 23 must use ``days-HH:MM:SS``).
+    """
+    try:
+        h = int(round(float(hours or 0)))
+    except (TypeError, ValueError):
+        h = 6
+    if h <= 0:
+        h = 6
+    if h < 24:
+        return f"{h:02d}:00:00"
+    days, rem = divmod(h, 24)
+    if rem == 0:
+        return f"{days}-00:00:00"
+    return f"{days}-{rem:02d}:00:00"
+
+
+def slurm_gpu_directive(gpu_count: int = 1) -> str:
+    """Return a ``#SBATCH`` GPU line compatible with older SLURM (e.g. BlueHive).
+
+    Many clusters reject ``--gpus-per-node`` but accept ``--gres=gpu:N``.
+    Override with ``HPC_SLURM_GPU_GRES`` (e.g. ``gpu:a100:1``).
+    """
+    gres = os.getenv("HPC_SLURM_GPU_GRES", f"gpu:{max(1, int(gpu_count))}")
+    return f"#SBATCH --gres={gres}"
+
+
 def _shell_value(value):
     """Render a param for a shell template: Python bools -> lowercase true/false
     (templates test `[ "{flag}" = "true" ]`; str(True) is "True" and would fail)."""
@@ -149,6 +179,89 @@ class SLURMBackend(ExecutionBackend):
                     logger.info("Resolved work_dir to $HOME: %s", home)
         except Exception as e:
             logger.warning("Could not resolve work_dir '%s': %s", raw, e)
+
+    def _partition_has_gpus(self, partition: dict) -> bool:
+        """True if SLURM partition exposes GPU resources."""
+        g = str(partition.get("gpus", "(null)")).strip()
+        if g and g not in ("(null)", "0", "0/0/0/0"):
+            return True
+        name = (partition.get("name") or "").lower()
+        return "gpu" in name
+
+    def _resolve_partition(self, needs_gpu: bool = False) -> str:
+        """Pick a valid SLURM partition for this cluster and job type.
+
+        NeuroInsight defaults to ``general``, which BlueHive/BlueHive3 do not have.
+        GPU jobs must land on a GPU partition; CPU jobs should avoid GPU-only queues.
+        """
+        configured = (self.partition or "").strip()
+        try:
+            partitions = self.get_partitions()
+        except Exception as e:
+            logger.debug("Could not list partitions for resolve: %s", e)
+            return configured or ("gpu" if needs_gpu else "standard")
+
+        names = [p["name"] for p in partitions if p.get("name")]
+        if not names:
+            return configured or ("gpu" if needs_gpu else "standard")
+
+        by_name = {p["name"]: p for p in partitions if p.get("name")}
+
+        if needs_gpu:
+            if configured and configured in by_name and self._partition_has_gpus(by_name[configured]):
+                return configured
+            for p in partitions:
+                if self._partition_has_gpus(p):
+                    chosen = p["name"]
+                    if configured and configured != chosen:
+                        logger.info(
+                            "GPU job on %s: partition %r -> %r",
+                            self.ssh_host, configured, chosen,
+                        )
+                    return chosen
+            for name in names:
+                if "gpu" in name.lower():
+                    return name
+            logger.warning("GPU requested on %s but no GPU partition found", self.ssh_host)
+            return configured if configured in names else names[0]
+
+        # CPU job — prefer configured non-GPU partition
+        if configured and configured in by_name:
+            if not self._partition_has_gpus(by_name[configured]):
+                return configured
+            for pref in ("standard", "interactive", "compute", "batch", "debug"):
+                if pref in names:
+                    logger.info(
+                        "CPU job on %s: partition %r -> %r",
+                        self.ssh_host, configured, pref,
+                    )
+                    return pref
+
+        if configured and configured in names:
+            return configured
+
+        for p in partitions:
+            if p.get("is_default") and p.get("name") and not self._partition_has_gpus(p):
+                logger.warning(
+                    "SLURM partition %r not found on %s; using default %r",
+                    configured, self.ssh_host, p["name"],
+                )
+                return p["name"]
+
+        for pref in ("standard", "interactive", "compute", "batch", "debug"):
+            if pref in names:
+                logger.warning(
+                    "SLURM partition %r not found on %s; using %r",
+                    configured, self.ssh_host, pref,
+                )
+                return pref
+
+        fallback = names[0]
+        logger.warning(
+            "SLURM partition %r not found on %s; using %r",
+            configured, self.ssh_host, fallback,
+        )
+        return fallback
 
     def _hpc_neuroinsight_root(self) -> str:
         """Directory that contains ``jobs/`` on the HPC (NeuroInsight project root).
@@ -432,6 +545,16 @@ class SLURMBackend(ExecutionBackend):
             ).strip()
             if not abs_script.startswith("/"):
                 abs_script = script_path
+            try:
+                self._ssh_exec(f'sbatch --test-only "{abs_script}"')
+            except SSHCommandError as e:
+                hint = ""
+                if spec.resources.gpu:
+                    hint = (
+                        " Hint: GPU jobs need a GPU partition (e.g. gpu). "
+                        "CPU-only plugins should use the cpu_only profile or turn GPU off."
+                    )
+                raise ExecutionError(f"sbatch validation failed: {e}{hint}") from e
             stdout = self._ssh_exec(f'sbatch "{abs_script}"')
             slurm_job_id = self._parse_slurm_job_id(stdout)
             logger.info(f"Submitted job {job_id[:8]} -> SLURM {slurm_job_id}")
@@ -1337,13 +1460,15 @@ class SLURMBackend(ExecutionBackend):
                 logger.debug("Could not compute workflow resources from steps: %s", e)
 
         safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", spec.pipeline_name[:20])
+        needs_gpu = bool(res.gpu)
+        partition = self._resolve_partition(needs_gpu=needs_gpu)
         lines = [
             "#!/bin/bash",
             f"#SBATCH --job-name=ni-{safe_name}-{job_id[:8]}",
-            f"#SBATCH --partition={self.partition}",
+            f"#SBATCH --partition={partition}",
             f"#SBATCH --mem={effective_mem}G",
             f"#SBATCH --cpus-per-task={effective_cpus}",
-            f"#SBATCH --time={effective_time}:00:00",
+            f"#SBATCH --time={format_slurm_timelimit(effective_time)}",
             f"#SBATCH --output={job_dir}/logs/slurm-%j.out",
             f"#SBATCH --error={job_dir}/logs/slurm-%j.err",
         ]
@@ -1352,8 +1477,8 @@ class SLURMBackend(ExecutionBackend):
             lines.append(f"#SBATCH --account={self.account}")
         if self.qos:
             lines.append(f"#SBATCH --qos={self.qos}")
-        if res.gpu:
-            lines.append("#SBATCH --gpus-per-node=1")
+        if needs_gpu:
+            lines.append(slurm_gpu_directive())
 
         lines.append("")
         lines.append("set -euo pipefail")

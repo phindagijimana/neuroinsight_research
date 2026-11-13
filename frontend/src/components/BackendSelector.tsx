@@ -97,7 +97,7 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
   const [password, setPassword] = useState('');
 
   const [hpcConfig, setHpcConfig] = useState<HPCConfig>({
-    workDir: '~', partition: 'general', account: '', qos: '', modules: '',
+    workDir: '~', partition: '', account: '', qos: '', modules: '',
   });
 
   const [partitions, setPartitions] = useState<Array<{ name: string; timelimit: string; nodes: string }>>([]);
@@ -250,9 +250,16 @@ export const BackendSelector: React.FC<BackendSelectorProps> = ({
       if (resp.ok) {
         const data = await resp.json();
         setPartitions(data.partitions || []);
-        if (data.partitions?.length > 0 && !hpcConfig.partition) {
-          const defaultPartition = data.partitions.find((p: any) => p.is_default)?.name || data.partitions[0].name;
-          setHpcConfig(prev => ({ ...prev, partition: defaultPartition }));
+        if (data.partitions?.length > 0) {
+          const names = data.partitions.map((p: any) => p.name);
+          const defaultPartition =
+            data.partitions.find((p: any) => p.is_default)?.name || data.partitions[0].name;
+          setHpcConfig(prev => {
+            if (!prev.partition || !names.includes(prev.partition)) {
+              return { ...prev, partition: defaultPartition };
+            }
+            return prev;
+          });
         }
       }
     } catch { /* ignore */ }

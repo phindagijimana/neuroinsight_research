@@ -1,39 +1,23 @@
-# Quick Start — Developers (run from source)
+# Quick Start — developers
 
-> **Desktop users:** install the app from [docs/INSTALL.md](docs/INSTALL.md) instead —
-> you do not need this guide.
+> **Engineers:** read **[docs/ENGINEERING.md](docs/ENGINEERING.md)** first (architecture, map, tests).  
+> **Desktop users:** [docs/INSTALL.md](docs/INSTALL.md).
 
-## Prerequisites
-
-- Python 3.9+, Node.js 18+, Docker (Compose v2), 8GB+ RAM
-
-## Setup, run, and common commands
+**Prerequisites:** Python 3.9+, Node 18+, Docker Compose v2.
 
 ```bash
-./research install        # deps + infra + DB (first time)
-./research license        # FreeSurfer / MELD — see docs/TOOL_LICENSES.md
-./research start          # launch → http://localhost:3000
+./research install        # first time: deps + infra + DB
+./research license        # FreeSurfer / MELD — docs/TOOL_LICENSES.md
+./research start          # http://localhost:3000
 ./research stop           # stop app + infra (keep data)
-./research stop app       # stop app only
-./research stop --all     # stop and remove infra data
-./research status         # service health
-./research logs all       # tail logs
-./research health         # backend /health
-./research restart
+./research status
+./research health
+./research-dev start      # hot-reload backend + frontend
 ```
 
-## Infrastructure only
+**Tests:**
 
 ```bash
-./research infra up       # PostgreSQL, Redis, MinIO
-./research infra status
-./research infra down
-./research infra reset    # stop + delete data
-```
-
-## Development mode
-
-```bash
-./research-dev start      # hot-reload backend + HMR frontend
-./research-dev logs all
+pip install -r requirements.txt pytest httpx
+PYTHONPATH=. python -m pytest tests/ -v --tb=short
 ```

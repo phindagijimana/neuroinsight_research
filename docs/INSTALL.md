@@ -4,7 +4,9 @@ NeuroInsight is a desktop app for macOS, Windows, and Linux. It runs its
 processing engine locally in a container, so **your data never leaves your
 machine**.
 
-Doc index: [README.md](README.md).
+**About:** developed by **Philbert Ndagijimana** with **URMC researchers and
+neurologists**; at URMC it supports **Radiology** workflows — [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md).
+Engineers: [ENGINEERING.md](ENGINEERING.md). Doc index: [README.md](README.md).
 
 ## System requirements
 

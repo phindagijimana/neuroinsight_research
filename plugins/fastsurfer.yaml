@@ -61,7 +61,7 @@ parameters:
     description: "Run segmentation only (skip surface reconstruction)"
   - name: use_cpu
     type: bool
-    default: false
+    default: true
     description: "Force CPU processing (slower, use if GPU unavailable)"
   - name: batch_size
     type: int
@@ -77,15 +77,15 @@ parameters:
 resources:
   profiles:
     default:
-      cpus: 4
-      mem_gb: 16
-      time_hours: 1
-      gpus: 1
-    cpu_only:
       cpus: 8
       mem_gb: 16
       time_hours: 3
       gpus: 0
+    gpu:
+      cpus: 4
+      mem_gb: 16
+      time_hours: 1
+      gpus: 1
 
 execution:
   style: single_stage

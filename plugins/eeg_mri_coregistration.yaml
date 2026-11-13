@@ -16,6 +16,10 @@ description: >
 authors:
   - "NeuroInsight Research Team"
 
+references:
+  - "Gramfort, A., et al. (2013). MEG and EEG data analysis with MNE-Python. Frontiers in Neuroscience, 7, 267."
+  - "https://mne.tools/stable/auto_tutorials/preprocessing/80_coreg.html"
+
 container:
   runtime: docker
   image: "phindagijimana321/eeg-mri-coregistration-mne:1.0.2"
