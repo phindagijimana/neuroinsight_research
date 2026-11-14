@@ -8,6 +8,7 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 ## [Unreleased]
 
 ### Added
+- **Research output policy** — [docs/RESEARCH_OUTPUT_USE.md](docs/RESEARCH_OUTPUT_USE.md); strict research-use-only across use-case docs.
 - **URMC use cases** — [docs/USE_CASES.md](docs/USE_CASES.md) (Radiology & Neurology; AI and classical workflows).
 - **TRACK-TBI** — [docs/TRACK_TBI.md](docs/TRACK_TBI.md) (600 subjects × 2 timepoints; DoD technical report deliverable).
 

@@ -1,13 +1,18 @@
-# URMC use cases (clinical support)
+# URMC use cases (research workflows)
+
+!!! warning "Output use"
+    **All outputs: research use only.** **Clinical support** use is allowed only on
+    **your responsibility** — [RESEARCH_OUTPUT_USE.md](RESEARCH_OUTPUT_USE.md).
 
 NeuroInsight at the **University of Rochester Medical Center (URMC)** runs
-**workflows that support clinical services** — primarily **Radiology** and
-**Neurology**. The platform **orchestrates** containerized pipelines (Transfer →
-Jobs on local Docker or **HPC/SLURM**); it does **not** replace radiologists,
+**research workflows** in programs associated with **Radiology** and **Neurology**.
+The platform **orchestrates** containerized pipelines (Transfer → Jobs on local
+Docker or **HPC/SLURM**); it does **not** replace radiologists,
 neuroradiologists, or neurologists.
 
 Developed by **Philbert Ndagijimana** with **URMC researchers and neurologists**.
-See [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md) for governance and limitations.
+Deployment context: [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md).
+Output policy: [RESEARCH_OUTPUT_USE.md](RESEARCH_OUTPUT_USE.md).
 
 Workflow and plugin IDs match the in-app **Docs** tab and `workflows/` /
 `plugins/` in this repository.
@@ -24,9 +29,9 @@ Workflow and plugin IDs match the in-app **Docs** tab and `workflows/` /
 
 ---
 
-## Radiology — clinical support
+## Radiology — research workflows
 
-| Use case | Type | NeuroInsight workflow / plugin | Support role |
+| Use case | Type | NeuroInsight workflow / plugin | Research role (outputs **research use only**) |
 |----------|------|--------------------------------|--------------|
 | Cortical surface & volumetry | AI + classical | **FastSurfer** (`fastsurfer`); **FreeSurfer recon** (`freesurfer_recon`, `freesurfer_autorecon_volonly`) | Quantitative parcellation and volumes for read support |
 | Longitudinal structural MRI | Classical | **FreeSurfer Longitudinal Pipeline** (`wf_freesurfer_longitudinal_full`) | Unbiased within-subject templates across timepoints |
@@ -44,9 +49,9 @@ derivatives. Input layouts: [HPC_PIPELINE_SUBMISSION_GUIDE.md](HPC_PIPELINE_SUBM
 
 ---
 
-## Neurology — clinical support
+## Neurology — research workflows
 
-| Use case | Type | NeuroInsight workflow / plugin | Support role |
+| Use case | Type | NeuroInsight workflow / plugin | Research role (outputs **research use only**) |
 |----------|------|--------------------------------|--------------|
 | EEG screening (epileptiform activity) | Classical (+ signal processing) | **EEG Epilepsy Screening** (`basic_eeg_epilepsy_detection`: preprocessing → **spike detection** `spike_detection`) | Spike candidates for neurology review |
 | EEG + MRI source imaging | Classical | **EEG Source Localization** (`eeg_source_localization`); steps: preprocessing, coregistration, BEM, forward model, **source localization** | Distributed source estimates for surgical planning support |
@@ -69,12 +74,15 @@ Neurology workflows often share **structural MRI** steps with Radiology (FreeSur
 
 ---
 
-## What “clinical support” means here
+## Outputs: research use; clinical support on your responsibility
 
-- Outputs are **decision support** and **quantitative adjuncts** to the clinical record.
-- Validation, intended use, and sign-out remain under **URMC policy** and specialty
-  standards.
+- **Research use only** — default intended use for all pipeline outputs.
+- **Clinical support** — you **may** use outputs to support reads or neurology
+  workflows **only if you and your institution** assume responsibility (IRB,
+  validation, sign-out policy, tool licenses, applicable law).
+- NeuroInsight does not make clinical-use claims or provide medical advice.
 - Cite NeuroInsight and **each underlying tool** — [REFERENCES.md](REFERENCES.md).
+- [RESEARCH_OUTPUT_USE.md](RESEARCH_OUTPUT_USE.md)
 
 ---
 
@@ -83,6 +91,7 @@ Neurology workflows often share **structural MRI** steps with Radiology (FreeSur
 | Page | Topic |
 |------|--------|
 | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) | Transfer, Jobs, backends |
-| [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md) | URMC deployment context |
+| [RESEARCH_OUTPUT_USE.md](RESEARCH_OUTPUT_USE.md) | Research-only output policy |
+| [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md) | URMC deployment |
 | [TRACK_TBI.md](TRACK_TBI.md) | DoD cohort workflow |
 | [PRODUCT.md](PRODUCT.md) | Product scope |

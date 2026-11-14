@@ -1,21 +1,26 @@
-# Clinical support use (URMC)
+# URMC deployment & clinical support
+
+!!! warning "Output use"
+    **All outputs: research use only.** **Clinical support** use is on the
+    **user’s responsibility** — [RESEARCH_OUTPUT_USE.md](RESEARCH_OUTPUT_USE.md).
 
 NeuroInsight was **developed by Philbert Ndagijimana** in **collaboration with
 URMC researchers and neurologists**. It is **deployed as a production orchestration
 platform** at the **University of Rochester Medical Center (URMC)**. It runs
-neuroimaging **workflows that serve as clinical support tools for Radiology** —
-coordinating transfer, staging, and compute across local workstations,
-institutional storage (including XNAT), HPC (SLURM), and containerized analysis
-plugins.
+workflows that can **support Radiology and Neurology** (quantitative pipelines under
+institutional programs) — coordinating transfer, staging, and compute across local
+workstations, XNAT, and HPC (SLURM).
 
 NeuroInsight does **not** replace radiologists, neuroradiologists, or neurologists.
-It **automates the technical pipeline** around studies that **Radiology** and
-**Neurology** use for quantitative neuroimaging support.
+It **automates the technical pipeline**. **Outputs are for research use only**; any
+**clinical support** use is **the user’s responsibility** —
+[RESEARCH_OUTPUT_USE.md](RESEARCH_OUTPUT_USE.md).
 
 ## Use cases (workflows)
 
 URMC runs **multiple workflows** on NeuroInsight — **AI / deep-learning pipelines**
-and **classical** neuroimaging tools — as **clinical support** (orchestration only).
+and **classical** neuroimaging tools as **clinical support** tooling (orchestration
+only — see output policy above).
 
 **→ [USE_CASES.md](USE_CASES.md)** — dedicated tables for **Radiology** and
 **Neurology** (workflow IDs, AI vs classical, TRACK-TBI cohort).
@@ -40,13 +45,12 @@ Plugin/workflow definitions: in-app **Docs** tab; `plugins/` and `workflows/` in
 
 ## Important limitations
 
+- **All outputs: research use only.** **Clinical support** use only on **user/
+  institution responsibility** — [RESEARCH_OUTPUT_USE.md](RESEARCH_OUTPUT_USE.md).
 - NeuroInsight is **research and workflow software** (MIT license for this repository).
-  **Clinical use** at URMC is under **institutional policies**, appropriate
-  qualifications, and study-/service-specific governance (e.g. IRB, QA, validation
-  of each workflow for its intended support role).
-- Output from containerized tools (FreeSurfer, MELD, fMRIPrep, etc.) must be
-  interpreted by **licensed clinicians**; cite those tools as required by their
-  licenses and publications — see [TOOL_LICENSES.md](TOOL_LICENSES.md) and
+  Any activity at URMC must follow **IRB**, contracts, and institutional policy.
+- Output from containerized tools (FreeSurfer, MELD, fMRIPrep, etc.) remains
+  **research output**; cite those tools as required — [TOOL_LICENSES.md](TOOL_LICENSES.md),
   [REFERENCES.md](REFERENCES.md).
 - This document describes **documented deployment context**; it is **not** a
   regulatory clearance or “FDA-approved device” statement.

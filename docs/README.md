@@ -17,6 +17,7 @@ Build: [BUILDING_DOCS.md](BUILDING_DOCS.md).
 | **Engineer / technical reviewer** | **[ENGINEERING.md](ENGINEERING.md)** |
 | **Installing the desktop app** | [INSTALL.md](INSTALL.md) |
 | **Using HPC, Pennsieve, XNAT** | [USER_GUIDE.md](USER_GUIDE.md) — start with **10-minute path** |
+| **Research output policy (required reading)** | **[RESEARCH_OUTPUT_USE.md](RESEARCH_OUTPUT_USE.md)** |
 | **URMC use cases (Radiology & Neurology)** | **[USE_CASES.md](USE_CASES.md)** |
 | **Clinical deployment context (URMC)** | [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md) |
 | **TRACK-TBI cohort / DoD report** | [TRACK_TBI.md](TRACK_TBI.md) |

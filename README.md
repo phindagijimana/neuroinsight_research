@@ -4,6 +4,9 @@ Neuroimaging **orchestration platform**: Transfer data, submit containerized
 **plugins** and **workflows**, monitor jobs on local Docker, remote SSH, or HPC/SLURM
 — from a browser or desktop app.
 
+**All outputs: research use only** — may be used as **clinical support** only on
+**user responsibility** — **[docs/RESEARCH_OUTPUT_USE.md](docs/RESEARCH_OUTPUT_USE.md)**.
+
 **Developed by Philbert Ndagijimana** in **collaboration with researchers and
 neurologists at the University of Rochester Medical Center (URMC)**. At URMC,
 NeuroInsight runs **AI and classical workflows** that **support URMC Radiology and

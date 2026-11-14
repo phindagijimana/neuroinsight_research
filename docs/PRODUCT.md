@@ -4,9 +4,9 @@
 
 NeuroInsight is neuroimaging **orchestration software**: move data, submit
 containerized pipelines, and monitor jobs — without writing cluster scripts for
-every study. At URMC it supports **Radiology** and **Neurology** clinical-support workflows
-(AI and classical pipelines) — [USE_CASES.md](USE_CASES.md),
-[CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md).
+every study. At URMC it supports **Radiology** and **Neurology** workflows (AI and classical;
+outputs **research use only**, clinical support at **user responsibility**) —
+[USE_CASES.md](USE_CASES.md), [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md).
 
 ## What it is
 
@@ -18,9 +18,13 @@ every study. At URMC it supports **Radiology** and **Neurology** clinical-suppor
 | **Delivery** | Desktop app (macOS, Windows, Linux) or run from source |
 | **License** | MIT (this repo); FreeSurfer/MELD and others — [TOOL_LICENSES.md](TOOL_LICENSES.md) |
 
+**All pipeline outputs are for research use only.** They may be used as **clinical
+support** only on **user/institution responsibility** —
+[RESEARCH_OUTPUT_USE.md](RESEARCH_OUTPUT_USE.md).
+
 NeuroInsight is **not** a PACS, not an AI diagnostic device, and **not** a
-substitute for clinical reads. It runs and tracks pipelines; clinicians interpret
-outputs.
+substitute for clinical reads. It runs and tracks pipelines; it does **not**
+determine clinical applicability of outputs.
 
 ## Supported capabilities
 

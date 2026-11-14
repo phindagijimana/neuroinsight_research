@@ -28,9 +28,10 @@ abstract: >
   pipelines (FreeSurfer, FastSurfer, fMRIPrep, QSIPrep, XCP-D, MELD Graph, EEG/MNE
   steps) with local Docker, remote SSH, and HPC via SLURM and Apptainer. Transfer
   moves data between Local, HPC, Pennsieve, and XNAT; Jobs submits compute on
-  staged paths. Developed by Philbert Ndagijimana in collaboration with researchers
-  and neurologists at the University of Rochester Medical Center (URMC), where it
-  runs workflows supporting Radiology. Cohort-scale TRACK-TBI (DoD collaboration:
+  staged paths. All outputs are for research use only; clinical support use is
+  solely the user's responsibility (docs/RESEARCH_OUTPUT_USE.md). Developed by
+  Philbert Ndagijimana with URMC collaborators; workflows support Radiology and
+  Neurology programs. Cohort-scale TRACK-TBI (DoD collaboration:
   University of Rochester and University of Pennsylvania): 600 subjects, two
   timepoints; workflow delivered in the TRACK-TBI DoD technical report
   (docs/TRACK_TBI.md). See docs/ENGINEERING.md and docs/CLINICAL_SUPPORT.md.

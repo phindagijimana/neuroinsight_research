@@ -125,11 +125,12 @@ Both use the same React UI and FastAPI backend contract.
 
 ---
 
-## URMC clinical support
+## URMC research workflows
 
-At URMC, NeuroInsight runs **Radiology support workflows** (structural MRI, lesion
-detection, HS, multimodal epilepsy). It **does not** replace reads.
-[Clinical support](CLINICAL_SUPPORT.md).
+At URMC, NeuroInsight runs **research workflows** in Radiology and Neurology
+programs. **Outputs: research use only**; **clinical support** on **user
+responsibility** — [RESEARCH_OUTPUT_USE.md](RESEARCH_OUTPUT_USE.md).
+[Use cases](USE_CASES.md) · [Deployment context](CLINICAL_SUPPORT.md).
 
 ---
 

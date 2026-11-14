@@ -1,5 +1,9 @@
 # TRACK-TBI deployment
 
+!!! warning "Output use"
+    **Research use only.** **Clinical support** use only on **your responsibility** —
+    [RESEARCH_OUTPUT_USE.md](RESEARCH_OUTPUT_USE.md).
+
 NeuroInsight was used to **run and operationalize** neuroimaging processing for the
 **TRACK-TBI** study at scale: **600 subjects**, each with **two timepoints**, on
 institutional HPC via the platform’s **Transfer**, **Jobs**, and **SLURM** backends.
@@ -35,8 +39,9 @@ workflow) remain subject to their **own citations and licenses** —
 
 ## Scope and limitations
 
-- This page describes **documented research use** under TRACK-TBI; it is **not** a
-  DoD endorsement of NeuroInsight as a medical device.
+- **All outputs: research use only** — [RESEARCH_OUTPUT_USE.md](RESEARCH_OUTPUT_USE.md).
+- This page describes TRACK-TBI **research** orchestration; it is **not** a DoD
+  endorsement of NeuroInsight as a medical device.
 - **600 × 2 timepoints** reflects study scale on the platform; individual QA and
   scientific interpretation follow TRACK-TBI and **University of Rochester / University
   of Pennsylvania** study governance.
@@ -49,5 +54,6 @@ workflow) remain subject to their **own citations and licenses** —
 
 - [How NeuroInsight works](HOW_IT_WORKS.md) — Transfer → Jobs model
 - [HPC pipeline submission](HPC_PIPELINE_SUBMISSION_GUIDE.md)
-- [URMC clinical support](CLINICAL_SUPPORT.md)
+- [URMC deployment](CLINICAL_SUPPORT.md)
+- [Research output policy](RESEARCH_OUTPUT_USE.md)
 - [Citing NeuroInsight](REFERENCES.md)

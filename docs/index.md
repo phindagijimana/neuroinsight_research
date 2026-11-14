@@ -4,8 +4,12 @@
 submit containerized analysis, monitor execution on **local Docker**, **remote
 SSH**, or **HPC/SLURM**.
 
-Developed by **Philbert Ndagijimana** with **URMC researchers and neurologists**;
-deployed at URMC as **clinical support for Radiology**.
+Developed by **Philbert Ndagijimana** with **URMC researchers and neurologists**.
+
+!!! warning "Output use"
+    **All outputs are for research use only.** They **may** be used as **clinical
+    support** only on **your responsibility** (IRB, validation, licenses) —
+    [Research output policy](RESEARCH_OUTPUT_USE.md).
 
 ## New here?
 
@@ -23,7 +27,7 @@ deployed at URMC as **clinical support for Radiology**.
 | Move data (Pennsieve, XNAT, HPC) | [Transfer guide](TRANSFER.md) |
 | Submit pipelines on HPC | [HPC pipeline layouts](HPC_PIPELINE_SUBMISSION_GUIDE.md) · [Full user guide](USER_GUIDE.md) (repo) |
 | URMC Radiology & Neurology workflows | [Use cases](USE_CASES.md) |
-| URMC deployment context | [Clinical support](CLINICAL_SUPPORT.md) |
+| URMC deployment | [URMC deployment](CLINICAL_SUPPORT.md) |
 | TRACK-TBI cohort (DoD report) | [TRACK-TBI deployment](TRACK_TBI.md) |
 | Cite methods | [References](REFERENCES.md) |
 | Extend the codebase | [Engineering overview](ENGINEERING.md) |

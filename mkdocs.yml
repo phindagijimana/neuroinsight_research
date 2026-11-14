@@ -80,8 +80,9 @@ nav:
       - Transfer: TRANSFER.md
       - HPC pipeline inputs: HPC_PIPELINE_SUBMISSION_GUIDE.md
   - Use cases & clinical:
+      - Research output policy: RESEARCH_OUTPUT_USE.md
       - URMC use cases (Radiology & Neurology): USE_CASES.md
-      - Clinical support context: CLINICAL_SUPPORT.md
+      - URMC deployment & clinical support: CLINICAL_SUPPORT.md
       - TRACK-TBI (DoD deliverable): TRACK_TBI.md
       - References & citations: REFERENCES.md
       - Tool licenses: TOOL_LICENSES.md
