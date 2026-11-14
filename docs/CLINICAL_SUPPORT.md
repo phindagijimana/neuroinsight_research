@@ -8,24 +8,28 @@ coordinating transfer, staging, and compute across local workstations,
 institutional storage (including XNAT), HPC (SLURM), and containerized analysis
 plugins.
 
-NeuroInsight does **not** replace the radiologist or neuroradiologist. It **automates
-the technical pipeline** around studies that Radiology and related services use for
-readings, research–clinical translation, and quantitative neuroimaging support.
+NeuroInsight does **not** replace radiologists, neuroradiologists, or neurologists.
+It **automates the technical pipeline** around studies that **Radiology** and
+**Neurology** use for quantitative neuroimaging support.
 
-## What runs in practice
+## Use cases (workflows)
 
-At URMC, typical uses include:
+URMC runs **multiple workflows** on NeuroInsight — **AI / deep-learning pipelines**
+and **classical** neuroimaging tools — as **clinical support** (orchestration only).
 
-| Capability | Role for Radiology |
-|------------|-------------------|
-| **Structural MRI** (FreeSurfer, FastSurfer, hippocampal subfields / SegmentHA) | Volumetry, segmentation, and longitudinal templates for interpretation support |
-| **Lesion & FCD workflows** (e.g. Cortical Lesion Detection → MELD Graph) | Quantitative surface-based analysis to support epilepsy and lesion-related reads |
-| **Hippocampal sclerosis (HS) workflow** | Asymmetry, lateralization, and QC overlays to support temporal-lobe epilepsy imaging review |
-| **Transfer + Jobs** | Move data between **local**, **HPC**, **Pennsieve**, and **URMC XNAT** (`xnat.urmc.rochester.edu`), then submit compute on staged paths without manual cluster scripting |
-| **Multimodal epilepsy biomarker workflow** (EEG + MRI) | Chained EEG/MRI steps for research and translational clinical support where multimodal evidence is needed |
+**→ [USE_CASES.md](USE_CASES.md)** — dedicated tables for **Radiology** and
+**Neurology** (workflow IDs, AI vs classical, TRACK-TBI cohort).
 
-Exact plugins and workflows in your environment match those in the **Docs** page in
-the app and the definitions under `plugins/` and `workflows/` in this repository.
+At a glance:
+
+- **Radiology:** FastSurfer / FreeSurfer, hippocampal subfields, MELD lesion
+  detection, hippocampal sclerosis, fMRI/diffusion BIDS pipelines, TRACK-TBI at scale.
+- **Neurology:** EEG epilepsy screening, EEG–MRI source localization, multimodal
+  epilepsy biomarker, tuberous sclerosis MRI chain.
+- **Platform:** Transfer + Jobs across **local**, **HPC**, **Pennsieve**, **URMC XNAT**
+  (`xnat.urmc.rochester.edu`).
+
+Plugin/workflow definitions: in-app **Docs** tab; `plugins/` and `workflows/` in this repo.
 
 ## How this relates to published documentation
 

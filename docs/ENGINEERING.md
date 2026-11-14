@@ -11,10 +11,11 @@ Apptainer**.
 
 It was **developed by Philbert Ndagijimana** in **collaboration with researchers and
 neurologists at the University of Rochester Medical Center (URMC)**, where the
-platform runs workflows that **support Radiology and related clinical services**
-(structural MRI, lesion detection, hippocampal sclerosis, multimodal epilepsy
-pipelines). See [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md) for scope and
-limitations — orchestration only; interpretation stays with clinicians.
+platform runs **AI and classical workflows** that **support URMC Radiology and
+Neurology** — [USE_CASES.md](USE_CASES.md). **TRACK-TBI:** **600 subjects × 2 timepoints** on HPC; workflow
+delivered in the **DoD technical report** — [TRACK_TBI.md](TRACK_TBI.md).
+See [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md) for scope and limitations —
+orchestration only; interpretation stays with clinicians.
 
 | | |
 |---|---|

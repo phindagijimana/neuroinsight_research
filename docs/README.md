@@ -17,7 +17,9 @@ Build: [BUILDING_DOCS.md](BUILDING_DOCS.md).
 | **Engineer / technical reviewer** | **[ENGINEERING.md](ENGINEERING.md)** |
 | **Installing the desktop app** | [INSTALL.md](INSTALL.md) |
 | **Using HPC, Pennsieve, XNAT** | [USER_GUIDE.md](USER_GUIDE.md) — start with **10-minute path** |
+| **URMC use cases (Radiology & Neurology)** | **[USE_CASES.md](USE_CASES.md)** |
 | **Clinical deployment context (URMC)** | [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md) |
+| **TRACK-TBI cohort / DoD report** | [TRACK_TBI.md](TRACK_TBI.md) |
 
 ## All guides
 
@@ -41,7 +43,8 @@ Build: [BUILDING_DOCS.md](BUILDING_DOCS.md).
 | [RELEASE_NOTES_v0.1.25.md](RELEASE_NOTES_v0.1.25.md) | Latest release summary |
 | [INSTALL.md](INSTALL.md) | Download, verify, first launch |
 | [DESKTOP_UPDATES.md](DESKTOP_UPDATES.md) | Auto-update, engine refresh |
-| [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md) | URMC Radiology support workflows |
+| [USE_CASES.md](USE_CASES.md) | URMC Radiology & Neurology workflows (AI + classical) |
+| [CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md) | URMC deployment context |
 | [REFERENCES.md](REFERENCES.md) | Citations (regenerate via `scripts/generate_references_doc.py`) |
 | [TOOL_LICENSES.md](TOOL_LICENSES.md) | FreeSurfer / MELD files |
 

@@ -7,6 +7,10 @@ the repo-root `VERSION` file (see `scripts/bump_version.py`).
 
 ## [Unreleased]
 
+### Added
+- **URMC use cases** — [docs/USE_CASES.md](docs/USE_CASES.md) (Radiology & Neurology; AI and classical workflows).
+- **TRACK-TBI** — [docs/TRACK_TBI.md](docs/TRACK_TBI.md) (600 subjects × 2 timepoints; DoD technical report deliverable).
+
 ### Changed
 - **Documentation** — slim public MkDocs nav; `docs/MAINTAINER.md`; gitignore `local/` and `clear`; removed `RELEASE_NOTES_v0.1.23.md`; fixed `TOOL_LICENSES` link.
 

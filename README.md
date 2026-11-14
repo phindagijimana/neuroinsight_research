@@ -6,12 +6,17 @@ Neuroimaging **orchestration platform**: Transfer data, submit containerized
 
 **Developed by Philbert Ndagijimana** in **collaboration with researchers and
 neurologists at the University of Rochester Medical Center (URMC)**. At URMC,
-NeuroInsight runs workflows that **support Radiology** (structural MRI, lesion
-detection, hippocampal sclerosis, multimodal epilepsy pipelines). Details:
+NeuroInsight runs **AI and classical workflows** that **support URMC Radiology and
+Neurology** — **[docs/USE_CASES.md](docs/USE_CASES.md)** (structural MRI, MELD,
+HS, EEG–MRI, multimodal epilepsy, TRACK-TBI, and more). **TRACK-TBI:**
+**600 subjects × 2 timepoints** on HPC (DoD **University of Rochester–University of
+Pennsylvania** collaboration); workflow **deliverable in the DoD technical report** —
+**[docs/TRACK_TBI.md](docs/TRACK_TBI.md)**. Details:
 **[docs/CLINICAL_SUPPORT.md](docs/CLINICAL_SUPPORT.md)**.
 
 | Reader | Start here |
 |--------|------------|
+| **URMC use cases** | **[docs/USE_CASES.md](docs/USE_CASES.md)** |
 | **What it is (product)** | **[docs/PRODUCT.md](docs/PRODUCT.md)** |
 | **Supported platforms** | **[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)** |
 | **Experienced engineer** | **[docs/ENGINEERING.md](docs/ENGINEERING.md)** |

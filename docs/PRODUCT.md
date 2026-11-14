@@ -4,8 +4,9 @@
 
 NeuroInsight is neuroimaging **orchestration software**: move data, submit
 containerized pipelines, and monitor jobs — without writing cluster scripts for
-every study. At URMC it supports **Radiology** workflows (see
-[CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md)).
+every study. At URMC it supports **Radiology** and **Neurology** clinical-support workflows
+(AI and classical pipelines) — [USE_CASES.md](USE_CASES.md),
+[CLINICAL_SUPPORT.md](CLINICAL_SUPPORT.md).
 
 ## What it is
 
@@ -35,6 +36,10 @@ Platform and architecture limits: **[COMPATIBILITY.md](COMPATIBILITY.md)**.
 
 - **Neuroradiology / neurology research** teams staging MRI, EEG, and multimodal studies
 - **Imaging scientists** submitting to institutional HPC
+- **Multi-site / cohort studies** — e.g. **TRACK-TBI** (DoD **University of
+  Rochester–University of Pennsylvania** collaboration): **600 subjects, 2 timepoints**,
+  workflow on NeuroInsight, **delivered in the TRACK-TBI DoD technical report**
+  — [TRACK_TBI.md](TRACK_TBI.md)
 - **Engineers** extending YAML plugins and connectors — [ENGINEERING.md](ENGINEERING.md)
 
 ## Version and releases
